@@ -1,0 +1,42 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ---------- Node / 前端 ----------
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# ---------- 环境变量与密钥（严禁提交）----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# ---------- 飞控与仿真原始产物（体积大，走 OBS 归档）----------
+*.ulg
+*.bag
+*.db3
+*.mcap
+logs/
+logs_*/
+
+# ---------- 结果目录：CSV 属于证据，必须进版本库 ----------
+# 只忽略中间产物
+results/*.tmp
+results/meta/
+
+# ---------- 系统 ----------
+.DS_Store
+Thumbs.db
+desktop.ini

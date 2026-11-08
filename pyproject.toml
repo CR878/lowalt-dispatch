@@ -1,0 +1,15 @@
+# 只放工具配置，不声明可安装包 —— 克隆下来直接 `python -m eval.run` 就能跑，
+# 不要求先 pip install -e .（三个学生每天 2—3 小时，少一步失败就少一次放弃）。
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]

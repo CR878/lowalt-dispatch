@@ -1,0 +1,17 @@
+# 统一换行符，避免 Windows 开发 + Linux 容器部署时整文件 diff
+* text=auto eol=lf
+
+# Windows 脚本必须保留 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制，不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.mp4 binary
+*.ulg binary
+*.bag binary
+*.db3 binary
+*.mcap binary

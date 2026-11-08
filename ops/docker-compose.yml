@@ -1,0 +1,58 @@
+# 云边拓扑（开发 / 断连演示）
+#
+# 设计要点：边缘 agent 同时接入两张网络
+#
+#     cloud-api ── cloud_link ── mosquitto ── cloud_link ── edge-agent
+#                                                              │
+#                                                       flight_control
+#                                                              │
+#                                                         sitl / 飞控
+#
+# 演示"云端断连"时，只摘掉边缘容器的 cloud_link，flight_control 不动：
+#
+#     docker network disconnect lowalt_cloud_link lowalt-edge-agent
+#     docker network connect    lowalt_cloud_link lowalt-edge-agent
+#
+# 这样演示的是**真的网络断开**，而边缘对飞控的控制链路仍然在——
+# 正好对应"云端任务链接中断 ≠ GPS/飞控/遥控同时失效"这句话。
+#
+# 不要拿 `docker pause mosquitto` 单独当"网络物理断开"来宣传：
+# 那只是 Broker 进程被暂停，客户端多久判定失效取决于 Keep Alive 和超时，
+# 属于 Broker 故障用例，不是链路断开用例。
+
+name: lowalt
+
+networks:
+  cloud_link:
+    name: lowalt_cloud_link
+  flight_control:
+    name: lowalt_flight_control
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: lowalt-mosquitto
+    # 镜像 tag 与可用性在 11/09 的 SWR 预检里实测确认，不默认 Docker Hub 可达
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    networks:
+      - cloud_link
+
+  # ---- 以下两个服务在 11/12 起接入，先把 Dockerfile 写出来再取消注释 ----
+  #
+  # cloud-api:
+  #   build: ../services/api
+  #   container_name: lowalt-cloud-api
+  #   env_file: ../.env
+  #   networks: [cloud_link]
+  #
+  # edge-agent:
+  #   build: ../edge
+  #   container_name: lowalt-edge-agent
+  #   depends_on: [mosquitto]
+  #   networks:
+  #     - cloud_link        # 断开这张网 = 云端断连
+  #     - flight_control    # 这张网必须保留

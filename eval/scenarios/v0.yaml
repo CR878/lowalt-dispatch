@@ -1,0 +1,281 @@
+# 评测场景集 v0 —— 20 个任务样例（S1×5 / S2×5 / S3×5 / S4×5）
+#
+# 坐标约定
+#   局部 ENU 米制坐标，场景范围 3000 m × 3000 m，原点对应哪块地由 B 在
+#   docs/接口契约.md 里定（11/10 前）。v0 只做结构验证，不接真实地理底图，
+#   因此这里刻意不写经纬度 —— 坐标基准没确认前不该出现两种坐标并存。
+#
+# 数值来源
+#   payload_kg / time_limit_s 是"任务设计参数"，属于场景定义，可以直接改。
+#   机型能力、电池容量、速度、爬升率等**平台参数不在这里**，见
+#   scenarios/vehicles/placeholder.yaml，当前全部待定，禁止套用通用数值。
+#
+# events[].at_s 是相对任务开始的秒数，不是墙上时间。这样脚本可以脱离具体日期复用。
+
+suite_version: 0
+schema_version: "0.1.0"
+
+vehicle_ref: scenarios/vehicles/placeholder.yaml
+default_seeds: [1, 2, 3]
+
+scenarios:
+  # ---------------- S1 正常配送 ----------------
+  - id: S1-01
+    cls: S1
+    title: 正常配送 · 对角线基准
+    origin: {x_m: 150, y_m: 150, alt_m: 0}
+    destination: {x_m: 2650, y_m: 2750, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 600
+    wind_profile: calm
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  - id: S1-02
+    cls: S1
+    title: 正常配送 · 反向对角线
+    origin: {x_m: 200, y_m: 2800, alt_m: 0}
+    destination: {x_m: 2800, y_m: 200, alt_m: 25}
+    payload_kg: 0.8
+    time_limit_s: 700
+    wind_profile: calm
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  - id: S1-03
+    cls: S1
+    title: 正常配送 · 短程重载
+    origin: {x_m: 400, y_m: 400, alt_m: 0}
+    destination: {x_m: 2400, y_m: 1600, alt_m: 40}
+    payload_kg: 1.5
+    time_limit_s: 550
+    wind_profile: headwind_light
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  - id: S1-04
+    cls: S1
+    title: 正常配送 · 南北向
+    origin: {x_m: 1500, y_m: 150, alt_m: 0}
+    destination: {x_m: 1500, y_m: 2850, alt_m: 30}
+    payload_kg: 0.5
+    time_limit_s: 480
+    wind_profile: calm
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  - id: S1-05
+    cls: S1
+    title: 正常配送 · 满载大半径
+    origin: {x_m: 800, y_m: 2200, alt_m: 0}
+    destination: {x_m: 2200, y_m: 800, alt_m: 35}
+    payload_kg: 2.0
+    time_limit_s: 800
+    wind_profile: crosswind
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  # ---------------- S2 动态改线（限制区事件） ----------------
+  - id: S2-01
+    cls: S2
+    title: 改线 · 起飞后 40 s 限制区生效
+    origin: {x_m: 300, y_m: 300, alt_m: 0}
+    destination: {x_m: 2700, y_m: 2700, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 700
+    wind_profile: calm
+    link_profile: nominal
+    events:
+      - {kind: restriction_zone, at_s: 40, zone_id: R01}
+    landing_site_changes: []
+
+  - id: S2-02
+    cls: S2
+    title: 改线 · 起飞后 20 s 限制区生效
+    origin: {x_m: 250, y_m: 500, alt_m: 0}
+    destination: {x_m: 2750, y_m: 2500, alt_m: 30}
+    payload_kg: 1.2
+    time_limit_s: 700
+    wind_profile: headwind_light
+    link_profile: nominal
+    events:
+      - {kind: restriction_zone, at_s: 20, zone_id: R02}
+    landing_site_changes: []
+
+  - id: S2-03
+    cls: S2
+    title: 改线 · 90 s 才生效（可能已进入区域）
+    origin: {x_m: 400, y_m: 2600, alt_m: 0}
+    destination: {x_m: 2600, y_m: 400, alt_m: 30}
+    payload_kg: 0.9
+    time_limit_s: 650
+    wind_profile: calm
+    link_profile: nominal
+    events:
+      - {kind: restriction_zone, at_s: 90, zone_id: R03}
+    landing_site_changes: []
+
+  - id: S2-04
+    cls: S2
+    title: 改线 · 起飞前已知限制区
+    origin: {x_m: 500, y_m: 1500, alt_m: 0}
+    destination: {x_m: 2500, y_m: 1500, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 600
+    wind_profile: calm
+    link_profile: nominal
+    events:
+      - {kind: restriction_zone, at_s: 0, zone_id: R01}
+    landing_site_changes: []
+
+  - id: S2-05
+    cls: S2
+    title: 改线 · 150 s 生效 + 逆风
+    origin: {x_m: 200, y_m: 2000, alt_m: 0}
+    destination: {x_m: 2800, y_m: 1000, alt_m: 30}
+    payload_kg: 1.4
+    time_limit_s: 750
+    wind_profile: headwind_strong
+    link_profile: nominal
+    events:
+      - {kind: restriction_zone, at_s: 150, zone_id: R02}
+    landing_site_changes: []
+
+  # ---------------- S3 通信退化与本地处置 ----------------
+  - id: S3-01
+    cls: S3
+    title: 链路退化 · 30 s 起持续 90 s
+    origin: {x_m: 350, y_m: 350, alt_m: 0}
+    destination: {x_m: 2650, y_m: 2650, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 700
+    wind_profile: calm
+    link_profile: intermittent
+    events:
+      - {kind: link_degradation, at_s: 30, duration_s: 90, severity: degraded}
+    landing_site_changes: []
+
+  - id: S3-02
+    cls: S3
+    title: 链路中断 · 60 s 起持续 120 s
+    origin: {x_m: 300, y_m: 2700, alt_m: 0}
+    destination: {x_m: 2700, y_m: 300, alt_m: 30}
+    payload_kg: 0.8
+    time_limit_s: 700
+    wind_profile: calm
+    link_profile: intermittent
+    events:
+      - {kind: link_degradation, at_s: 60, duration_s: 120, severity: outage}
+    landing_site_changes: []
+
+  - id: S3-03
+    cls: S3
+    title: 断连期间限制区生效（消息到不了）
+    origin: {x_m: 600, y_m: 600, alt_m: 0}
+    destination: {x_m: 2400, y_m: 2400, alt_m: 35}
+    payload_kg: 1.1
+    time_limit_s: 700
+    wind_profile: headwind_light
+    link_profile: intermittent
+    events:
+      - {kind: link_degradation, at_s: 50, duration_s: 120, severity: outage}
+      - {kind: restriction_zone, at_s: 80, zone_id: R03}
+    landing_site_changes: []
+
+  - id: S3-04
+    cls: S3
+    title: 断连 + 备降点失效同时发生
+    origin: {x_m: 400, y_m: 1200, alt_m: 0}
+    destination: {x_m: 2600, y_m: 1800, alt_m: 30}
+    payload_kg: 1.3
+    time_limit_s: 720
+    wind_profile: calm
+    link_profile: intermittent
+    events:
+      - {kind: link_degradation, at_s: 40, duration_s: 100, severity: outage}
+    landing_site_changes:
+      - {site_id: L2, at_s: 45, change: closed}
+
+  - id: S3-05
+    cls: S3
+    title: 恢复后版本核对（长断连）
+    origin: {x_m: 500, y_m: 2500, alt_m: 0}
+    destination: {x_m: 2500, y_m: 500, alt_m: 30}
+    payload_kg: 0.7
+    time_limit_s: 800
+    wind_profile: crosswind
+    link_profile: intermittent
+    events:
+      - {kind: link_degradation, at_s: 30, duration_s: 180, severity: outage}
+    landing_site_changes: []
+
+  # ---------------- S4 任务不可行 ----------------
+  - id: S4-01
+    cls: S4
+    title: 不可行 · 载荷超出机型能力
+    origin: {x_m: 400, y_m: 400, alt_m: 0}
+    destination: {x_m: 2600, y_m: 2600, alt_m: 30}
+    payload_kg: 6.0
+    time_limit_s: 900
+    wind_profile: calm
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  - id: S4-02
+    cls: S4
+    title: 不可行 · 时限过紧
+    origin: {x_m: 200, y_m: 200, alt_m: 0}
+    destination: {x_m: 2800, y_m: 2800, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 90
+    wind_profile: calm
+    link_profile: nominal
+    events: []
+    landing_site_changes: []
+
+  - id: S4-03
+    cls: S4
+    title: 不可行 · 全部备降点关闭
+    origin: {x_m: 300, y_m: 1500, alt_m: 0}
+    destination: {x_m: 2700, y_m: 1500, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 600
+    wind_profile: calm
+    link_profile: nominal
+    events: []
+    landing_site_changes:
+      - {site_id: L1, at_s: 0, change: closed}
+      - {site_id: L2, at_s: 0, change: closed}
+      - {site_id: L3, at_s: 0, change: closed}
+      - {site_id: L4, at_s: 0, change: closed}
+
+  - id: S4-04
+    cls: S4
+    title: 不可行 · 目的地被限制区覆盖
+    origin: {x_m: 500, y_m: 500, alt_m: 0}
+    destination: {x_m: 2500, y_m: 2500, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 600
+    wind_profile: calm
+    link_profile: nominal
+    events:
+      - {kind: restriction_zone, at_s: 0, zone_id: R04}
+    landing_site_changes: []
+
+  - id: S4-05
+    cls: S4
+    title: 不可行 · 初始能量低于保留量
+    origin: {x_m: 1500, y_m: 200, alt_m: 0}
+    destination: {x_m: 1500, y_m: 2800, alt_m: 30}
+    payload_kg: 1.0
+    time_limit_s: 900
+    wind_profile: headwind_strong
+    link_profile: nominal
+    events: []
+    landing_site_changes: []

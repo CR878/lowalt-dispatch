@@ -1,0 +1,38 @@
+# 机型平台参数 —— 当前全部待定（这是故意的，不是漏写）
+#
+# 为什么空着：
+#   交付计划 4.1 与课题细化 7.2 都写了同一句话——机型载重、速度、爬升能力和电量阈值
+#   必须"由你们已有平台参数确定，不直接套用通用数值"。这是全项目最容易出幻觉的地方：
+#   随便填一组"看起来合理"的数，后面每一个能量结论、每一条备降余量曲线都会变成假的，
+#   而且没人看得出来。宁可空着。
+#
+# 谁来填：学生 A，11/10 前，按实际机体/飞控手册或日志标定结果补齐。
+# 现在的影响：没有。harness 的 mock 规划器不读这个文件，所以管道照样能跑。
+#             接真实规划器（B 的任务）之前必须填完，否则只能继续用 mock。
+
+vehicle_schema_version: 0
+
+vehicles:
+  placeholder:
+    display_name: "待定 · 由 A 按实际平台填写"
+    platform_note: "PX4 还是 ArduPilot 尚未确认；确认后在此注明型号与固件版本"
+
+    # ---------- 以下全部必需，null = 未定，禁止先用估算值顶替 ----------
+    max_payload_kg: null            # 最大载荷（kg）
+    cruise_speed_mps: null          # 巡航速度（m/s）
+    climb_rate_mps: null            # 最大爬升率（m/s）
+    descent_rate_mps: null          # 最大下降率（m/s）
+    max_bank_deg: null              # 最大倾角（deg），影响转弯半径
+    service_ceiling_m: null         # 实用升限（m，说明基准）
+
+    # ---------- 能量相关：备降余量全靠这几个数，必须标定 ----------
+    battery_capacity_wh: null       # 电池标称总能量（Wh）
+    usable_battery_wh: null         # 实际可用能量（Wh）—— 不是标称容量
+    energy_per_meter_wh: null       # 巡航单位距离能耗（Wh/m）
+    energy_per_second_hover_wh: null  # 悬停单位时间能耗（Wh/s）
+    reserve_policy_wh: null         # 策略保留量 E_reserve（Wh）
+
+    # ---------- 溯源 ----------
+    source: null                    # 手册 / 日志标定 / 受控实测，写清楚
+    calibrated_at: null             # 标定日期
+    uncertainty_note: null          # 上述数值的误差范围，定性描述也可以
