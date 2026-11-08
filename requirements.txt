@@ -2,12 +2,12 @@
 # 安装：python -m venv .venv && .venv/Scripts/python -m pip install -r requirements.txt
 pydantic>=2.5
 pyyaml>=6.0
+numpy>=1.26
 pytest>=8.0
 
 # ---- 以下等真正用到时再取消注释，避免一开始装一堆用不上的包 ----
 # fastapi>=0.115
 # uvicorn[standard]>=0.30
-# numpy>=1.26
 # shapely>=2.0
 # networkx>=3.2
 # pyproj>=3.6

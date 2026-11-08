@@ -1,0 +1,168 @@
+{
+  "type": "FeatureCollection",
+  "crs_note": "局部 ENU 米制坐标（x 向东，y 向北，原点待定），不是经纬度。转 WGS84 前不得用于地图渲染。",
+  "status": "draft",
+  "note": "草稿几何：参考实现生成，B 必须按设计意图复核或重画",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1000,
+              1200
+            ],
+            [
+              1400,
+              1200
+            ],
+            [
+              1400,
+              1700
+            ],
+            [
+              1000,
+              1700
+            ],
+            [
+              1000,
+              1200
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "R01",
+        "kind": "restriction_zone",
+        "alt_min_m": 0,
+        "alt_max_m": 120,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "压在左下→右上的主对角走廊；S2-04 直线必经"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              1600,
+              700
+            ],
+            [
+              2000,
+              700
+            ],
+            [
+              2000,
+              1100
+            ],
+            [
+              1600,
+              1100
+            ],
+            [
+              1600,
+              700
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "R02",
+        "kind": "restriction_zone",
+        "alt_min_m": 0,
+        "alt_max_m": 120,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "压在中部横向走廊；S2-02/S2-05 直线必穿"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              900,
+              1800
+            ],
+            [
+              1300,
+              1800
+            ],
+            [
+              1300,
+              2200
+            ],
+            [
+              900,
+              2200
+            ],
+            [
+              900,
+              1800
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "R03",
+        "kind": "restriction_zone",
+        "alt_min_m": 0,
+        "alt_max_m": 120,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "压在另一条斜向走廊；给 S2-01/S3-03 一条要绕的路"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2445,
+              2445
+            ],
+            [
+              2555,
+              2445
+            ],
+            [
+              2555,
+              2555
+            ],
+            [
+              2445,
+              2555
+            ],
+            [
+              2445,
+              2445
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "id": "R04",
+        "kind": "restriction_zone",
+        "alt_min_m": 0,
+        "alt_max_m": 120,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "盖住 S4-04 目的地 (2500,2500)，验证'目的地被禁=不可行'；故意收小以免碰 S3-03/S4-01 终点（各距 64m）"
+      }
+    }
+  ]
+}

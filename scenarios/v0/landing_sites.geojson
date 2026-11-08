@@ -1,0 +1,108 @@
+{
+  "type": "FeatureCollection",
+  "crs_note": "局部 ENU 米制坐标（x 向东，y 向北，原点待定），不是经纬度。转 WGS84 前不得用于地图渲染。",
+  "status": "draft",
+  "note": "草稿几何：参考实现生成，B 必须按设计意图复核或重画",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          700,
+          700
+        ]
+      },
+      "properties": {
+        "id": "L1",
+        "kind": "landing_site",
+        "radius_m": 30,
+        "compatible_vehicle_types": [
+          "placeholder"
+        ],
+        "occupied": false,
+        "available_from": null,
+        "available_until": null,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "起点侧后方，方便短程任务就近退出"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          1900,
+          1900
+        ]
+      },
+      "properties": {
+        "id": "L2",
+        "kind": "landing_site",
+        "radius_m": 30,
+        "compatible_vehicle_types": [
+          "placeholder"
+        ],
+        "occupied": false,
+        "available_from": null,
+        "available_until": null,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "城区中部，唯一真正的中段备降点——没有它备降约束就形同虚设"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2700,
+          700
+        ]
+      },
+      "properties": {
+        "id": "L3",
+        "kind": "landing_site",
+        "radius_m": 30,
+        "compatible_vehicle_types": [
+          "placeholder"
+        ],
+        "occupied": false,
+        "available_from": null,
+        "available_until": null,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "右下角，覆盖东南向航段"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          700,
+          2700
+        ]
+      },
+      "properties": {
+        "id": "L4",
+        "kind": "landing_site",
+        "radius_m": 30,
+        "compatible_vehicle_types": [
+          "placeholder"
+        ],
+        "occupied": false,
+        "available_from": null,
+        "available_until": null,
+        "is_simulated": true,
+        "status": "draft",
+        "source": "自建虚拟城区 v0",
+        "design_intent": "左上角，覆盖西北向航段"
+      }
+    }
+  ]
+}
