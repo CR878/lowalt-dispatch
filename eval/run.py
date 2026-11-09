@@ -27,12 +27,14 @@ import json
 import platform
 import subprocess
 import sys
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
+from core.console import ensure_utf8_stdout
 from eval import planners
 
 REQUIRED_SCENARIO_KEYS = ("id", "cls", "origin", "destination", "payload_kg")
@@ -111,6 +113,7 @@ def _load_suite(path: Path) -> dict[str, Any]:
 # 主流程
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
         prog="python -m eval.run",
         description="低空项目评测 harness（v0：mock 跑通管道）",
@@ -156,7 +159,7 @@ def main(argv: list[str] | None = None) -> int:
 
     meta = {
         "run_mode": "mock" if is_mock else "real",
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "suite_path": str(args.suite).replace("\\", "/"),
         "suite_sha256": _sha256_of(args.suite),
         "scenario_count": len(suite["scenarios"]),
@@ -178,8 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  MOCK 运行 —— 这些数字不是结果，只证明管道能跑通")
         print("  真实评测必须由 B 接上规划器后重跑，并确认 run_mode=real")
     print("=" * 64)
-    print(f"场景 {meta['scenario_count']} × 种子 {len(seeds)} × 算法 {len(algo_names)}"
-          f" = {len(rows)} 行")
+    print(f"场景 {meta['scenario_count']} × 种子 {len(seeds)} × 算法 {len(algo_names)} = {len(rows)} 行")
     print(f"CSV  → {out_path}")
     print(f"meta → {meta_path}")
 

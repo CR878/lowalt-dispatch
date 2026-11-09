@@ -204,7 +204,9 @@ class DiversionMarginSample(BaseModel):
     s_m: float = Field(ge=0, description="沿航线累计距离")
     t_s: float = Field(ge=0, description="预计飞行时间")
     margin_wh: float = Field(description="E_left - E_reserve - E_need_to_nearest_valid_landing，单位 Wh")
-    nearest_site_id: str | None = Field(default=None, description="该采样点最近的可用备降点；None 表示无有效退出路径")
+    nearest_site_id: str | None = Field(
+        default=None, description="该采样点最近的可用备降点；None 表示无有效退出路径"
+    )
 
 
 class DiversionMarginProfile(BaseModel):
@@ -242,7 +244,9 @@ class RoutePlan(BaseModel):
     algorithm: str = Field(description="例如 'astar_static', 'astar_diversion_aware'")
     waypoints: list[Position] = Field(min_length=2)
     energy_budget_wh: float = Field(gt=0)
-    diversion_site_id: str | None = Field(default=None, description="主备降点；None 表示规划时未找到有效退出方案")
+    diversion_site_id: str | None = Field(
+        default=None, description="主备降点；None 表示规划时未找到有效退出方案"
+    )
     valid_until: datetime | None = None
     checks: list[ConstraintCheck] = Field(
         default_factory=list,
@@ -276,7 +280,9 @@ class VehicleState(BaseModel):
     ts: datetime
     position: Position
     groundspeed_mps: float | None = None
-    energy_remaining_wh: float | None = Field(default=None, description="飞控能给出的估计值；拿不到就留 None，不要拿 SOC 硬换算")
+    energy_remaining_wh: float | None = Field(
+        default=None, description="飞控能给出的估计值；拿不到就留 None，不要拿 SOC 硬换算"
+    )
     flight_mode: str = Field(description="飞控原始模式名，如 'AUTO.MISSION', 'AUTO.LOITER'")
     gps_fix: str | None = Field(default=None, description="定位质量，如 '3d_fix', 'rtk_fixed'；未知留 None")
     link_quality_pct: float | None = Field(default=None, ge=0, le=100, description="云边链路质量采样值")

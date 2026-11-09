@@ -12,6 +12,7 @@ from agent.cache import FallbackCache
 from agent.edge_decisions import EdgeDecisionAgent
 from agent.engine import TaskAgent
 from agent.fixtures import FixtureTools, fixture_task
+from core.console import ensure_utf8_stdout
 from core.models import PlanAck, PlanCommand
 
 SCENARIOS = (
@@ -30,6 +31,7 @@ SCENARIOS = (
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
         description="M3 MOCK decisions only; no flight or safety performance claims"
     )

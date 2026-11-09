@@ -24,8 +24,14 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - run: python -m pip install -r requirements.txt ruff
+      # pytest 单独开 UTF-8：失败信息里一旦出现中文，cp1252 的控制台连报错都打不出来。
       - run: python -m pytest
-      - run: python -m ruff check agent validator planner sim core tests
-      - run: python -m ruff format --check agent validator
+        env:
+          PYTHONUTF8: "1"
+      # 下面几步**故意不设** PYTHONUTF8：让 Windows runner 的真实 cp1252 控制台暴露问题。
+      # 2026-11-09 的 CI 就是在这里红的（validator 打印中文 → UnicodeEncodeError），
+      # 修复在 core/console.py；tests/test_cli_encoding.py 守着它。
+      - run: python -m ruff check agent validator planner sim core tests tools eval
+      - run: python -m ruff format --check agent validator core planner tools
       - run: python -m agent.demo --scenario all
       - run: python -m validator

@@ -18,6 +18,7 @@ from __future__ import annotations
 import sys
 from datetime import UTC, datetime
 
+from core.console import ensure_utf8_stdout
 from planner.assemble import build_snapshot, build_task, route_from_path
 from planner.astar import plan_scenario
 from planner.scene import load_scene, load_suite
@@ -67,6 +68,7 @@ def _run(scenario: dict, scene, profile: VehicleProfile | None):
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     args = argv if argv is not None else sys.argv[1:]
     wanted = set(args)
 

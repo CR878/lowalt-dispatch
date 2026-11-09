@@ -19,6 +19,7 @@ import math
 import time
 from dataclasses import dataclass, field
 
+from core.console import ensure_utf8_stdout
 from core.geometry import polyline_length
 from planner.grid import DEFAULT_CLEARANCE_M, DEFAULT_RES_M, Grid, build_grid, snap_to_free
 from planner.scene import endpoint_xy, load_scene, load_suite, zones_known_at_t0
@@ -74,7 +75,12 @@ def plan(
     snapped = s != grid.to_ij(*start_xy) or g != grid.to_ij(*goal_xy)
 
     if s == g:
-        return done(found=True, waypoints=[start_xy, goal_xy], length_m=polyline_length([start_xy, goal_xy]), snapped=snapped)
+        return done(
+            found=True,
+            waypoints=[start_xy, goal_xy],
+            length_m=polyline_length([start_xy, goal_xy]),
+            snapped=snapped,
+        )
 
     counter = itertools.count()
     open_heap: list[tuple[float, float, int, int, int]] = [(0.0, 0.0, next(counter), s[0], s[1])]
@@ -100,13 +106,17 @@ def plan(
             pts[0] = start_xy
             pts[-1] = goal_xy
             return done(
-                found=True, waypoints=pts, length_m=polyline_length(pts),
-                nodes_expanded=expanded, snapped=snapped,
+                found=True,
+                waypoints=pts,
+                length_m=polyline_length(pts),
+                nodes_expanded=expanded,
+                snapped=snapped,
             )
 
         if expanded >= max_expand:
-            return done(found=False, nodes_expanded=expanded,
-                        reason=f"超出扩展上限 {max_expand} 个节点，放弃")
+            return done(
+                found=False, nodes_expanded=expanded, reason=f"超出扩展上限 {max_expand} 个节点，放弃"
+            )
 
         for dy, dx, step in NEIGHBORS:
             ny, nx = iy + dy, ix + dx
@@ -152,6 +162,7 @@ def plan_scenario(
 # CLI
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     import sys
 
     args = argv if argv is not None else sys.argv[1:]
@@ -186,8 +197,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"{detour * 100:>7.0f}%{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  —"
             )
         else:
-            print(f"{sc['id']:<9}{'否':>6}{'-':>9}{straight:>9.0f}{'-':>8}"
-                  f"{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  {res.reason}")
+            print(
+                f"{sc['id']:<9}{'否':>6}{'-':>9}{straight:>9.0f}{'-':>8}"
+                f"{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  {res.reason}"
+            )
 
     print("-" * 78)
     print(f"找到路线 {n_found}/{total}")

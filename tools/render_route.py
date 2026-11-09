@@ -17,6 +17,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from core.console import ensure_utf8_stdout
 from planner.astar import plan_scenario
 from planner.scene import load_scene, load_suite
 
@@ -163,6 +164,7 @@ def render(scenario_id: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     args = argv if argv is not None else sys.argv[1:]
     if not args:
         raise SystemExit(__doc__)
