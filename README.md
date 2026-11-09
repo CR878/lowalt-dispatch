@@ -15,11 +15,12 @@ v0.1 —— 骨架 + 一条能跑通的评测管道。
 - `core/geometry.py` —— 几何原语（只做数学，不做判定）
 - `planner/` —— 栅格化 + A\* 基线，能真的在草稿城区里算出一条不穿楼的路线
 - `sim/energy.py` —— 能量模型；**机型参数不填就直接报错，不给你一个像样的错数字**
-- `agent/` —— M3规则驱动任务决策、工具审计、云边备用选择与恢复对账；[运行与接口说明](agent/README.md)。可运行MOCK联调，尚未接MaaS、真实校验器和飞控
+- `validator/` —— **独立校验器**：只读航线航点，按自己的采样重新判净空、限制区（按生效时刻）、载荷、能量、备降可达性
+- `agent/` —— M3 决策内核、工具审计、云边备用选择与恢复对账；[运行与接口说明](agent/README.md)。MOCK 联调，尚未接 MaaS、真实消息通道和飞控
 - `eval/` —— 评测 harness，一条命令跑 20 场景 × 3 种子 × 3 算法，产出带溯源 meta 的 CSV
-- `tests/` —— 24 个测试，保证数据不合约定时立刻炸而不是静默出错
+- `tests/` —— 124 个测试，保证数据不合约定时立刻炸而不是静默出错
 
-**没有的**：备降余量计算与搜索剪枝、独立校验器、飞控连接、云端部署、前端页面、机型参数。
+**没有的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控连接、云端部署、前端页面、机型参数。
 准确进度只看 [`事实文档.md`](事实文档.md)，别信 README 的乐观描述。
 
 ## 快速开始
@@ -32,14 +33,17 @@ python -m venv .venv
 # A* 基线：在草稿城区里给 20 个任务各算一条路线
 .venv/Scripts/python -m planner.astar
 
-# 跑评测管道（当前三个算法仍是 mock）
+# 独立校验器：拿 20 条基线航线跑五项检查
+.venv/Scripts/python -m validator
+
+# 评测 harness（三个算法仍是 mock）
 .venv/Scripts/python -m eval.run --suite eval/scenarios/v0.yaml --seeds 1,2,3 --out results/v0.csv
+
+# M3 决策内核（MOCK 联调）
+.venv/Scripts/python -m agent.demo --scenario all
 
 # 跑测试
 .venv/Scripts/python -m pytest
-
-# M3工具决策与异常场景（MOCK，不是飞行/安全效果评测）
-.venv/Scripts/python -m agent.demo --scenario all
 ```
 
 预期输出：
@@ -57,9 +61,10 @@ meta → results\v0_MOCK.meta.json
 
 ```
 core/            数据契约 + 几何原语（A/B/C 共用，改这里必须同步 docs/接口契约.md）
-planner/         栅格化 + A* 基线（M2）
+planner/         栅格化 + A* 基线 + 场景装配（M2）
 sim/             能量模型（M2）—— 机型参数不填就报错
-agent/           M3任务决策与云边决策内核；当前使用MOCK工具联调
+validator/       独立校验器（M2）—— 只读航点，自己重新采样复算
+agent/           M3 任务决策与云边决策内核；当前使用 MOCK 工具联调
 eval/            评测 harness + 场景集
   scenarios/     20 个任务样例（v0.yaml）
 scenarios/v0/    草稿几何：建筑 / 限制区 / 备降点 —— 待 B 复核或重画
@@ -77,8 +82,8 @@ results/         评测产物；真实结果在冻结时提交，mock 永不入�
 | 角色 | 第一件事 | 卡点 |
 |---|---|---|
 | A · 飞控与仿真 | PX4 SITL 起得来、读到位置/状态 | 填 `scenarios/vehicles/placeholder.yaml` 的 `null`——**它卡着所有能量计算** |
-| B · 规划与数据 | 复核 `scenarios/v0/` 草稿几何的设计意图；把备降余量做进 A\* 搜索 | 机型参数（来自 A） |
-| C · 平台与智能体 | ECS 最小部署 + SWR 镜像预检；FastAPI 骨架 | 云账号与安全组 |
+| B · 规划与数据 | 复核 `scenarios/v0/` 草稿几何的设计意图；把备降余量做进 A\* **搜索**（`astar_diversion`） | 机型参数（来自 A） |
+| C · 平台与智能体 | ECS 最小部署 + SWR 镜像预检；FastAPI 骨架；把 `validator` 接进 `AgentTools.verify_route` | 云账号与安全组 |
 
 ## 表述红线
 

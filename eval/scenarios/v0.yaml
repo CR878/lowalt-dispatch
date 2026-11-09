@@ -275,6 +275,9 @@ scenarios:
     destination: {x_m: 1500, y_m: 2800, alt_m: 30}
     payload_kg: 1.0
     time_limit_s: 900
+    # 起飞时电量是任务级输入（调度员看得到电池状态），不是机型参数，
+    # 所以可以写在场景里。这里的 50 Wh 低于策略保留量，任务在起飞前就不可行。
+    initial_energy_wh: 50.0
     wind_profile: headwind_strong
     link_profile: nominal
     events: []

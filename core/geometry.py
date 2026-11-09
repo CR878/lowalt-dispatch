@@ -67,6 +67,30 @@ def polygon_bbox(poly: Polygon) -> tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs), max(ys)
 
 
+def _dist_point_to_segment(px: float, py: float, ax: float, ay: float, bx: float, by: float) -> float:
+    dx, dy = bx - ax, by - ay
+    seg2 = dx * dx + dy * dy
+    if seg2 == 0.0:
+        return ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / seg2))
+    return ((px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2) ** 0.5
+
+
+def distance_point_to_polygon(x: float, y: float, poly: Polygon) -> float:
+    """点到多边形边界的最小距离；点在多边形内部时返回 0（内部视为距离零）。
+
+    校验器用它来判断安全净空。注意这类"距离"是几何事实，
+    至于"小于多少算违规"是判定，必须由调用方自己定。
+    """
+    if point_in_polygon(x, y, poly):
+        return 0.0
+    n = len(poly)
+    return min(
+        _dist_point_to_segment(x, y, poly[k][0], poly[k][1], poly[(k + 1) % n][0], poly[(k + 1) % n][1])
+        for k in range(n)
+    )
+
+
 def bbox_overlap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> bool:
     return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
 

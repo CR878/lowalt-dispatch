@@ -112,6 +112,12 @@ def plan(
             ny, nx = iy + dy, ix + dx
             if not grid.free(ny, nx):
                 continue
+            if dy and dx:
+                # 禁止切角：对角移动要求两个正交邻格也可用。
+                # 否则两个单元中心之间的直线会擦着障碍拐角过去，
+                # 栅格里看着"没碰"，连续几何里已经侵入净空。
+                if not grid.free(iy + dy, ix) or not grid.free(iy, ix + dx):
+                    continue
             nxt = (ny, nx)
             if nxt in closed:
                 continue
