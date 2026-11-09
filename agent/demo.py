@@ -8,10 +8,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
+from agent.cache import FallbackCache
 from agent.edge_decisions import EdgeDecisionAgent
 from agent.engine import TaskAgent
 from agent.fixtures import FixtureTools, fixture_task
-from core.models import PlanCommand
+from core.models import PlanAck, PlanCommand
 
 SCENARIOS = (
     "normal",
@@ -23,6 +24,8 @@ SCENARIOS = (
     "mismatched_ack",
     "fallback",
     "reconnect",
+    "recovery",
+    "cached_fallback",
 )
 
 
@@ -41,27 +44,51 @@ def main(argv: list[str] | None = None) -> int:
     for scenario in selected:
         tools = FixtureTools(scenario)
         log = output / f"{scenario}_MOCK.jsonl"
-        if scenario in ("fallback", "reconnect"):
+        if scenario in ("fallback", "reconnect", "cached_fallback"):
             task, observation, candidate = tools.fallback_fixture()
             # Fixture construction is not an orchestration planning call.
             tools.requests.clear()
             tools.verifications.clear()
-            edge = EdgeDecisionAgent(tools, log)
-            if scenario == "fallback":
-                result = edge.choose_fallback(task, observation, [candidate])
-            else:
-                now = datetime.now(UTC)
-                command = PlanCommand(
-                    command_id="MOCK-CMD-v2",
-                    task_id=task.task_id,
-                    plan_version="v2",
-                    issued_at=now,
-                    expires_at=now + timedelta(seconds=30),
-                )
-                result = edge.reconcile(task.task_id, command, observation)
+            with EdgeDecisionAgent(tools, log) as edge:
+                if scenario == "cached_fallback":
+                    cache = FallbackCache(output / "fallback_cache_MOCK.json")
+                    cache.save(task, [candidate], run_mode="mock", expected_revision=0)
+                    loaded = cache.load(task_id=task.task_id, run_mode="mock")
+                    result = edge.choose_fallback(task, observation, loaded.candidates)
+                elif scenario == "fallback":
+                    result = edge.choose_fallback(task, observation, [candidate])
+                else:
+                    now = datetime.now(UTC)
+                    command = PlanCommand(
+                        command_id="MOCK-CMD-v2",
+                        task_id=task.task_id,
+                        plan_version="v2",
+                        issued_at=now,
+                        expires_at=now + timedelta(seconds=30),
+                    )
+                    result = edge.reconcile(task.task_id, command, observation)
             status, reason = result.action, result.reason
+        elif scenario == "recovery":
+            tools.scenario = "ack_timeout"
+            with TaskAgent(tools, log) as agent:
+                pending = agent.run(fixture_task(datetime.now(UTC)))
+            with TaskAgent.restore(tools, log) as restored:
+                command = pending.command
+                assert command is not None
+                result = restored.accept_ack(
+                    PlanAck(
+                        command_id=command.command_id,
+                        task_id=command.task_id,
+                        plan_version=command.plan_version,
+                        received_at=datetime.now(UTC),
+                        accepted=True,
+                        fc_mode="MOCK-NO-FLIGHT-CONTROLLER",
+                    )
+                )
+            status, reason = result.status.value, result.reason
         else:
-            result = TaskAgent(tools, log).run(fixture_task(datetime.now(UTC)))
+            with TaskAgent(tools, log) as agent:
+                result = agent.run(fixture_task(datetime.now(UTC)))
             status, reason = result.status.value, result.reason
         row = {
             "scenario": scenario,

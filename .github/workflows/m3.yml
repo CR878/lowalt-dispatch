@@ -1,0 +1,30 @@
+name: M3 decisions
+
+on:
+  push:
+    paths: ["agent/**", "tests/**", "core/**", "planner/**", "sim/**", "eval/**", "scenarios/**", "requirements.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+  pull_request:
+    paths: ["agent/**", "tests/**", "core/**", "planner/**", "sim/**", "eval/**", "scenarios/**", "requirements.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -r requirements.txt ruff
+      - run: python -m pytest
+      - run: python -m ruff check agent tests/test_agent.py tests/test_agent_recovery.py
+      - run: python -m ruff format --check agent tests/test_agent.py tests/test_agent_recovery.py
+      - run: python -m agent.demo --scenario all

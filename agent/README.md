@@ -10,7 +10,7 @@
 
 ```powershell
 .\.venv\Scripts\python.exe -m agent.demo --scenario all
-.\.venv\Scripts\python.exe -m pytest tests/test_agent.py
+.\.venv\Scripts\python.exe -m pytest tests/test_agent.py tests/test_agent_recovery.py
 ```
 
 只演示“校验拒绝后重规划”：
@@ -37,6 +37,8 @@
 | `engine.py` | 有限重试的任务状态机，拒绝原因回传规划器、快照更新、命令有效期与ACK处理 |
 | `guards.py` | 跨工具的身份/版本/时效检查，不替代M2空间与能量校验 |
 | `audit.py` | 追加JSONL，调用前后留输入/输出；先落命令意图再提交，写盘失败阻止提交 |
+| `recovery.py` | 从审计恢复同一任务与命令的确认状态，不重放工具；崩溃中断保持结果未知 |
+| `cache.py` / `storage.py` | 原子JSON缓存、内容校验和、乐观版本检查、进程写锁与Windows/Linux文件操作 |
 | `link.py` | 云端心跳超时、质量退化、连续恢复样本与恢复后需对账标记；阈值可配置 |
 | `edge_decisions.py` | 本地缓存路线选择、当前遥测重新校验、云端恢复对账；不发飞行命令 |
 | `fixtures.py` / `demo.py` | 标明MOCK的可复现联调案例；没有重新实现队友算法 |
@@ -61,13 +63,44 @@ flowchart LR
 1. `Task` 必须结构完整，不猜能量、坐标或机型。当前入口接收结构化对象，自然语言入口尚未接入。
 2. 拒绝未来采集、过期或无时区的快照；最多额外刷新一次，可通过 `AgentPolicy` 配置。
 3. 同一次任务运行的计划版本依次为 `v1/v2/v3`，最多三次规划。下一次请求包含实际独立校验的失败项。
-4. 不采用规划器自己的 `RoutePlan.checks` 作为授权依据。独立回执须包含 `restriction_zone`、`clearance`、`diversion_reachability`、`energy`，不得缺失或重名，全部检查通过。
+4. 不采用规划器自己的 `RoutePlan.checks` 作为授权依据。独立回执须包含 `restriction_zone`、`clearance`、`diversion_reachability`、`energy`，任务有时限时还须包含 `time_limit`；不得缺失、重名或缺少解释，全部检查通过。
 5. 回执绑定 `task_id/route_id/plan_version/snapshot_id` 与整条候选路线的SHA256摘要；同名但内容变化的路线不能套用旧回执。
 6. 校验后再次检查快照、任务和路线时效。命令有效期取策略TTL、路线有效期、快照有效期的最早值。失效时刻本身也按过期处理。
 7. **先持久记录命令意图，再提交一次。**提交异常/超时不代表对端未收到，因此保留 `waiting_ack`，不自动生成新命令或重发。
 8. ACK必须匹配命令ID、任务ID、版本及有效时间。重复ACK不会再次提交。`acknowledged` 仅表示命令被接受，**不表示飞行完成或配送成功**。
 
-每个 `TaskAgent` 实例处理一个运行。重启后的状态恢复、跨进程同任务去重和持续任务版本分配仍需后续任务存储接入；不要重新 `run()` 来猜测上一次提交是否成功。恢复时应读取已持久化的待确认命令并对账。
+每个 `TaskAgent` 实例处理一个运行。相同日志由进程写锁保护，方法调用及同一进程的ACK处理串行化。使用上下文管理器或`close()`释放文件资源。不同日志之间的同任务注册去重及跨任务版本分配仍需后续任务存储接入；不要另建日志重新 `run()` 来猜测上一次提交是否成功。
+
+## 重启恢复与缓存
+
+进程停止后，从原审计恢复待确认命令，接收原命令的真实ACK；恢复不会重新调用任何工具：
+
+```python
+with TaskAgent.restore(team_tools, Path("logs/agent/task-run.jsonl")) as recovered:
+    pending = recovered.result
+    # 通过执行适配层查询原command_id的状态；拿到实际ACK后：
+    # recovered.accept_ack(ack)
+```
+
+恢复保留任务ID、run_id、计划版本、原命令ID和已经持久记录的ACK。只有命令意图而无法确定是否发送时，保持`waiting_ack`；命令意图之前中断的运行变为`blocked`。过期命令不会自动换ID重发；迟到ACK只有其接收时间位于原命令有效期内才可接受。
+
+损坏日志默认拒绝恢复。如确认最后一行因崩溃写了一半，可显式传`repair_tail=True`，先将残片保存为旁边的`.partial-*`文件，再移除残行。中间行损坏、混用MOCK/真实工具和时钟倒退不允许修复绕过。恢复是本地单任务的状态重建，不是跨服务事务或任意执行点checkpoint。
+
+本地备用路线缓存示例：
+
+```python
+from agent.cache import FallbackCache
+
+mode = "mock" if team_tools.is_mock else "integration"
+cache = FallbackCache(Path("logs/agent/task-fallback.json"))
+# candidate由上层提供，含独立校验回执、基础版本和相同run_mode。
+written = cache.save(task, [candidate], run_mode=mode, expected_revision=0)
+loaded = cache.load(task_id=task.task_id, run_mode=mode)
+# 将loaded.candidates交给EdgeDecisionAgent.choose_fallback重新核对当前状态。
+# 后续替换时传expected_revision=written.revision，避免覆盖别人的新缓存。
+```
+
+缓存使用同目录临时文件、写盘与原子替换；替换失败保留之前版本。摘要用于发现意外编辑，不能证明来源身份。缓存载入不授权执行，过期缓存即使成功读出也必须经决策模块拒绝。
 
 ## 与队友的四个工具接口
 
@@ -86,9 +119,9 @@ from agent.engine import TaskAgent
 
 # team_tools实现上表接口；task是core.models.Task。
 # 真实实现接入后再设置team_tools.is_mock=False。
-agent = TaskAgent(team_tools, Path("logs/agent/task-run.jsonl"))
-result = agent.run(task)
-# 传输层稍后收到ACK时：agent.accept_ack(ack)
+with TaskAgent(team_tools, Path("logs/agent/task-run.jsonl")) as agent:
+    result = agent.run(task)
+    # 传输层稍后收到ACK时：agent.accept_ack(ack)
 ```
 
 真实适配器暂未提供，因为M2尚无独立校验器，机型参数仍缺失。现有A*只返回几何路线，不能靠填造预算/校验结果来“接通”它。`is_mock=False` 只标识适配器声明，不自动证明它是真实数据、真实飞控或云服务。
@@ -96,15 +129,15 @@ result = agent.run(task)
 ## 链路与本地备用方案
 
 - `CloudLinkMonitor` 只消费云端通道心跳的接收时间和RTT/丢包样本。**不把云端超时当作PX4连接中断**。默认5秒心跳超时、300ms RTT、10%丢包是示例阈值，需要用实际网络观测调整。
-- 连续健康样本满足恢复条件后仍保留 `requires_reconciliation`；只有上层完成 `reconcile()` 且结果为 `synced` 后才调用 `mark_reconciled()`。
+- 连续健康样本满足恢复条件后仍保留 `requires_reconciliation`；上层完成`decision = edge.reconcile(...)`后，用`monitor.mark_reconciled(decision, task_id=task.task_id)`清除标记，该方法拒绝对账失败或任务不符的结果。
 - `choose_fallback()` 输入预校验缓存和带任务ID的当前遥测。先筛过期/错任务/错基础版本/回执不符的缓存，再用**本地**校验工具按当前位置、电量和时间重新校验。
 - 当前能量未知、遥测过期或当前状态校验不可用时，返回 `no_valid_fallback`，交给既有飞控保护/飞手策略；这里不擅自下达悬停、返航或降落命令。
 - 选中缓存只返回 `select_cached_route` 和回执，不调用规划工具、云端服务或飞控。这叫**本地备用路线选择**，不叫边缘实时重规划。
 - 对账需要带 `task_id/accepted_command_id` 的边缘遥测信封，因为公共 `VehicleState` 本身没有任务ID。任务、执行版本或命令ID不一致时返回 `reconcile_required`，不覆盖状态、不重发计划。
-- 候选缓存可由上层从文件或数据库恢复；当前没有实现磁盘缓存管理、MQTT传输、断连真实注入或飞控保护策略。
+- 候选缓存可用`FallbackCache`保存/载入；MOCK缓存不允许被真实适配器使用，备用路线的`vN`版本必须比基础计划更新。当前尚未接入MQTT传输、真实网络故障注入或飞控保护策略。
 - 每个`EdgeDecisionAgent`及其审计文件只处理同一个任务，可记录该任务的多次决策；不同任务使用独立实例与日志，避免混合证据。
 
-## 九个可运行的演示
+## 十一个可运行的演示
 
 | `--scenario` | 演示什么 | 应得到的状态 |
 |---|---|---|
@@ -117,6 +150,8 @@ result = agent.run(task)
 | `mismatched_ack` | ACK版本不匹配 | `waiting_ack` |
 | `fallback` | 缓存初检、当前遥测重新校验、选路线 | `select_cached_route`，不发飞行命令 |
 | `reconnect` | 云端v2、边缘v1 | `reconcile_required`，不自动覆盖 |
+| `recovery` | 提交超时后关闭并恢复原任务，处理原命令的ACK | `acknowledged`，整个过程只提交一次 |
+| `cached_fallback` | 原子保存、重新载入缓存，再按当前状态校验 | `select_cached_route`，不发飞行命令 |
 
 ## 依赖和验证边界
 
@@ -124,9 +159,11 @@ result = agent.run(task)
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
-.\.venv\Scripts\python.exe -m ruff check agent tests/test_agent.py
+.\.venv\Scripts\python.exe -m ruff check agent tests/test_agent.py tests/test_agent_recovery.py
 ```
 
 今天可以写进开发记录：**完成M3规则决策内核和云边决策接口，通过控制流程与异常分支测试。**
 
-今天不能写成：完成M3全部功能、已接入大模型、云边真实断连通过、PX4在环通过、备降安全性提升、实际配送完成。后续需逐项接入M2真实规划/独立校验、MaaS、消息通道、缓存持久化与实际执行回执。
+仓库提供GitHub Actions工作流，针对Python 3.11/3.13与Windows/Linux运行完整测试、M3静态检查和命令行演示；具体远端运行结果以Actions页面为准。
+
+今天不能写成：完成M3全部功能、已接入大模型、云边真实断连通过、PX4在环通过、备降安全性提升、实际配送完成。后续需逐项接入M2真实规划/独立校验、MaaS、消息通道、跨服务任务存储与实际执行回执。

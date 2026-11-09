@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import math
+import re
 from datetime import UTC, datetime
 
 from agent.contracts import REQUIRED_CHECKS, ValidationReport, route_digest
 from core.models import ConstraintCheck, RiskSnapshot, RoutePlan, Task, VehicleState
+
+
+def version_number(value: str) -> int:
+    if re.fullmatch(r"v[1-9][0-9]{0,8}", value) is None:
+        raise ValueError("M3 plan versions must be v1..v999999999")
+    return int(value[1:])
 
 
 def utc(value: datetime) -> datetime:
@@ -104,8 +111,11 @@ def report_failures(
     names = [c.name for c in report.checks]
     if len(names) != len(set(names)):
         fail("report_checks", "Duplicate check names are ambiguous")
-    for name in REQUIRED_CHECKS:
+    required = (*REQUIRED_CHECKS, "time_limit") if task.time_limit_s is not None else REQUIRED_CHECKS
+    for name in required:
         if name not in names:
             fail(name, "Required independent check is missing")
+    if any(not check.name.strip() or not check.detail.strip() for check in report.checks):
+        fail("report_checks", "Independent checks must have a name and a nonempty explanation")
     issues.extend(c for c in report.checks if not c.passed)
     return issues

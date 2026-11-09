@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import RLock
 from typing import Any, TypeVar
 from uuid import uuid4
 
@@ -23,6 +24,7 @@ from agent.contracts import (
     VerificationRequest,
 )
 from agent.guards import report_failures, route_problem, snapshot_problem, task_problem, utc
+from agent.recovery import recover_result
 from core.models import ConstraintCheck, PlanAck, PlanCommand, RiskSnapshot, Task
 
 T = TypeVar("T", bound=BaseModel)
@@ -55,12 +57,74 @@ class TaskAgent:
         self._result: AgentResult | None = None
         self._snapshot: RiskSnapshot | None = None
         self._submission_attempted = False
+        self._mutex = RLock()
+        self._closed = False
+
+    @classmethod
+    def restore(
+        cls,
+        tools: AgentTools,
+        audit_path: Path,
+        *,
+        clock: Callable[[], datetime] | None = None,
+        repair_tail: bool = False,
+    ) -> TaskAgent:
+        """Reopen a stopped run for ACK handling only; never repeat side effects.
+
+        A live writer must close first. A torn final JSON row is rejected unless
+        repair_tail=True, which preserves that fragment before truncating it.
+        """
+        instance = cls(tools, audit_path, clock=clock)
+        restored = None
+
+        def validate(records):
+            nonlocal restored
+            result, policy, attempted, interrupted = recover_result(records, Path(audit_path))
+            expected = "mock" if tools.is_mock else "integration"
+            if result.run_mode != expected:
+                raise ValueError("Recovery cannot mix MOCK and integration tool adapters")
+            if any(utc(datetime.fromisoformat(r["ts"])) > instance._now() for r in records):
+                raise ValueError("Recovery clock is behind the recorded audit trail")
+            restored = result, policy, attempted, interrupted
+
+        audit, _, backup = JsonlAudit.resume(audit_path, repair_tail=repair_tail, validate=validate)
+        instance._audit = audit
+        try:
+            assert restored is not None
+            result, policy, attempted, interrupted = restored
+            instance._result, instance.policy = result, policy
+            instance._submission_attempted = attempted
+            for call_id, tool in interrupted.items():
+                instance._emit(
+                    "tool_interrupted",
+                    call_id=call_id,
+                    tool=tool,
+                    reason="Process restarted; tool not replayed and delivery not inferred",
+                )
+            instance._emit("run_restored", result=result, torn_tail_backup=backup)
+            return instance
+        except BaseException:
+            instance.close()
+            raise
+
+    def close(self) -> None:
+        with self._mutex:
+            self._closed = True
+            if self._audit is not None:
+                self._audit.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
 
     @property
     def result(self) -> AgentResult:
-        if self._result is None:
-            raise RuntimeError("Task has not started")
-        return self._result.model_copy(deep=True)
+        with self._mutex:
+            if self._result is None:
+                raise RuntimeError("Task has not started")
+            return self._result.model_copy(deep=True)
 
     def _now(self) -> datetime:
         return utc(self.clock())
@@ -147,6 +211,12 @@ class TaskAgent:
         return True
 
     def run(self, task: Task) -> AgentResult:
+        with self._mutex:
+            if self._closed:
+                raise RuntimeError("Agent is closed")
+            return self._start(task)
+
+    def _start(self, task: Task) -> AgentResult:
         if self._result is not None:
             raise RuntimeError("One TaskAgent instance handles one task; do not resubmit a run")
         task = task.model_copy(deep=True)
@@ -279,6 +349,12 @@ class TaskAgent:
         self._move(AgentStatus.BLOCKED, "Planning/validation attempt limit reached")
 
     def accept_ack(self, ack: PlanAck) -> AgentResult:
+        with self._mutex:
+            if self._closed:
+                raise RuntimeError("Agent is closed")
+            return self._accept_ack(ack)
+
+    def _accept_ack(self, ack: PlanAck) -> AgentResult:
         if self._result is None or self._result.command is None or not self._submission_attempted:
             raise RuntimeError("No pending command to acknowledge")
         command = self._result.command

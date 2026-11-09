@@ -14,6 +14,7 @@ from typing import Literal
 from pydantic import Field
 
 from agent.contracts import Contract
+from agent.edge_decisions import EdgeDecision
 from agent.guards import utc
 
 
@@ -43,6 +44,7 @@ class CloudLinkMonitor:
         self.clock = clock or (lambda: datetime.now(UTC))
         self.started_at = utc(self.clock())
         self.last_received: datetime | None = None
+        self._last_poll = self.started_at
         self.status: Literal["unknown", "healthy", "degraded", "disconnected"] = "unknown"
         self.reason = "No cloud heartbeat observed"
         self._healthy_samples = 0
@@ -51,8 +53,9 @@ class CloudLinkMonitor:
     def poll(self) -> LinkDecision:
         now = utc(self.clock())
         previous = self.last_received or self.started_at
-        if now < previous:
+        if now < self._last_poll or now < previous:
             raise ValueError("Clock moved backwards")
+        self._last_poll = now
         if (now - previous).total_seconds() >= self.policy.heartbeat_timeout_s:
             self.status, self.reason = "disconnected", "Cloud heartbeat timed out"
             self._healthy_samples = 0
@@ -89,10 +92,12 @@ class CloudLinkMonitor:
             self.reason = "Cloud quality recovered" if ready else "Waiting for consecutive healthy samples"
         return self._decision()
 
-    def mark_reconciled(self) -> LinkDecision:
-        """Integration calls this ONLY after EdgeDecisionAgent.reconcile == synced."""
+    def mark_reconciled(self, decision: EdgeDecision, *, task_id: str) -> LinkDecision:
+        """A matching successful reconciliation is required to clear recovery."""
         if self.poll().status != "healthy":
             raise RuntimeError("Cannot clear reconciliation before link recovery")
+        if decision.action != "synced" or decision.task_id != task_id:
+            raise ValueError("A matching successful task reconciliation is required")
         self._requires_reconciliation = False
         return self._decision()
 

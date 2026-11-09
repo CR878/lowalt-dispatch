@@ -376,7 +376,7 @@ def test_replay_detects_missing_records_and_leaves_inflight_tools_visible(tmp_pa
 def test_all_demo_scenarios_are_explicitly_mock(tmp_path):
     assert demo_main(["--scenario", "all", "--out-dir", str(tmp_path / "demo")]) == 0
     summary = json.loads(next(tmp_path.rglob("summary_MOCK.json")).read_text(encoding="utf-8"))
-    assert len(summary["scenarios"]) == 9
+    assert len(summary["scenarios"]) == 11
     assert summary["run_mode"] == "mock"
     assert {r["run_mode"] for r in summary["scenarios"]} == {"mock"}
 
@@ -397,7 +397,12 @@ def test_cloud_heartbeat_timeout_recovery_requires_reconciliation(clock):
     clock.advance(1)
     up = monitor.observe(LinkSample(received_at=clock(), round_trip_ms=20))
     assert up.status == "healthy" and up.requires_reconciliation
-    assert not monitor.mark_reconciled().requires_reconciliation
+    from agent.edge_decisions import EdgeDecision
+
+    synced = EdgeDecision(
+        action="synced", reason="fixture reconciliation", task_id="T", run_mode="mock", is_simulated=True
+    )
+    assert not monitor.mark_reconciled(synced, task_id="T").requires_reconciliation
 
 
 @pytest.mark.parametrize("sample", [{"round_trip_ms": 300}, {"loss_pct": 10}, {}])

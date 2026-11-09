@@ -6,11 +6,14 @@ import argparse
 import json
 from pathlib import Path
 
+from agent.audit import read_records
+
 
 def summarize(path: Path) -> dict:
-    records = [
-        json.loads(line) for line in Path(path).read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
+    return summarize_records(read_records(path))
+
+
+def summarize_records(records: list[dict]) -> dict:
     if not records:
         raise ValueError("Empty audit trail")
     run_id = records[0]["run_id"]
@@ -30,7 +33,7 @@ def summarize(path: Path) -> dict:
             if call in pending or call in completed:
                 raise ValueError("Duplicate tool call identifier")
             pending[call] = row["tool"]
-        elif row["event"] in ("tool_completed", "tool_failed"):
+        elif row["event"] in ("tool_completed", "tool_failed", "tool_interrupted"):
             call = row["call_id"]
             if pending.pop(call, None) != row["tool"]:
                 raise ValueError("Tool outcome without a matching start")

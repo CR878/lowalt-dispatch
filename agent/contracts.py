@@ -25,7 +25,7 @@ def route_digest(route: RoutePlan) -> str:
 
 
 class Contract(BaseModel):
-    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, validate_assignment=True)
 
 
 class AgentStatus(StrEnum):

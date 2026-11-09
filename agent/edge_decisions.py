@@ -10,6 +10,7 @@ import math
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import RLock
 from typing import Literal
 from uuid import uuid4
 
@@ -17,7 +18,7 @@ from pydantic import Field
 
 from agent.audit import JsonlAudit
 from agent.contracts import AgentTools, Contract, ValidationReport, VerificationRequest
-from agent.guards import report_failures, route_problem, snapshot_problem, utc
+from agent.guards import report_failures, route_problem, snapshot_problem, utc, version_number
 from core.models import PlanCommand, RiskSnapshot, RoutePlan, Task, VehicleState
 
 
@@ -32,6 +33,7 @@ class ExecutionObservation(Contract):
 
 class CachedFallback(Contract):
     task_id: str
+    run_mode: Literal["mock", "integration"] = "mock"
     based_on_plan_version: str
     priority: int = Field(default=0, ge=0)
     cached_at: datetime
@@ -95,6 +97,19 @@ class EdgeDecisionAgent:
         self.audit = JsonlAudit(audit_path)
         self._is_simulated: bool | None = None
         self._task_id: str | None = None
+        self._mutex = RLock()
+        self._closed = False
+
+    def close(self):
+        with self._mutex:
+            self._closed = True
+            self.audit.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        self.close()
 
     def _emit(self, task_id: str, event: str, **payload) -> None:
         if self._task_id is not None and self._task_id != task_id:
@@ -111,6 +126,17 @@ class EdgeDecisionAgent:
         )
 
     def choose_fallback(
+        self,
+        task: Task,
+        observation: ExecutionObservation,
+        candidates: list[CachedFallback],
+    ) -> EdgeDecision:
+        with self._mutex:
+            if self._closed:
+                raise RuntimeError("Agent is closed")
+            return self._choose_fallback(task, observation, candidates)
+
+    def _choose_fallback(
         self,
         task: Task,
         observation: ExecutionObservation,
@@ -153,13 +179,22 @@ class EdgeDecisionAgent:
                 return finish("no_valid_fallback", problem)
             if candidate.task_id != task.task_id:
                 problem = "Cached route belongs to another task"
+            elif candidate.run_mode != self.run_mode:
+                problem = "Cached route MOCK/integration mode differs from local adapters"
             elif candidate.based_on_plan_version != observation.state.executing_plan_version:
                 problem = "Cached route is based on a different active plan version"
             elif candidate.route.plan_version == observation.state.executing_plan_version:
                 problem = "Fallback must have its own distinct plan version"
             else:
                 try:
-                    problem = "Cache timestamp is in the future" if utc(candidate.cached_at) > now else None
+                    if version_number(candidate.route.plan_version) <= version_number(
+                        candidate.based_on_plan_version
+                    ):
+                        problem = "Fallback version must be newer than its base plan"
+                    else:
+                        problem = (
+                            "Cache timestamp is in the future" if utc(candidate.cached_at) > now else None
+                        )
                 except ValueError as exc:
                     problem = str(exc)
             problem = problem or snapshot_problem(candidate.snapshot, now)
@@ -236,6 +271,17 @@ class EdgeDecisionAgent:
         )
 
     def reconcile(
+        self,
+        task_id: str,
+        cloud_command: PlanCommand,
+        observation: ExecutionObservation,
+    ) -> EdgeDecision:
+        with self._mutex:
+            if self._closed:
+                raise RuntimeError("Agent is closed")
+            return self._reconcile(task_id, cloud_command, observation)
+
+    def _reconcile(
         self,
         task_id: str,
         cloud_command: PlanCommand,
