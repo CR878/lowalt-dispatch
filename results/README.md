@@ -18,6 +18,8 @@ results/
   frozen_v0.1.meta.json
 ```
 
+`example_vehicle_compare.csv` 是 **示例机型** `scenarios/vehicles/example_not_real.yaml` 下的规划对照，不是冻结的参赛结果，也不是实飞。meta 里 `vehicle_is_example=true`。`min_landing_margin=-1000000` 表示该采样点没有几何可达备降点，不是能量缺口。`astar_dynamic` 的 mock 仍然不入库。
+
 冻结时建议把 git commit 写进文件名或 meta，确保能回到当时的代码：
 
 ```bash
