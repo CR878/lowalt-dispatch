@@ -1,10 +1,10 @@
-name: M3 decisions
+name: Test suite (M2 + M3)
 
 on:
   push:
-    paths: ["agent/**", "tests/**", "core/**", "planner/**", "sim/**", "eval/**", "scenarios/**", "requirements.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "requirements.txt", "pyproject.toml", ".github/workflows/m3.yml"]
   pull_request:
-    paths: ["agent/**", "tests/**", "core/**", "planner/**", "sim/**", "eval/**", "scenarios/**", "requirements.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "requirements.txt", "pyproject.toml", ".github/workflows/m3.yml"]
 
 permissions:
   contents: read
@@ -25,6 +25,7 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt ruff
       - run: python -m pytest
-      - run: python -m ruff check agent tests/test_agent.py tests/test_agent_recovery.py
-      - run: python -m ruff format --check agent tests/test_agent.py tests/test_agent_recovery.py
+      - run: python -m ruff check agent validator planner sim core tests
+      - run: python -m ruff format --check agent validator
       - run: python -m agent.demo --scenario all
+      - run: python -m validator

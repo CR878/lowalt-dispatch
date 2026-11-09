@@ -14,17 +14,16 @@ import yaml
 from pydantic import ValidationError
 
 from core.models import (
+    AltitudeReference,
+    DataProvenance,
     DiversionMarginProfile,
     DiversionMarginSample,
     Frame,
-    AltitudeReference,
     Position,
     RiskEvent,
     RoutePlan,
-    DataProvenance,
 )
 from eval import planners, run
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUITE = REPO_ROOT / "eval" / "scenarios" / "v0.yaml"

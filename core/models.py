@@ -16,6 +16,8 @@ v0：字段已定义，**机型/能量/速度的数值一律待定**，由学生
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
@@ -248,6 +250,21 @@ class RoutePlan(BaseModel):
     )
 
 
+def route_digest(route: RoutePlan) -> str:
+    """把校验报告绑定到航线**内容**，而不只是版本号。
+
+    为什么放在 core：这是 RoutePlan 自身的属性，规划器和校验器必须用**同一份实现**
+    算同一个摘要。如果两边各写一份，摘要一旦对不上，报告就永远绑不上；
+    更糟的情况是绑上了一条被偷偷改过的航线。
+
+    顺带拒绝嵌套模型里的 NaN/Infinity（allow_nan=False）。
+    """
+    encoded = json.dumps(
+        route.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
 # --------------------------------------------------------------------------- #
 # 执行与遥测
 # --------------------------------------------------------------------------- #
@@ -312,4 +329,5 @@ __all__ = [
     "RoutePlan",
     "Task",
     "VehicleState",
+    "route_digest",
 ]

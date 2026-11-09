@@ -1,27 +1,31 @@
-"""M3-local contracts; shared core/models.py remains unchanged."""
+"""M3 工具接口与本地契约。共享数据模型以 core/models.py 为准，本文件不复制它们。
+
+`route_digest` 从 core 再导出，保持 `from agent.contracts import route_digest` 的老写法可用。
+它本身属于 RoutePlan 的属性，实现放在 core，避免规划侧和校验侧各算一份摘要。
+"""
 
 from __future__ import annotations
 
-import hashlib
 from datetime import datetime
 from enum import StrEnum
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from core.models import ConstraintCheck, PlanAck, PlanCommand, RiskSnapshot, RoutePlan, Task, VehicleState
+from core.models import (
+    ConstraintCheck,
+    PlanAck,
+    PlanCommand,
+    RiskSnapshot,
+    RoutePlan,
+    Task,
+    VehicleState,
+)
+from core.models import (
+    route_digest as route_digest,  # 再导出，保持老导入路径可用
+)
 
 REQUIRED_CHECKS = ("restriction_zone", "clearance", "diversion_reachability", "energy")
-
-
-def route_digest(route: RoutePlan) -> str:
-    """Bind a validation report to the exact candidate, not just its label."""
-    import json
-
-    encoded = json.dumps(
-        route.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), allow_nan=False
-    )
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 class Contract(BaseModel):
