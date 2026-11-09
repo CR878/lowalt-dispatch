@@ -19,7 +19,8 @@ v0.1 —— 骨架 + 几何基线 + 备降硬约束的第一版搜索。仍无�
 - `sim/energy.py` —— 能量模型；**机型参数不填就直接报错**。`placeholder.yaml` 仍全是 null
 - `scenarios/vehicles/example_not_real.yaml` —— 手写示例参数，文件头写明**不是真实平台数据**。只为把上面这条链路跑通
 - `eval/` —— 评测 harness。`astar_static` 与 `astar_diversion` 是真算法；`astar_dynamic` 仍是 mock，输出继续带 `_MOCK`
-- `tests/` —— 契约、基线、剪枝、无解和余量公式
+- `services/api/` —— FastAPI：任务、v0 场景、默认调用几何基线。余量 URL 在；入口还没切到备降规划器，所以剖面返回未实现
+- `tests/` —— 契约、基线、剪枝、无解、余量公式，以及 API 的 TestClient。当前全量见事实文档 3.7
 
 **没有的**：另一人实现的独立校验器、动态重规划（`astar_dynamic` 仍是 mock）、风场、飞控连接、云端部署、前端页面、真实机型参数。
 备降路径是栅格八邻域近似，不是连续轨迹。准确进度只看 [`事实文档.md`](事实文档.md)。
@@ -78,7 +79,7 @@ eval/            评测 harness + 场景集
   scenarios/     20 个任务样例（v0.yaml）
 scenarios/v0/    草稿几何：建筑 / 限制区 / 备降点 —— 待 B 复核或重画
   vehicles/      placeholder.yaml 仍全是 null；example_not_real.yaml 是示例参数
-services/api/    FastAPI 后端 —— 未开始
+services/api/    FastAPI 后端（任务 / 场景 / 规划；默认仍是几何基线，余量接口在、剖面还没从规划器接到 HTTP）
 edge/            边缘 agent（云边断连时兜底）—— 未开始
 apps/web/        React + MapLibre 任务台 —— 未开始
 ops/             Compose 拓扑（含断连演示用的双网络）
