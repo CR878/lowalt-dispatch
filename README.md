@@ -16,9 +16,9 @@ v0.1 —— 骨架 + 一条能跑通的评测管道。
 - `planner/` —— 栅格化 + A\* 基线，能真的在草稿城区里算出一条不穿楼的路线
 - `sim/energy.py` —— 能量模型；**机型参数不填就直接报错，不给你一个像样的错数字**
 - `validator/` —— **独立校验器**：只读航线航点，按自己的采样重新判净空、限制区（按生效时刻）、载荷、能量、备降可达性
-- `agent/` —— M3 决策内核、工具审计、云边备用选择与恢复对账；[运行与接口说明](agent/README.md)。MOCK 联调，尚未接 MaaS、真实消息通道和飞控
+- `agent/` —— M3 决策、审计恢复、M2适配、草稿确认与云服务基础接口；[最新运行与待办](docs/M3_2026-11-10基础接入与下一步.md)。本地可联调，真实MaaS/云资源/飞控仍待接入
 - `eval/` —— 评测 harness，一条命令跑 20 场景 × 3 种子 × 3 算法，产出带溯源 meta 的 CSV
-- `tests/` —— 124 个测试，保证数据不合约定时立刻炸而不是静默出错
+- `tests/` —— 公共契约、规划校验、M3异常与集成测试；实际数量以本次运行输出为准
 
 **没有的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控连接、云端部署、前端页面、机型参数。
 准确进度只看 [`事实文档.md`](事实文档.md)，别信 README 的乐观描述。
@@ -41,6 +41,11 @@ python -m venv .venv
 
 # M3 决策内核（MOCK 联调）
 .venv/Scripts/python -m agent.demo --scenario all
+
+# M3基础接入（可选依赖；无需购买云资源）
+.venv/Scripts/python -m pip install -r requirements-m3.txt
+.venv/Scripts/python -m agent.integration check
+.venv/Scripts/python -m agent.integration demo --scenario S1-01
 
 # 跑测试
 .venv/Scripts/python -m pytest
