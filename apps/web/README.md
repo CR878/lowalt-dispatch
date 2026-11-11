@@ -25,7 +25,7 @@ CDN 依赖（全部锁定版本，UMD/经典脚本）：
 - `@deck.gl/layers@9.1.0`
 - `@deck.gl/geo-layers@9.1.0`
 
-底图使用 CARTO `dark-matter` 暗色瓦片。若网络不可用或瓦片加载失败，页面自动降级为程序化暗色网格，三维要素与面板仍可用；舞台左上出现降级提示条，可点「重试底图」。
+底图使用 CARTO `dark-matter` 暗色瓦片。启动时同时探测**样式**（`style.json`）与**瓦片**（CARTO 瓦片 URL，5 s 超时）：若网络不可用、样式不可达、瓦片被代理/拦截器阻断，或任一探测超时，页面自动降级为程序化暗色网格，三维要素与面板仍可用；舞台左上出现降级提示条，可点「重试底图」。样式已应用后若 Maplibre 报出瓦片资源错误，同样会切到该降级模式（每次会话只触发一次）。
 
 ## 界面与快捷键
 
@@ -46,11 +46,11 @@ CDN 依赖（全部锁定版本，UMD/经典脚本）：
 | 图层菜单 | `K` |
 | 2D / 3D 视角切换 | `V` |
 | 暂停 / 继续演示 | `Space` |
-| 组件管理抽屉 | `O` |
+| 组件管理抽屉 | `O`（打开 / 关闭） |
 | 帮助 / 快捷键说明 | `?` |
 | 关闭抽屉/菜单、恢复默认布局 | `Esc` |
 
-其它交互：任务/候选列表可点选并联动地图高亮与剖面版本；事件时间线默认「LIVE · 跟随」，新事件生效时自动逐条滚动并入场高亮，手动滚动/悬停会暂停跟随数秒后恢复；舞台底部回放滑块可拖动定位演示时刻；「导出快照」下载 JSON。
+其它交互：任务/候选列表可点选并联动地图高亮与剖面版本；每条候选路线带 `SIM` 徽标与 provenance（`source` / `version` / `captured_at`，优先取 `route.provenance`，缺省回退 `task.provenance`）；KPI「最小备降余量」口径为**取全部剖面（含 v1 历史方案）的最小值**；事件时间线默认「LIVE · 跟随」，新事件生效时自动逐条滚动并入场高亮，手动滚动/悬停会暂停跟随数秒后恢复；舞台底部回放滑块可拖动定位演示时刻；「导出快照」下载 JSON。
 
 **诊断接口**：`window.LOWALT_CONSOLE`（version `1.0.0`），含 `getState()`、`getPanels()`、`setWorkspace()`、`getLayers()`、`setLayer()`、`setAutoFollow()`、`selectTask()`、`selectRoute()`、`setPlaying()`、`setDemoTime()`、`setMode()`、`exportSnapshot()`、`simulateDegradation()`、`symbols`、`lastFrameMs`。
 
@@ -61,7 +61,7 @@ CDN 依赖（全部锁定版本，UMD/经典脚本）：
 | 模式 | 触发 | 表现 |
 | --- | --- | --- |
 | FULL | 底图与三维库均可用 | 暗色底图 + 三维场景 |
-| NO_BASEMAP | 底图探测失败/超时 | 程序化暗色网格 + 三维要素，提示条 + 重试 |
+| NO_BASEMAP | 底图样式或瓦片探测失败/超时（含瓦片被拦截） | 程序化暗色网格 + 三维要素，提示条 + 重试 |
 | DECK_ONLY | MapLibre 不可用 | deck.gl 独立三维视图，面板可读 |
 | STATIC | 三维库或场景数据缺失 | 网格占位说明；任务/剖面/遥测/时间线仍可读 |
 
@@ -115,7 +115,7 @@ CDN 依赖（全部锁定版本，UMD/经典脚本）：
 apps/web/index.vite.entry.backup.html
 ```
 
-`src/`、`node_modules/`、`.vite/` 等属既有工程基线，**不是本特性新增的运行时文件，未删除**。如需恢复原 Vite 工程：把 `index.vite.entry.backup.html` 改回 `index.html`，并确保 `src/` 等原工程文件存在。
+`src/`、`node_modules/`、`.vite/` 等若存在，属既有工程基线，**不是本特性新增的运行时文件，也未删除**。如需恢复原 Vite 工程：把 `index.vite.entry.backup.html` 改回 `index.html`，并确保 `src/` 等原工程文件存在（若当前工作区未保留这些目录，则说明本工作区只包含单文件原型）。
 
 ## 版权
 

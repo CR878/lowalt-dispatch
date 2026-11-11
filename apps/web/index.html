@@ -92,6 +92,10 @@ ul,ol{list-style:none}
   font-size:9px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+.kpi-note{
+  font-size:8px;letter-spacing:0.02em;color:var(--faint);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;
+}
 .kpi-val{display:flex;align-items:baseline;gap:4px;white-space:nowrap;min-width:0}
 .kpi-val .kv{font-size:22px;line-height:1.1;color:var(--hi);font-weight:500;letter-spacing:-0.01em}
 .kpi-val .unit{font-size:9px;color:var(--muted);letter-spacing:0.08em}
@@ -199,7 +203,16 @@ ul,ol{list-style:none}
   border:1px solid rgba(240,166,198,0.35);padding:0 4px;
 }
 .ri-cur{margin-left:auto;font-size:9px;letter-spacing:0.1em;color:var(--cyan);white-space:nowrap}
+.ri-sim{
+  font-size:9px;letter-spacing:0.1em;color:var(--cyan);
+  border:1px solid rgba(152,224,207,0.4);padding:0 4px;line-height:1.35;flex:0 0 auto;
+}
 .ri-alg{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:0.04em}
+.ri-prov{
+  margin-top:4px;font-size:9px;color:var(--faint);letter-spacing:0.03em;line-height:1.5;
+  border-left:1px solid var(--line2);padding-left:6px;
+  white-space:normal;overflow-wrap:anywhere;
+}
 .ri-grid{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 6px;font-size:9px;margin-top:4px}
 .ri-grid span{color:var(--faint);white-space:nowrap}
 .ri-grid b{color:var(--text);font-weight:400;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -851,8 +864,9 @@ body.reduce-motion .layout.ws-anim{animation:none}
       <div class="kpi-val"><span class="kv">--</span><span class="unit">架</span></div>
       <div class="kpi-bar"><i></i></div>
     </div>
-    <div class="kpi" data-k="min_margin_wh">
+    <div class="kpi" data-k="min_margin_wh" title="口径：取全部剖面（含 v1 历史方案）的最小备降余量">
       <div class="kpi-label">最小备降余量 · MIN MARGIN</div>
+      <div class="kpi-note" title="口径：取全部剖面（含 v1 历史方案）的最小备降余量">取全部剖面（含 v1 历史方案）最小</div>
       <div class="kpi-val"><span class="kv">--</span><span class="unit">Wh</span></div>
       <div class="kpi-bar"><i></i></div>
     </div>
@@ -1410,6 +1424,7 @@ body.reduce-motion .layout.ws-anim{animation:none}
   var basemapAbort = null;
   var basemapState = 'idle';    // idle | probing | online | offline
   var forcedOffline = false;
+  var basemapTileErrorSeen = false;  // R11.1：FULL 模式下瓦片错误只降级一次（节流）
 
   var staticLayers = [];
   var frameLayers = [];
@@ -1668,6 +1683,8 @@ body.reduce-motion .layout.ws-anim{animation:none}
       case 'v': ev.preventDefault(); toggleMode(); return;
       case 'k': ev.preventDefault(); toggleLayerMenu(); return;
       case 'm': ev.preventDefault(); toggleMotionMode(); return;
+      // R6：O 与「组件管理」按钮一致地打开抽屉；再次按下则收起（可切换）
+      case 'o': ev.preventDefault(); setDrawer(!drawerOpen); return;
       default: return;
     }
   }
@@ -2437,6 +2454,20 @@ body.reduce-motion .layout.ws-anim{animation:none}
         ? h('b', { cls: 'warn', text: '无有效退出方案' })
         : h('b', { text: String(r.diversion_site_id) });
 
+      // R10.2：每条候选路线展示仿真标识与 provenance（route 优先，缺省回退 task.provenance）
+      var routeTask = taskById(r.task_id || state.selectedTaskId);
+      var prov = (r.provenance && typeof r.provenance === 'object') ? r.provenance
+        : ((routeTask && routeTask.provenance) || {});
+      var simFlag = (r.is_simulated === undefined || r.is_simulated === null) ? null : r.is_simulated;
+      var simBadge = h('span', {
+        cls: 'ri-sim',
+        title: 'is_simulated: ' + (simFlag === null ? '—' : String(simFlag)) + '（SITL 软件在环仿真）',
+        'aria-label': '仿真标识 SIM，is_simulated=' + (simFlag === null ? '未知' : String(simFlag)),
+        text: simFlag === true ? 'SIM' : (simFlag === null ? 'SIM ?' : 'SIM ✕')
+      });
+      var provLine = 'provenance ' + String(prov.source || '—') + ' · ' +
+        String(prov.version || '—') + ' · ' + String(prov.captured_at || '—');
+
       var checks = Array.isArray(r.checks) ? r.checks : [];
       var checkNodes = checks.map(function (c) {
         return h('div', { cls: 'ck-row' }, [
@@ -2461,9 +2492,11 @@ body.reduce-motion .layout.ws-anim{animation:none}
         h('div', { cls: 'ri-row1' }, [
           h('span', { cls: 'ri-id', text: r.route_id || '—' }),
           h('span', { cls: 'ri-ver', text: String(r.plan_version || '—') }),
+          simBadge,
           sel ? h('span', { cls: 'ri-cur', text: '当前选中' }) : null
         ]),
         h('div', { cls: 'ri-alg', text: String(r.algorithm || '—') + ' · snapshot ' + String(r.snapshot_id || '—') }),
+        h('div', { cls: 'ri-prov', text: provLine }),
         h('div', { cls: 'ri-grid' }, [
           h('span', { text: 'diversion_site_id' }), divSite,
           h('span', { text: 'energy_budget_wh' }), h('b', { text: fmt(r.energy_budget_wh, 1) })
@@ -2694,6 +2727,24 @@ body.reduce-motion .layout.ws-anim{animation:none}
   }
 
   /* ===================== 剖面绘制（VIEW-MARGIN@1） ===================== */
+  /**
+   * R4.4：历史方案判定只看 plan_version，不依赖 profile.algorithm
+   * （DiversionMarginProfile 契约中并无 algorithm 字段）。
+   * 兼容数字 1、字符串 "1" 与 "v1" 三种写法。
+   */
+  function isLegacyPlanVersion(v) {
+    if (v === null || v === undefined) return false;
+    var s = String(v).trim().toLowerCase();
+    return s === '1' || s === 'v1';
+  }
+
+  /** 图例版本标签：统一补 "v" 前缀，避免出现 "undefined"。 */
+  function planTag(p) {
+    var v = String((p && p.plan_version) || '?').trim();
+    if (!v || v === '?') return 'v?';
+    return v.charAt(0).toLowerCase() === 'v' ? v : 'v' + v;
+  }
+
   function ptsFromSamples(samples, px, py) {
     var pts = [];
     (samples || []).forEach(function (s) {
@@ -2891,9 +2942,9 @@ body.reduce-motion .layout.ws-anim{animation:none}
     ctx.fillText('0 Wh', padL + plotW, zeroY - 8);
 
     var mainPts = ptsFromSamples(mainSamples, px, py);
-    var mainIsLegacy = /astar_static/.test(String(main.algorithm || ''));
+    var mainIsLegacy = isLegacyPlanVersion(main.plan_version);
     var altPts = (alt && Array.isArray(alt.samples)) ? ptsFromSamples(alt.samples, px, py) : [];
-    var altIsLegacy = alt ? /astar_static/.test(String(alt.algorithm || '')) : false;
+    var altIsLegacy = alt ? isLegacyPlanVersion(alt.plan_version) : false;
 
     function tracePath(pts, closeToZero) {
       if (!pts.length) return;
@@ -2984,6 +3035,63 @@ body.reduce-motion .layout.ws-anim{animation:none}
       ctx.fillText(site.site_id, x + 3, ly + 5);
     });
 
+    // ---- 标注：无最近备降点样本（R4.5）----
+    // 契约允许 nearest_site_id 为 null：这些样本没有任何可用备降点。
+    // 必须与上方备降点投影标签区分开（灰色空心三角 + 短虚线 + NO SITE 小字），
+    // 不复用站点颜色/站名标签。相邻样本合并为区段，并限制标注数量，避免密集标记拖慢绘制。
+    var noSiteSamples = fullMain.filter(function (sm) {
+      return sm.nearest_site_id === null || sm.nearest_site_id === undefined;
+    });
+    if (noSiteSamples.length) {
+      var noSiteRuns = [];
+      var prevNoSiteS = null;
+      noSiteSamples.forEach(function (sm) {
+        if (!isNum(sm.s_m)) return;
+        var sVal = clamp(sm.s_m, 0, totalS);
+        if (prevNoSiteS !== null && Math.abs(sVal - prevNoSiteS) <= 30) {
+          noSiteRuns[noSiteRuns.length - 1].push(sVal);
+        } else {
+          noSiteRuns.push([sVal]);
+        }
+        prevNoSiteS = sVal;
+      });
+      var markY = padT + plotH - 8;
+      noSiteRuns.slice(0, 6).forEach(function (run) {
+        var x0 = px(run[0]);
+        var x1 = px(run[run.length - 1]);
+        if (x1 - x0 < 2) x1 = Math.min(padL + plotW, x0 + 2);
+        var xm = (x0 + x1) / 2;
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = 'rgba(107,111,120,0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x0, markY - 18);
+        ctx.lineTo(x1, markY - 18);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = COL.bg;
+        ctx.strokeStyle = COL.muted;
+        ctx.beginPath();
+        ctx.moveTo(xm, markY - 16);
+        ctx.lineTo(xm - 4, markY - 8);
+        ctx.lineTo(xm + 4, markY - 8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        var noSiteLy = markY - 26;
+        while (labelYs.some(function (v) { return Math.abs(v - noSiteLy) < 11; })) noSiteLy -= 11;
+        if (noSiteLy < padT + 6) return;
+        labelYs.push(noSiteLy);
+        ctx.fillStyle = COL.muted;
+        ctx.font = '9px ' + fontFamily;
+        ctx.textAlign = xm > padL + plotW - 44 ? 'right' : 'left';
+        ctx.fillText('NO SITE', xm + (xm > padL + plotW - 44 ? -5 : 5), noSiteLy);
+      });
+      ctx.font = '10px ' + fontFamily;
+    }
+
     // ---- 标注：限制区生效点 ----
     var zoneEvents = allEvents().filter(function (ev) {
       return ev && ev.kind === 'restriction_zone' && ev.task_id === main.task_id;
@@ -3036,8 +3144,8 @@ body.reduce-motion .layout.ws-anim{animation:none}
       var minMain = Math.min.apply(null, mainSamples.map(function (s) { return s.margin_wh; }));
       var altSamples = (alt.samples || []).filter(function (s) { return isNum(s.margin_wh); });
       var minAlt = altSamples.length ? Math.min.apply(null, altSamples.map(function (s) { return s.margin_wh; })) : 0;
-      var mainTag = String(main.plan_version || '?') + ' ' + String(main.algorithm || '');
-      var altTag = String(alt.plan_version || '?') + ' ' + String(alt.algorithm || '');
+      var mainTag = planTag(main) + (mainIsLegacy ? ' 历史方案' : ' 当前方案');
+      var altTag = planTag(alt) + (altIsLegacy ? ' 历史方案' : ' 当前方案');
       // 先画旧版本，再画新版版本，保持稳定顺序
       var rows = mainIsLegacy
         ? [{ tag: mainTag, min: minMain, legacy: true }, { tag: altTag, min: minAlt, legacy: altIsLegacy }]
@@ -3932,6 +4040,9 @@ body.reduce-motion .layout.ws-anim{animation:none}
     layers: [{ id: 'bg', type: 'background', paint: { 'background-color': COL.bg } }]
   };
   var BASEMAP_URL = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
+  /** R11.1：底图探测同时覆盖瓦片；样式可达但瓦片被阻断时也必须降级。 */
+  var BASEMAP_TILE_PROBE_URL = 'https://tiles.basemaps.cartocdn.com/dark_all/14/13558/6841.png';
+  var BASEMAP_PROBE_TIMEOUT_MS = 5000;
 
   function sceneCenter() {
     var d = DATA();
@@ -3979,6 +4090,16 @@ body.reduce-motion .layout.ws-anim{animation:none}
         mapErrorCount += 1;
         warnOnce('map:error:' + mapErrorCount, msg);
         if (mapErrorCount >= 2) enterDeckOnly('map_error');
+        return;
+      }
+      // R11.1：样式已应用但瓦片被阻断时，同样进入 NO_BASEMAP（每会话只触发一次）
+      if (isTileResourceError(ev) && state.bootMode === 'FULL' && !basemapTileErrorSeen) {
+        basemapTileErrorSeen = true;
+        warnOnce('basemap:tile', msg || 'tile fetch failed');
+        basemapState = 'offline';
+        if (map) { try { map.setStyle(OFFLINE_STYLE); } catch (e) { /* 忽略 */ } }
+        setBootMode('NO_BASEMAP', 'tile_error');
+        console.info('[BOOT] mode=NO_BASEMAP (tile_error)');
       }
     });
 
@@ -4145,7 +4266,17 @@ body.reduce-motion .layout.ws-anim{animation:none}
     console.info('[BOOT] mode=STATIC reason=' + (reason || 'unknown'));
   }
 
-  /* ===================== 底图探测（5 s 超时） ===================== */
+  /* ===================== 底图探测（5 s 超时，样式 + 瓦片） ===================== */
+  /** R11.1：判定 map error 是否来自底图瓦片资源（而非样式结构/控制器问题）。 */
+  function isTileResourceError(ev) {
+    var err = ev && ev.error;
+    var blob = String((err && (err.message || err)) || '') + ' ' +
+      String((err && err.url) || '') + ' ' +
+      String((ev && ev.sourceId) || '');
+    if (/tiles\.basemaps\.cartocdn\.com/i.test(blob)) return true;
+    return /(?:\.png|\.pbf)(?:\?|#|$|\s)/i.test(blob);
+  }
+
   function probeBasemap(isRetry) {
     if (forcedOffline) return;
     if (!map || state.bootMode === 'STATIC' || state.bootMode === 'DECK_ONLY') return;
@@ -4157,6 +4288,9 @@ body.reduce-motion .layout.ws-anim{animation:none}
     var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
     basemapAbort = ctrl;
     var finished = false;
+    // R11.1：样式与瓦片两项探测都成功才算底图可用
+    var styleOk = false;
+    var tileOk = false;
 
     function fail(reason) {
       if (finished) return;
@@ -4165,6 +4299,11 @@ body.reduce-motion .layout.ws-anim{animation:none}
       basemapState = 'offline';
       if (state.bootMode === 'FULL') setBootMode('NO_BASEMAP', reason || 'basemap_unreachable');
       console.info('[BOOT] mode=NO_BASEMAP (' + (reason || 'basemap_unreachable') + ')');
+    }
+
+    function bothReady() {
+      if (!styleOk || !tileOk) return;
+      ok();
     }
 
     function ok() {
@@ -4185,19 +4324,48 @@ body.reduce-motion .layout.ws-anim{animation:none}
     basemapProbeTimer = setTimeout(function () {
       if (ctrl) { try { ctrl.abort(); } catch (e) { /* 忽略 */ } }
       fail(isRetry ? 'basemap_timeout_retry' : 'basemap_timeout');
-    }, 5000);
+    }, BASEMAP_PROBE_TIMEOUT_MS);
 
     if (typeof fetch !== 'function') { fail('fetch_unavailable'); return; }
+
+    // 1) 样式探测：style.json 可达并能解析
     try {
       fetch(BASEMAP_URL, { mode: 'cors', signal: ctrl ? ctrl.signal : undefined, cache: 'no-store' })
         .then(function (res) {
           if (!res || !res.ok) throw new Error('HTTP ' + (res ? res.status : 'unknown'));
           return res.json();
         })
-        .then(function () { ok(); })
+        .then(function () {
+          styleOk = true;
+          bothReady();
+        })
         .catch(function (err) { fail('basemap_error:' + (err && err.message ? err.message : 'unknown')); });
     } catch (err) {
       fail('basemap_throw');
+      return;
+    }
+
+    // 2) 瓦片探测：样式可达但瓦片被阻断（广告拦截/代理/DNS）时仍必须降级
+    try {
+      fetch(BASEMAP_TILE_PROBE_URL, {
+        mode: 'cors',
+        signal: ctrl ? ctrl.signal : undefined,
+        cache: 'no-store',
+        credentials: 'omit'
+      })
+        .then(function (res) {
+          // 只关心可达性：任何 2xx/3xx 视为瓦片链路可用
+          if (!res || (!res.ok && res.status !== 0 && res.status >= 400)) {
+            throw new Error('tile HTTP ' + (res ? res.status : 'unknown'));
+          }
+          tileOk = true;
+          bothReady();
+        })
+        .catch(function (err) {
+          fail('tile_error:' + (err && err.message ? err.message : 'unknown'));
+        });
+    } catch (err) {
+      fail('tile_error:throw');
     }
   }
 
@@ -4222,8 +4390,9 @@ body.reduce-motion .layout.ws-anim{animation:none}
   function retryBasemap() {
     forcedOffline = false;
     basemapState = 'idle';
+    basemapTileErrorSeen = false;
     if (state.bootMode === 'NO_BASEMAP' && map) {
-      setBootMode('FULL');
+      // 保持 NO_BASEMAP 网格，等样式 + 瓦片探测都成功再由 ok() 切回 FULL，避免假恢复闪烁
       try { map.setStyle(OFFLINE_STYLE); } catch (e) { /* 忽略 */ }
     }
     probeBasemap(true);
