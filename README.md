@@ -20,11 +20,14 @@ v0.1 —— 骨架 + 一条能跑通的评测管道。
 - `eval/` —— 评测 harness，一条命令跑 20 场景 × 3 种子 × 3 算法，产出带溯源 meta 的 CSV
 - `tests/` —— 公共契约、规划校验、M3 异常与集成测试；2026-11-10 合并后实测 174 passed / 3 skipped（3 项为需真实 PostgreSQL/Redis/MQTT 的服务测试）
 
-**没有的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控连接、云端部署、机型参数，以及 React/MapLibre 正式前端工程。
+**没有的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（PX4 SITL 遥测通道已打通，见 [`ops/sitl/README.md`](ops/sitl/README.md)）、云端部署、机型参数，以及 React/MapLibre 正式前端工程。
 `apps/web/index.html` 有一张**硬编码静态战术态势台**（3D 倾斜俯视 + ASCII 侧栏），零依赖、不接 API、几何为草稿、数值为占位，仅用于可视化表达，不是上述正式工程。
 准确进度只看 [`事实文档.md`](事实文档.md)，别信 README 的乐观描述。
 
 ## 快速开始
+
+> **第一次拿到仓库？先看 [`启动指南.md`](启动指南.md)** —— 分三层（纯本地 / 本地 Docker 替身 / PX4 SITL），
+> 每步都有实测预期输出和常见坑。下面是最短版本。
 
 ```bash
 python -m venv .venv
@@ -82,7 +85,7 @@ eval/            评测 harness + 场景集
 scenarios/v0/    草稿几何：建筑 / 限制区 / 备降点 —— 待 B 复核或重画
   vehicles/      机型平台参数 —— 待 A 填写，当前全为 null
 services/api/    FastAPI 后端 —— 未开始
-edge/            边缘执行端：去重/过期/ACK/遥测/重启恢复（控制流可用，SITL 未接）
+edge/            边缘执行端：去重/过期/ACK/遥测/重启恢复（控制流可用；PX4 SITL 遥测已通，任务上传未实现）
 apps/web/        静态战术态势台（硬编码，不接 API）；React + MapLibre 工程未开始
 ops/             Compose 拓扑（含断连演示用的双网络）
 docs/            接口契约
@@ -93,7 +96,7 @@ results/         评测产物；真实结果在冻结时提交，mock 永不入�
 
 | 角色 | 第一件事 | 卡点 |
 |---|---|---|
-| A · 飞控与仿真 | PX4 SITL 起得来、读到位置/状态 | 填 `scenarios/vehicles/placeholder.yaml` 的 `null`——**它卡着所有能量计算** |
+| A · 飞控与仿真 | SITL 遥测已通（[`ops/sitl/`](ops/sitl/README.md)）；下一步校准/home → `MavsdkExecutor.upload_mission` | 填 `scenarios/vehicles/placeholder.yaml` 的 `null`——**它卡着所有能量计算** |
 | B · 规划与数据 | 复核 `scenarios/v0/` 草稿几何的设计意图；把备降余量做进 A\* **搜索**（`astar_diversion`） | 机型参数（来自 A） |
 | C · 平台与智能体 | ECS 最小部署 + SWR 镜像预检；FastAPI 骨架；把 `validator` 接进 `AgentTools.verify_route` | 云账号与安全组 |
 

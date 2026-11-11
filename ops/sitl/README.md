@@ -21,18 +21,32 @@ PX4 **v1.15.4** 在 Docker 容器（`px4`，Ubuntu 22.04）内从源码编译，
 # 1. 建容器（宿主机）
 docker run -it --name px4 -v E:/px4:/work -p 14540:14540/udp -p 14550:14550/udp ubuntu:22.04
 
-# 2. 容器内编译（约 15–30 分钟）
-bash /work/ops/sitl/setup-px4-container.sh
+# 2. 把脚本送进容器并编译（约 15–30 分钟）
+docker cp ops/sitl/setup-px4-container.sh px4:/work/setup.sh
+docker exec -it px4 bash /work/setup.sh
 
 # 3. 后台启动飞控（容器内；关掉 stdbuf 缓冲才能看到日志）
-cd /work/src/build/px4_sitl_default && \
-  ../bin/px4 -d > /work/sitl.log 2>&1 &
+docker exec -d px4 bash -c "cd /work/src/build/px4_sitl_default && \
+  ../bin/px4 -d > /work/sitl.log 2>&1"
 
 # 4. 装 mavsdk（容器内；必须 <4，4.x 换 native binding API 不兼容）
-pip3 install "mavsdk<4"
+docker exec px4 pip3 install "mavsdk<4"
 
-# 5. 验证遥测
-docker exec px4 python3 /work/ops/sitl/sitl_probe.py
+# 5. 验证遥测（探针先拷进容器）
+docker cp ops/sitl/sitl_probe.py px4:/work/sitl_probe.py
+docker exec px4 python3 /work/sitl_probe.py
+```
+
+> 注意：容器只挂载 `E:\px4` → `/work`，**仓库目录不在容器里**。所以脚本要 `docker cp` 送进去，
+> 不要写 `/work/ops/sitl/...`（那是个不存在的路径）。
+
+容器停了之后重新起（不用重新编译）：
+
+```bash
+docker start px4
+docker exec -d px4 bash -c "cd /work/src/build/px4_sitl_default && \
+  ../bin/px4 -d > /work/sitl.log 2>&1"
+docker exec px4 pgrep -x px4        # 有 PID 就是起来了
 ```
 
 ## 坑（踩过的）
@@ -50,7 +64,7 @@ docker exec px4 python3 /work/ops/sitl/sitl_probe.py
 
 ## 证据
 
-`docker exec px4 python3 /work/ops/sitl/sitl_probe.py` 实跑输出（2026-11-11）：
+`docker exec px4 python3 /work/sitl_probe.py` 实跑输出（2026-11-11）：
 
 ```json
 {
