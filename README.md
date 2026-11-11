@@ -18,16 +18,32 @@ v0.1 —— 骨架 + 一条能跑通的评测管道。
 - `validator/` —— **独立校验器**：只读航线航点，按自己的采样重新判净空、限制区（按生效时刻）、载荷、能量、备降可达性
 - `agent/` —— M3 决策、审计恢复、M2适配、草稿确认与云服务基础接口；[最新运行与待办](docs/M3_2026-11-10基础接入与下一步.md)。本地可联调，真实MaaS/云资源/飞控仍待接入
 - `eval/` —— 评测 harness，一条命令跑 20 场景 × 3 种子 × 3 算法，产出带溯源 meta 的 CSV
-- `tests/` —— 公共契约、规划校验、M3 异常与集成测试；2026-11-10 合并后实测 174 passed / 3 skipped（3 项为需真实 PostgreSQL/Redis/MQTT 的服务测试）
+- `tests/` + `services/assistant/tests/` —— 公共契约、规划校验、M3/M4 与助手集成测试；2026-11-11 合并后实测 232 passed / 3 skipped（3 项为需真实 PostgreSQL/Redis/MQTT 的服务测试）
+- [`apps/console/`](apps/console/README.md) —— AERIS React/MapLibre 控制台：真实底图与选点、2D/3D、无人机演示仪表、地形版本变化、事件流、候选方案和可收起的调度助手
+- [`services/assistant/`](services/assistant/README.md) —— 控制台本地工具服务、MaaS 工具调用适配与地点搜索；默认规则演示，不下发飞控
 
-**没有的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（PX4 SITL 遥测通道已打通，见 [`ops/sitl/README.md`](ops/sitl/README.md)）、云端部署、机型参数，以及 React/MapLibre 正式前端工程。
+**待完成的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（PX4 SITL 遥测通道已打通，见 [`ops/sitl/README.md`](ops/sitl/README.md)）、云端部署、机型参数，以及控制台与正式任务/遥测/规划接口的联调。
 `apps/web/index.html` 有一张**硬编码静态战术态势台**（3D 倾斜俯视 + ASCII 侧栏），零依赖、不接 API、几何为草稿、数值为占位，仅用于可视化表达，不是上述正式工程。
 准确进度只看 [`事实文档.md`](事实文档.md)，别信 README 的乐观描述。
 
 ## 快速开始
 
 > **第一次拿到仓库？先看 [`启动指南.md`](启动指南.md)** —— 分三层（纯本地 / 本地 Docker 替身 / PX4 SITL），
-> 每步都有实测预期输出和常见坑。下面是最短版本。
+> 每步都有实测预期输出和常见坑。独立控制台入口见下面及 [`apps/console/README.md`](apps/console/README.md)。
+
+控制台本地启动（Node.js 22.12+、Python 3.11+）：
+
+```bash
+python -m venv .venv
+.venv/Scripts/python -m pip install -r services/assistant/requirements.txt
+cd apps/console
+npm ci
+npm run dev:all
+```
+
+打开 <http://127.0.0.1:5174/>。Windows PowerShell 如有限制，使用 `npm.cmd`。真实选点可以保存为草稿；地图上的建筑、航线、仪表和历史剖面仍标明为演示。全球 DEM 是已有高程资料，实时变化需外部数据源。
+
+规划与 M3 命令：
 
 ```bash
 python -m venv .venv
@@ -85,8 +101,10 @@ eval/            评测 harness + 场景集
 scenarios/v0/    草稿几何：建筑 / 限制区 / 备降点 —— 待 B 复核或重画
   vehicles/      机型平台参数 —— 待 A 填写，当前全为 null
 services/api/    FastAPI 后端 —— 未开始
+services/assistant/ 控制台本地助手与地点搜索；正式M3下发仍待对接
 edge/            边缘执行端：去重/过期/ACK/遥测/重启恢复（控制流可用；PX4 SITL 遥测已通，任务上传未实现）
-apps/web/        静态战术态势台（硬编码，不接 API）；React + MapLibre 工程未开始
+apps/web/        原有静态战术页面（保留队友实现）
+apps/console/    AERIS React + MapLibre/Three.js 独立演示台
 ops/             Compose 拓扑（含断连演示用的双网络）
 docs/            接口契约
 results/         评测产物；真实结果在冻结时提交，mock 永不入库
