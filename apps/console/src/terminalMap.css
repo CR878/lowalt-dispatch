@@ -1,0 +1,213 @@
+.map-surface-toggle.terminal-map-toggle[aria-pressed="true"] {
+  color: #d9caff;
+  border-color: #7d679c;
+  background: #2d253d;
+}
+
+.map-panel .terminal-map {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin: 0;
+  padding: 10px clamp(10px, 2vw, 24px) 0;
+  background: transparent;
+}
+
+.terminal-plot {
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.terminal-plot > p {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.terminal-sheet {
+  --terminal-axis-space: 37px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 9px;
+  color: var(--muted);
+  font: 10px var(--mono);
+}
+
+.terminal-north,
+.terminal-east {
+  grid-area: 1 / 2;
+  color: #9faaba;
+}
+
+.terminal-east {
+  justify-self: end;
+}
+
+.terminal-ticks {
+  display: flex;
+  justify-content: space-between;
+}
+
+.terminal-ticks-n {
+  grid-area: 2 / 1;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-block: -5px;
+}
+
+.terminal-ticks-e {
+  grid-area: 3 / 2;
+}
+
+.terminal-grid {
+  grid-area: 2 / 2;
+  margin: 0;
+  white-space: pre;
+  font: 500
+    min(
+      18px,
+      calc((100cqw - 38px) / 40.5),
+      calc((100cqh - var(--terminal-axis-space)) / 25.6)
+    ) /
+    1.06 var(--mono);
+  font-variant-ligatures: none;
+}
+
+.terminal-row {
+  display: inline-block;
+  vertical-align: top;
+}
+
+.terminal-map figcaption {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 9px 0;
+  color: #9faaba;
+  font: 10px var(--mono);
+}
+
+.terminal-meta,
+.terminal-position,
+.terminal-legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+}
+
+.terminal-meta {
+  justify-content: space-between;
+}
+
+.terminal-position code,
+.terminal-legend code {
+  font: 600 1em var(--mono);
+}
+
+.terminal-position code {
+  color: #e0e4ed;
+}
+
+.terminal-position code:last-child {
+  color: var(--purple);
+}
+
+.terminal-legend {
+  column-gap: 15px;
+}
+
+.terminal-legend span {
+  white-space: nowrap;
+}
+
+.terminal-map [data-ink="terrain"] {
+  color: color-mix(in srgb, var(--muted) 74%, transparent);
+}
+
+.terminal-map [data-ink="frame"] {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.terminal-map [data-ink="building"],
+.terminal-map [data-ink="comparison"] {
+  color: #9faaba;
+}
+
+.terminal-map [data-ink="zone"] {
+  color: #e4a1c5;
+}
+
+.terminal-map [data-ink="route"],
+.terminal-map [data-ink="site"] {
+  color: var(--green);
+  font-weight: 650;
+}
+
+.terminal-grid [data-flight="upcoming"] {
+  color: color-mix(in srgb, var(--green) 60%, var(--muted));
+}
+
+.terminal-map [data-ink="preview"],
+.terminal-map [data-ink="cursor"] {
+  color: var(--purple);
+  font-weight: 750;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app:not(.motion-reduced) .terminal-row,
+  .app:not(.motion-reduced) .terminal-map figcaption {
+    animation: terminal-print 290ms ease-out both;
+  }
+
+  .app:not(.motion-reduced) .terminal-grid [data-flight] {
+    animation: terminal-print 260ms ease-out both;
+    transition:
+      color 240ms ease,
+      text-shadow 240ms ease;
+  }
+
+  .terminal-grid [data-trail] {
+    color: #e0e4ed;
+    text-shadow: 0 0 7px var(--green);
+  }
+
+  .terminal-grid[data-playing="true"] [data-ink="cursor"] {
+    animation: terminal-cursor 2.2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes terminal-print {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes terminal-cursor {
+  to {
+    opacity: 0.68;
+  }
+}
+
+@media (max-width: 700px) {
+  .map-panel .terminal-map {
+    gap: 6px;
+  }
+
+  .terminal-sheet {
+    --terminal-axis-space: 34px;
+    gap: 5px 7px;
+    font-size: 9px;
+  }
+
+  .terminal-map figcaption {
+    font-size: 9px;
+  }
+
+  .terminal-meta,
+  .terminal-position,
+  .terminal-legend {
+    column-gap: 8px;
+  }
+}

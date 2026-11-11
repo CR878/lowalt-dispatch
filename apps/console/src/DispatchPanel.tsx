@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { Activity, Check, Link2, RefreshCw, ShieldCheck } from "lucide-react";
 import "./dispatch.css";
 
@@ -81,20 +87,26 @@ async function api<T>(
   }
   return response.json();
 }
-function rememberedTask() {
+export function rememberedDispatchTask() {
   try {
-    return localStorage.getItem("aeris-local-task") ?? "";
+    const id = localStorage.getItem("aeris-local-task") ?? "";
+    return /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id) ? id : "";
   } catch {
     return "";
   }
 }
 
-export function DispatchPanel() {
+export function DispatchPanel({
+  taskId,
+  setTaskId,
+}: {
+  taskId: string;
+  setTaskId: Dispatch<SetStateAction<string>>;
+}) {
   const [health, setHealth] = useState<Health | null>(null);
   const [scenario, setScenario] = useState("S1-01");
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [reviewed, setReviewed] = useState(false);
-  const [taskId, setTaskId] = useState(rememberedTask);
   const [task, setTask] = useState<TaskView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -111,14 +123,14 @@ export function DispatchPanel() {
     api<Health>("health", undefined, controller.signal)
       .then((value) => {
         setHealth(value);
-        if (value.active_task_id && !rememberedTask())
-          setTaskId(value.active_task_id);
+        const active = value.active_task_id;
+        if (active) setTaskId((current) => current || active);
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(`服务未就绪：${e.message}`);
       });
     return () => controller.abort();
-  }, []);
+  }, [setTaskId]);
   useEffect(() => {
     if (!taskId) return;
     const controller = new AbortController();

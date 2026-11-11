@@ -80,6 +80,7 @@ class Context(Contract):
     is_simulated: Literal[True] = True
     sampled_at: datetime
     task_id: Literal["T-S1-01"] = "T-S1-01"
+    selected_task_id: UUID | None = None
     route_id: Literal["S1-01-baseline"] = "S1-01-baseline"
     progress: float = Field(ge=0, le=1)
     telemetry_mode: Literal["demo", "live"] = "demo"

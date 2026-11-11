@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from services.api.runtime import LocalDispatch
 from services.assistant import app as api
 from services.assistant.engine import Engine, ModelUnavailable, Settings
 from services.assistant.models import Bounds, Draft, Terrain, Turn
@@ -237,6 +238,47 @@ def test_model_without_evidence_cannot_present_it_as_queried_facts():
     result = Engine(Settings(provider="maas"), model).run(make_turn(), lambda p: None)
     assert "飞行完成" not in result["text"]
     assert "未查询业务证据" in result["text"]
+
+
+def test_task_status_uses_selected_dispatch_and_separates_ack_from_completion(tmp_path):
+    now = [datetime.now(UTC)]
+    turn = make_turn("这单现在到哪了？")
+    local = Engine(Settings())
+    empty = local.run(turn, lambda _: None)
+    assert empty["task_status"] is None
+    assert "选择要查询的任务" in empty["text"]
+
+    dispatch = LocalDispatch(tmp_path, clock=lambda: now[0])
+    try:
+        proposal = dispatch.propose("S1-01")
+        task_id = proposal["task_id"]
+        turn.context.selected_task_id = UUID(task_id)
+        pending = local.run(turn, lambda _: None, read_dispatch_task=dispatch.get)["task_status"]
+        assert pending["planning_status"] == "awaiting_confirmation"
+        assert pending["ack_accepted"] is None
+        dispatch.confirm(task_id, proposal["review_digest"])
+
+        model = FakeModel(
+            [tool_call("get_task_status", {}), {"role": "assistant", "content": "合成执行完成。"}]
+        )
+        result = Engine(Settings(provider="maas"), model).run(
+            turn, lambda _: None, read_dispatch_task=dispatch.get
+        )
+        status = result["task_status"]
+        assert (status["task_id"], status["plan_version"]) == (task_id, "v1")
+        assert status["ack_accepted"] is True
+        assert status["execution_state"] == "executing"
+        assert result["text"].startswith("合成执行中")
+        assert [trace["name"] for trace in result["traces"]] == ["get_task_status"]
+        assert dispatch.store.count() == 1
+
+        now[0] += timedelta(hours=1)
+        dispatch.tick()
+        completed = local.run(turn, lambda _: None, read_dispatch_task=dispatch.get)
+        assert completed["task_status"]["execution_state"] == "completed"
+        assert completed["text"].startswith("合成执行完成")
+    finally:
+        dispatch.close()
 
 
 def test_model_loop_is_bounded_and_does_not_fallback_silently():

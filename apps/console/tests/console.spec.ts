@@ -93,6 +93,67 @@ test("scene, 2D/3D controls, replay and exports work without external map servic
   expect(errors).toEqual([]);
 });
 
+test("ASCII terminal map rasterizes the scene and follows the replay cursor", async ({
+  page,
+}) => {
+  const toggle = page.getByRole("button", { name: "终端地图", exact: true });
+  const toolbar = page.locator(".map-toolbar");
+  const title = toolbar.locator(".map-title strong");
+  await expect(title).toHaveText("空域态势");
+  await toggle.click();
+  await expect(title).toHaveText("空域态势");
+  await expect(toolbar.getByRole("button", { name: "地形实验" })).toBeVisible();
+  await expect(
+    toolbar.getByRole("button", { name: "3D", exact: true }),
+  ).toBeVisible();
+  const figure = page.getByRole("figure", { name: "ASCII 终端地图" });
+  const map = figure.locator("pre");
+  await expect(map).toBeVisible();
+  for (const surface of [figure, map]) {
+    await expect(surface).toHaveCSS("background-image", "none");
+    await expect(surface).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  }
+  for (const ink of ["building", "zone", "route", "site", "terrain"]) {
+    await expect(map.locator('[data-ink="' + ink + '"]').first()).toBeVisible();
+  }
+  await expect(map).toContainText("+-----");
+  await expect(
+    map.locator('[data-ink="route"]').filter({ hasText: "*" }).first(),
+  ).toBeVisible();
+  const layers = toolbar.getByRole("button", { name: "地图图层" });
+  await layers.click();
+  const restrictions = toolbar.getByRole("button", {
+    name: "限制区",
+    exact: true,
+  });
+  await restrictions.click();
+  await expect(map.locator('[data-ink="zone"]')).toHaveCount(0);
+  await restrictions.click();
+  await expect(map.locator('[data-ink="zone"]').first()).toBeVisible();
+  await layers.click();
+  await page.getByRole("button", { name: "暂停演示 空格" }).click();
+  const replay = page.getByRole("slider", { name: "演示轨迹进度" });
+  await replay.press("Home");
+  await expect(map.locator('[data-flight="passed"]')).toHaveCount(0);
+  await expect(map.locator('[data-flight="upcoming"]').first()).toBeVisible();
+  const start = await map.textContent();
+  expect(start).toMatch(/^[\x20-\x7E\n]+$/);
+  await replay.press("End");
+  await expect(map).not.toHaveText(start ?? "");
+  await expect(map).toContainText("@");
+  await expect(map.locator('[data-flight="passed"]').first()).toBeVisible();
+  await expect(page.getByTitle("航图回放进度")).toHaveText(
+    Math.round(Number(await replay.inputValue()) * 100) + "%",
+  );
+  await toolbar.getByRole("button", { name: "2D", exact: true }).click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".map-render canvas")).toBeVisible();
+  await toggle.click();
+  await expect(map).toBeVisible();
+  await toggle.click();
+  await expect(page.locator(".map-render canvas")).toBeVisible();
+});
+
 test("panels can be hidden, restored, and remembered; focus view remains reversible", async ({
   page,
 }) => {
