@@ -1,5 +1,59 @@
 import { useEffect, useState } from "react";
-import type { Telemetry } from "./types";
+import type { LiveTelemetry, Telemetry } from "./types";
+
+const STALE_MS = 5000;
+
+export function useLiveTelemetry(enabled: boolean) {
+  const [frame, setFrame] = useState<LiveTelemetry | null>(null);
+  const [status, setStatus] = useState<
+    "connecting" | "waiting" | "live" | "stale" | "offline"
+  >("connecting");
+
+  useEffect(() => {
+    if (!enabled) {
+      setFrame(null);
+      setStatus("connecting");
+      return;
+    }
+    const stream = new EventSource("/api/telemetry/stream");
+    let newest = -Infinity;
+    let expiration: number | undefined;
+    stream.onopen = () => {
+      if (newest === -Infinity) setStatus("waiting");
+    };
+    stream.onerror = () => setStatus("offline");
+    stream.onmessage = (event) => {
+      let sample: LiveTelemetry;
+      try {
+        sample = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (
+        typeof sample?.source !== "string" ||
+        typeof sample.captured_at !== "string" ||
+        typeof sample.is_simulated !== "boolean"
+      )
+        return;
+      const captured = Date.parse(sample.captured_at);
+      if (!Number.isFinite(captured) || captured < newest) return;
+      const remaining = captured + STALE_MS - Date.now();
+      if (remaining > 2 * STALE_MS) return;
+      newest = captured;
+      setFrame(sample);
+      setStatus(remaining > 0 ? "live" : "stale");
+      window.clearTimeout(expiration);
+      if (remaining > 0)
+        expiration = window.setTimeout(() => setStatus("stale"), remaining);
+    };
+    return () => {
+      stream.close();
+      window.clearTimeout(expiration);
+    };
+  }, [enabled]);
+
+  return { frame, status };
+}
 
 export const initialTelemetry: Telemetry = {
   battery: 83.4,

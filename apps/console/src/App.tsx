@@ -74,6 +74,7 @@ import {
   formatCoordinates,
   loadGeoMission,
   validGeoPlace,
+  validLngLat,
   type GeoMission,
   type GeoPlace,
   type LngLat,
@@ -81,7 +82,7 @@ import {
 import "./enhancements.css";
 import { Attitude, MarginChart, Sparkline } from "./Charts";
 import { demoPatch, TerrainModel } from "./terrain";
-import { useFlight } from "./useFlight";
+import { useFlight, useLiveTelemetry } from "./useFlight";
 import Assistant from "./assistant/Assistant";
 import type { AssistantDraft, PreviewRoute } from "./assistant/types";
 import type {
@@ -92,6 +93,9 @@ import type {
   TerrainPatch,
   ViewMode,
 } from "./types";
+
+const metric = (value: number | null | undefined, digits = 1) =>
+  value?.toFixed(digits) ?? "—";
 
 const initialEvents: EventItem[] = [
   {
@@ -367,7 +371,40 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLElement>(null);
   const revision = useRef(0);
-  const { telemetry: t, progress, tick, setProgress } = useFlight(playing);
+  const [liveMode, setLiveMode] = useState(
+    () =>
+      new URLSearchParams(window.location.search).get("telemetry") === "live",
+  );
+  const {
+    telemetry: t,
+    progress,
+    tick,
+    setProgress,
+  } = useFlight(playing && !liveMode);
+  const { frame: liveFrame, status: liveStatus } = useLiveTelemetry(liveMode);
+  const readings = liveMode ? liveFrame : t;
+  const liveSource =
+    liveFrame?.source === "sim:px4_sitl" || liveFrame?.source === "fc:px4_sitl"
+      ? "PX4 SITL"
+      : (liveFrame?.source ?? "M4");
+  const liveStatusText = {
+    connecting: "正在连接遥测",
+    waiting: "等待遥测",
+    live: "实时",
+    stale: "遥测已过期",
+    offline: "遥测连接中断",
+  }[liveStatus];
+  const position = liveFrame?.position;
+  const coordinates =
+    liveMode && liveStatus === "live" && position?.frame === "WGS84"
+      ? [position.lon_deg, position.lat_deg]
+      : null;
+  const livePoint = validLngLat(coordinates) ? coordinates : null;
+  const altitudeLabel = liveMode
+    ? { agl: "离地高度", amsl: "海拔高度", rel_takeoff: "相对起飞点高度" }[
+        liveFrame?.altitude_ref ?? "rel_takeoff"
+      ]
+    : "相对高度";
   const events = useMemo(
     () =>
       [
@@ -575,13 +612,16 @@ export default function App() {
       schema_version: "aeris-ui-0.1",
       exported_at: new Date().toISOString(),
       provenance: {
-        is_simulated: true,
-        source: "frontend demo, not PX4 telemetry or safety evaluation",
+        is_simulated: liveMode ? (liveFrame?.is_simulated ?? null) : true,
+        source: liveMode ? (liveFrame?.source ?? null) : "frontend demo",
+        captured_at: liveMode ? (liveFrame?.captured_at ?? null) : null,
+        telemetry_mode: liveMode ? "live" : "demo",
+        telemetry_status: liveMode ? liveStatus : null,
       },
-      telemetry: t,
+      telemetry: readings,
       terrain,
       events,
-      progress,
+      progress: liveMode ? null : progress,
       drafts,
       geographic_mission: {
         crs: "EPSG:4326",
@@ -604,13 +644,17 @@ export default function App() {
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `aeris-DEMO-${Date.now()}.json`;
+    anchor.download = `aeris-${liveMode ? "TELEMETRY" : "DEMO"}-${Date.now()}.json`;
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
     // Give the browser time to start the download before releasing its source.
     window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-    notify("已导出演示快照，含数据来源标识");
+    notify(
+      liveMode
+        ? "已导出遥测快照，含采样时间和来源"
+        : "已导出演示快照，含数据来源标识",
+    );
   };
   const connectTerrain = () => {
     if (socket.current) {
@@ -712,10 +756,21 @@ export default function App() {
           <button onClick={() => setDrawer("events")}>飞行记录</button>
         </nav>
         <div className="top-right">
-          <span className="environment">
-            <span className="status-dot" /> DEMO{" "}
-            <span className="environment-label">演示数据</span>
-          </span>
+          <button
+            className="environment"
+            aria-label="实时遥测"
+            aria-pressed={liveMode}
+            title={liveMode ? "切换到演示回放" : "切换到 M4 实时遥测"}
+            onClick={() => {
+              if (!liveMode) setMapKind("world");
+              setLiveMode(!liveMode);
+            }}
+          >
+            <span className="status-dot" /> {liveMode ? "LIVE" : "DEMO"}{" "}
+            <span className="environment-label">
+              {liveMode ? "实时遥测" : "演示数据"}
+            </span>
+          </button>
           <time className="clock">
             {clock}
             <small>UTC+8</small>
@@ -833,40 +888,96 @@ export default function App() {
             </span>
             <div>
               <strong>
-                AER-01 <span>四旋翼 · 仿真机</span>
+                {liveMode ? liveSource : "AER-01"}{" "}
+                <span>
+                  {liveMode
+                    ? liveFrame?.is_simulated
+                      ? "仿真遥测"
+                      : "遥测"
+                    : "四旋翼 · 仿真机"}
+                </span>
               </strong>
               <small>
-                <span className="status-dot" />{" "}
-                {playing ? "演示巡航中" : "演示已暂停"}{" "}
-                <span className="muted">/ AUTO.MISSION</span>
+                {(!liveMode || liveStatus === "live") && (
+                  <span className="status-dot" />
+                )}{" "}
+                {liveMode
+                  ? liveStatusText
+                  : playing
+                    ? "演示巡航中"
+                    : "演示已暂停"}{" "}
+                <span className="muted">
+                  /{" "}
+                  {liveMode ? (liveFrame?.flight_mode ?? "—") : "AUTO.MISSION"}
+                </span>
               </small>
             </div>
             <ChevronDown size={14} />
           </div>
           <div className="summary-item">
-            <span>任务编号</span>
+            <span>{liveMode ? "电量 / 电压" : "任务编号"}</span>
             <strong>
-              T-S1-01 <i>BASELINE</i>
+              {liveMode ? (
+                <>
+                  {metric(liveFrame?.battery)}
+                  <small>%</small>
+                  <small> / {metric(liveFrame?.voltage)} V</small>
+                </>
+              ) : (
+                <>
+                  T-S1-01 <i>BASELINE</i>
+                </>
+              )}
             </strong>
           </div>
           <div className="summary-item">
-            <span>航程进度</span>
+            <span>{liveMode ? "地速" : "航程进度"}</span>
             <strong>
-              {(progress * 3.67).toFixed(2)} <small>/ 3.67 km</small>
+              {liveMode ? (
+                <>
+                  {metric(liveFrame?.speed)} <small>m/s</small>
+                </>
+              ) : (
+                <>
+                  {(progress * 3.67).toFixed(2)} <small>/ 3.67 km</small>
+                </>
+              )}
             </strong>
           </div>
           <div className="summary-item">
             <span>
-              剩余航时 <small>示例</small>
+              {liveMode ? (
+                "俯仰 / 横滚"
+              ) : (
+                <>
+                  剩余航时 <small>示例</small>
+                </>
+              )}
             </span>
             <strong>
-              08<span className="colon">:</span>42 <small>min</small>
+              {liveMode ? (
+                <>
+                  {metric(liveFrame?.pitch)}° <small>/</small>{" "}
+                  {metric(liveFrame?.roll)}°
+                </>
+              ) : (
+                <>
+                  08<span className="colon">:</span>42 <small>min</small>
+                </>
+              )}
             </strong>
           </div>
           <div className="summary-item link-summary">
-            <span>云边链路</span>
+            <span>{liveMode ? "遥测状态" : "云边链路"}</span>
             <strong>
-              <Radio size={14} /> 演示连接 <small>{t.rtt} ms</small>
+              <Radio size={14} />{" "}
+              {liveMode ? (
+                liveStatusText
+              ) : (
+                <>
+                  演示连接 <small>{t.rtt} ms</small>
+                </>
+              )}
             </strong>
           </div>
           <div className="summary-safe">
@@ -904,27 +1015,29 @@ export default function App() {
                   <MapPin size={13} />
                   <span>地点定位</span>
                 </button>
-                <button
-                  className="map-surface-toggle"
-                  onClick={() => {
-                    setMapKind((k) => (k === "world" ? "terrain" : "world"));
-                    setLocationOpen(false);
-                    setMapError("");
-                  }}
-                  title="在真实地图与原始地形实验视图间切换"
-                >
-                  {mapKind === "world" ? (
-                    <>
-                      <Mountain size={13} />
-                      <span>地形实验</span>
-                    </>
-                  ) : (
-                    <>
-                      <Globe2 size={13} />
-                      <span>真实地图</span>
-                    </>
-                  )}
-                </button>
+                {!liveMode && (
+                  <button
+                    className="map-surface-toggle"
+                    onClick={() => {
+                      setMapKind((k) => (k === "world" ? "terrain" : "world"));
+                      setLocationOpen(false);
+                      setMapError("");
+                    }}
+                    title="在真实地图与原始地形实验视图间切换"
+                  >
+                    {mapKind === "world" ? (
+                      <>
+                        <Mountain size={13} />
+                        <span>地形实验</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe2 size={13} />
+                        <span>真实地图</span>
+                      </>
+                    )}
+                  </button>
+                )}
                 <div className="segmented">
                   <button
                     className={mode === "2d" ? "selected" : ""}
@@ -976,8 +1089,10 @@ export default function App() {
                 }
                 preview={assistantPreview}
                 comparison={reviewRoute}
-                kind={mapKind}
-                demoVisible={demoVisible}
+                kind={liveMode ? "world" : mapKind}
+                demoVisible={!liveMode && demoVisible}
+                liveMode={liveMode}
+                livePoint={livePoint}
                 realTerrain={realTerrain}
                 reducedMotion={motionReduced}
                 terrainModel={terrainModel}
@@ -1026,7 +1141,8 @@ export default function App() {
                 </div>
               )}
               <div className="map-vignette" />
-              {reviewRoute &&
+              {!liveMode &&
+                reviewRoute &&
                 mapKind === "world" &&
                 demoVisible &&
                 layers.routes && (
@@ -1041,7 +1157,7 @@ export default function App() {
                     </button>
                   </div>
                 )}
-              {assistantPreview && (
+              {!liveMode && assistantPreview && (
                 <div className="assistant-preview-label">
                   <Sparkles size={12} /> 助手几何预览 · 不替换当前任务{" "}
                   <button
@@ -1052,13 +1168,13 @@ export default function App() {
                   </button>
                 </div>
               )}
-              {assistantFocus && (
+              {!liveMode && assistantFocus && (
                 <div className="assistant-map-focus">
                   <MapPin size={11} />
                   {assistantFocus}
                 </div>
               )}
-              {panels.mission && !focus && !locationOpen && (
+              {!liveMode && panels.mission && !focus && !locationOpen && (
                 <div className="mission-card glass">
                   <div className="mission-card-top">
                     <span>当前任务</span>
@@ -1113,7 +1229,7 @@ export default function App() {
                 </span>
                 <ChevronRight size={13} />
               </button>
-              {panels.perception && !focus && (
+              {!liveMode && panels.perception && !focus && (
                 <div className="perception-card glass">
                   <div className="mission-card-top">
                     <span>
@@ -1280,59 +1396,84 @@ export default function App() {
                 </span>
               </div>
             </div>
-            <div className="playback">
-              <IconButton
-                label={playing ? "暂停演示 空格" : "继续演示 空格"}
-                active={!playing}
-                onClick={() => setPlaying((v) => !v)}
-              >
-                {playing ? <Pause size={14} /> : <Play size={14} />}
-              </IconButton>
-              <span className="playback-time">
-                {Math.floor(progress * 8)
-                  .toString()
-                  .padStart(2, "0")}
-                :
-                {Math.floor((progress * 480) % 60)
-                  .toString()
-                  .padStart(2, "0")}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max="0.99"
-                step="0.001"
-                value={progress}
-                aria-label="演示轨迹进度"
-                onChange={(e) => setProgress(Number(e.target.value))}
-                style={
-                  {
-                    "--range-progress": `${progress * 100}%`,
-                  } as React.CSSProperties
-                }
-              />
-              <span className="playback-duration">08:00</span>
-              <span className="playback-live">
-                <span className="status-dot" />
-                {playing ? "演示回放" : "已暂停"}
-              </span>
-              <button
-                className="playback-speed"
-                onClick={() => {
-                  setProgress(0.43);
-                  notify("已回到任务演示起点");
-                }}
-              >
-                重置
-              </button>
-            </div>
+            {liveMode ? (
+              <div className="playback" aria-live="polite">
+                <span className="playback-live">
+                  {liveSource} · {liveStatusText}
+                  {liveFrame?.is_simulated ? " · 仿真" : ""}
+                </span>
+                {liveFrame && (
+                  <time
+                    className="playback-time"
+                    dateTime={liveFrame.captured_at}
+                  >
+                    {new Date(liveFrame.captured_at).toLocaleTimeString()}
+                  </time>
+                )}
+                {position && position.frame !== "WGS84" && (
+                  <small>
+                    {position.frame} · {metric(position.x_m)} /{" "}
+                    {metric(position.y_m)} / {metric(position.z_m)} m
+                  </small>
+                )}
+              </div>
+            ) : (
+              <div className="playback">
+                <IconButton
+                  label={playing ? "暂停演示 空格" : "继续演示 空格"}
+                  active={!playing}
+                  onClick={() => setPlaying((v) => !v)}
+                >
+                  {playing ? <Pause size={14} /> : <Play size={14} />}
+                </IconButton>
+                <span className="playback-time">
+                  {Math.floor(progress * 8)
+                    .toString()
+                    .padStart(2, "0")}
+                  :
+                  {Math.floor((progress * 480) % 60)
+                    .toString()
+                    .padStart(2, "0")}
+                </span>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.99"
+                  step="0.001"
+                  value={progress}
+                  aria-label="演示轨迹进度"
+                  onChange={(e) => setProgress(Number(e.target.value))}
+                  style={
+                    {
+                      "--range-progress": `${progress * 100}%`,
+                    } as React.CSSProperties
+                  }
+                />
+                <span className="playback-duration">08:00</span>
+                <span className="playback-live">
+                  <span className="status-dot" />
+                  {playing ? "演示回放" : "已暂停"}
+                </span>
+                <button
+                  className="playback-speed"
+                  onClick={() => {
+                    setProgress(0.43);
+                    notify("已回到任务演示起点");
+                  }}
+                >
+                  重置
+                </button>
+              </div>
+            )}
           </section>
 
           {panels.instruments && !focus && (
             <aside className="instruments">
               <section className="panel telemetry-panel">
                 <PanelTitle title="飞行遥测" subtitle="TELEMETRY">
-                  <span className="panel-indicator">合成数据</span>
+                  <span className="panel-indicator">
+                    {liveMode ? liveStatusText : "合成数据"}
+                  </span>
                   <IconButton
                     label="隐藏飞行仪表 2"
                     onClick={() => togglePanel("instruments")}
@@ -1343,15 +1484,15 @@ export default function App() {
                 <div className="flight-main-metrics">
                   <div>
                     <span>
-                      相对高度 <small>ALT</small>
+                      {altitudeLabel} <small>ALT</small>
                     </span>
                     <strong>
-                      {t.altitude.toFixed(1)}
+                      {metric(readings?.altitude)}
                       <small>m</small>
                     </strong>
                     <span className="metric-trend">
                       <ArrowUpRight size={11} />
-                      {t.climb.toFixed(1)} m/s
+                      {metric(readings?.climb)} m/s
                     </span>
                   </div>
                   <div>
@@ -1359,11 +1500,12 @@ export default function App() {
                       地速 <small>GND</small>
                     </span>
                     <strong>
-                      {t.speed.toFixed(1)}
+                      {metric(readings?.speed)}
                       <small>m/s</small>
                     </strong>
                     <span className="metric-trend muted">
-                      航向 {t.heading.toFixed(0)}° NE
+                      航向 {metric(readings?.heading, 0)}°
+                      {liveMode ? "" : " NE"}
                     </span>
                   </div>
                 </div>
@@ -1373,7 +1515,9 @@ export default function App() {
                       <Zap size={12} /> 电源状态
                     </span>
                     <strong>
-                      {t.battery.toFixed(1)}
+                      <span data-testid="telemetry-battery">
+                        {metric(readings?.battery)}
+                      </span>
                       <small>%</small>
                     </strong>
                   </div>
@@ -1381,7 +1525,11 @@ export default function App() {
                     {Array.from({ length: 30 }, (_, i) => (
                       <i
                         key={i}
-                        className={i / 30 < t.battery / 100 ? "filled" : ""}
+                        className={
+                          i / 30 < (readings?.battery ?? 0) / 100
+                            ? "filled"
+                            : ""
+                        }
                       />
                     ))}
                   </div>
@@ -1389,67 +1537,100 @@ export default function App() {
                     <span>
                       电压{" "}
                       <b>
-                        {t.voltage.toFixed(1)}
+                        {metric(readings?.voltage)}
                         <small> V</small>
                       </b>
                     </span>
                     <span>
                       电流{" "}
                       <b>
-                        {t.current.toFixed(1)}
+                        {metric(readings?.current)}
                         <small> A</small>
                       </b>
                     </span>
                     <span>
                       能量{" "}
                       <b>
-                        {t.energyWh?.toFixed(0) ?? "—"}
+                        {metric(readings?.energyWh, 0)}
                         <small> Wh</small>
                       </b>
                     </span>
                   </div>
                 </div>
-                <div className="link-row">
-                  <div>
-                    <Wifi size={13} />
+                {liveMode ? (
+                  <div className="metric-mode-line">
                     <span>
-                      {t.rssi} <small>dBm</small>
+                      MODE <b>{liveFrame?.flight_mode ?? "—"}</b>
                     </span>
-                    <i className="signal-bars">
-                      <b />
-                      <b />
-                      <b />
-                      <b />
-                      <b />
-                    </i>
+                    <span>
+                      飞行{" "}
+                      <b>
+                        {liveFrame?.in_air == null
+                          ? "—"
+                          : liveFrame.in_air
+                            ? "空中"
+                            : "地面"}
+                      </b>
+                    </span>
+                    <span>
+                      GPS <b>{liveFrame?.gps_fix ?? "—"}</b>
+                    </span>
+                    {liveFrame?.task_id && (
+                      <span>
+                        任务 <b>{liveFrame.task_id}</b>
+                      </span>
+                    )}
+                    {liveFrame?.plan_version && (
+                      <span>
+                        方案 <b>{liveFrame.plan_version}</b>
+                      </span>
+                    )}
                   </div>
-                  <span>
-                    GNSS <b>{t.satellites}</b>
-                    <span className="link-divider" />
-                    HDOP <b>{t.hdop}</b>
-                  </span>
-                </div>
-                <div className="metric-mode-line">
-                  <span>
-                    MODE <b>AUTO.MISSION</b>
-                  </span>
-                  <span>
-                    GPS <b>3D FIX</b>
-                  </span>
-                  <span>
-                    延迟 <b>{t.rtt} ms</b>
-                  </span>
-                  <span>
-                    链路{" "}
-                    <i className="metric-signal">
-                      <i
-                        style={{
-                          width: `${Math.max(0, Math.min(100, (t.rssi + 100) * 2))}%`,
-                        }}
-                      />
-                    </i>
-                  </span>
-                </div>
+                ) : (
+                  <>
+                    <div className="link-row">
+                      <div>
+                        <Wifi size={13} />
+                        <span>
+                          {t.rssi} <small>dBm</small>
+                        </span>
+                        <i className="signal-bars">
+                          <b />
+                          <b />
+                          <b />
+                          <b />
+                          <b />
+                        </i>
+                      </div>
+                      <span>
+                        GNSS <b>{t.satellites}</b>
+                        <span className="link-divider" />
+                        HDOP <b>{t.hdop}</b>
+                      </span>
+                    </div>
+                    <div className="metric-mode-line">
+                      <span>
+                        MODE <b>AUTO.MISSION</b>
+                      </span>
+                      <span>
+                        GPS <b>3D FIX</b>
+                      </span>
+                      <span>
+                        延迟 <b>{t.rtt} ms</b>
+                      </span>
+                      <span>
+                        链路{" "}
+                        <i className="metric-signal">
+                          <i
+                            style={{
+                              width: `${Math.max(0, Math.min(100, (t.rssi + 100) * 2))}%`,
+                            }}
+                          />
+                        </i>
+                      </span>
+                    </div>
+                  </>
+                )}
               </section>
               <section className="panel propulsion-panel">
                 <PanelTitle title="姿态与动力" subtitle="FLIGHT SYSTEM">
@@ -1457,42 +1638,53 @@ export default function App() {
                 </PanelTitle>
                 <div className="flight-instruments">
                   <div className="attitude-group">
-                    <Attitude pitch={t.pitch} roll={t.roll} />
+                    {readings?.pitch != null && readings.roll != null && (
+                      <Attitude pitch={readings.pitch} roll={readings.roll} />
+                    )}
                     <div className="attitude-values">
                       <span>
-                        P <b>{t.pitch.toFixed(1)}°</b>
+                        P <b>{metric(readings?.pitch)}°</b>
                       </span>
                       <span>
                         R{" "}
                         <b>
-                          {t.roll > 0 ? "+" : ""}
-                          {t.roll.toFixed(1)}°
+                          {(readings?.roll ?? 0) > 0 ? "+" : ""}
+                          {metric(readings?.roll)}°
                         </b>
                       </span>
                     </div>
                   </div>
-                  <div className="rotors">
-                    <div className="rotors-header">
-                      旋翼转速 <span>RPM</span>
+                  {!liveMode && (
+                    <div className="rotors">
+                      <div className="rotors-header">
+                        旋翼转速 <span>RPM</span>
+                      </div>
+                      <div className="rotor-grid">
+                        {t.rotors.map((rpm, i) => (
+                          <Rotor
+                            key={i}
+                            index={i}
+                            rpm={rpm}
+                            playing={playing}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <div className="rotor-grid">
-                      {t.rotors.map((rpm, i) => (
-                        <Rotor key={i} index={i} rpm={rpm} playing={playing} />
-                      ))}
+                  )}
+                </div>
+                {!liveMode && (
+                  <div className="motor-wave">
+                    <div>
+                      <span>
+                        <AudioLines size={12} /> 电机电流
+                      </span>
+                      <span>
+                        {t.motorTemp}°C <i>温度示例</i>
+                      </span>
                     </div>
+                    <Sparkline color="#aeb9c9" phase={tick / 8} height={31} />
                   </div>
-                </div>
-                <div className="motor-wave">
-                  <div>
-                    <span>
-                      <AudioLines size={12} /> 电机电流
-                    </span>
-                    <span>
-                      {t.motorTemp}°C <i>温度示例</i>
-                    </span>
-                  </div>
-                  <Sparkline color="#aeb9c9" phase={tick / 8} height={31} />
-                </div>
+                )}
               </section>
             </aside>
           )}
@@ -1607,8 +1799,9 @@ export default function App() {
         )}
         <footer className="statusbar">
           <span>
-            <span className="status-dot" /> LOCAL DEMO <i />{" "}
-            演示仪表不代表真实飞控遥测
+            <span className="status-dot" />{" "}
+            {liveMode ? "M4 TELEMETRY" : "LOCAL DEMO"} <i />{" "}
+            {liveMode ? "场景与备降剖面为示例" : "演示仪表不代表真实飞控遥测"}
           </span>
           <div>
             <span>地形阈值 ≥ 2 m</span>
@@ -1625,12 +1818,17 @@ export default function App() {
         onToggle={() => setAssistantOpen((v) => !v)}
         context={{
           is_simulated: true,
-          sampled_at: new Date().toISOString(),
+          sampled_at:
+            liveMode && liveFrame
+              ? liveFrame.captured_at
+              : new Date().toISOString(),
           task_id: "T-S1-01",
           route_id: "S1-01-baseline",
-          progress,
-          telemetry: t,
-          terrain,
+          progress: liveMode ? 0 : progress,
+          telemetry_mode: liveMode ? "live" : "demo",
+          telemetry: liveMode ? null : t,
+          live_telemetry: liveMode ? liveFrame : null,
+          terrain: liveMode ? null : terrain,
           events,
         }}
         onDraft={saveAssistantDraft}

@@ -628,7 +628,11 @@ export default function Assistant(props: Props) {
               )}
               {message.result && (
                 <div className="assistant-message-foot">
-                  <span>DEMO CONTEXT</span>
+                  <span>
+                    {props.context.telemetry_mode === "live"
+                      ? "LIVE TELEMETRY"
+                      : "DEMO CONTEXT"}
+                  </span>
                   <span>{message.result.turn_id.slice(0, 8)}</span>
                 </div>
               )}

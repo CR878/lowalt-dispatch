@@ -27,7 +27,7 @@ docker exec -it px4 bash /work/setup.sh
 
 # 3. 后台启动飞控（容器内；关掉 stdbuf 缓冲才能看到日志）
 docker exec -d px4 bash -c "cd /work/src/build/px4_sitl_default && \
-  ../bin/px4 -d > /work/sitl.log 2>&1"
+  ./bin/px4 -d > /work/sitl.log 2>&1"
 
 # 4. 装 mavsdk（容器内；必须 <4，4.x 换 native binding API 不兼容）
 docker exec px4 pip3 install "mavsdk<4"
@@ -45,7 +45,7 @@ docker exec px4 python3 /work/sitl_probe.py
 ```bash
 docker start px4
 docker exec -d px4 bash -c "cd /work/src/build/px4_sitl_default && \
-  ../bin/px4 -d > /work/sitl.log 2>&1"
+  ./bin/px4 -d > /work/sitl.log 2>&1"
 docker exec px4 pgrep -x px4        # 有 PID 就是起来了
 ```
 

@@ -74,6 +74,8 @@ export type GeoMapProps = {
   progress: number;
   playing: boolean;
   demoVisible: boolean;
+  liveMode: boolean;
+  livePoint: LngLat | null;
   realTerrain: boolean;
   reducedMotion: boolean;
   terrainModel: TerrainModel;
@@ -470,7 +472,9 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       const droneEl = document.createElement("div");
       droneEl.className = "geo-drone";
       droneEl.innerHTML =
-        '<span class="geo-drone-ring"></span><span class="geo-drone-body">✥</span><b>AER-01 <small>演示航迹</small></b>';
+        '<span class="geo-drone-ring"></span><span class="geo-drone-body">✥</span><b>无人机 <small></small></b>';
+      const droneLabel = droneEl.querySelector("small")!;
+      droneEl.hidden = true;
       const drone = new maplibregl.Marker({ element: droneEl })
         .setLngLat(enuToLngLat([150, 150]))
         .addTo(map);
@@ -478,12 +482,33 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         lastPreview = "",
         lastComparison = "",
         lastPins = "",
-        lastTerrain = false;
+        lastTerrain = false,
+        focusedLive = false;
       draw = () => {
+        const p = dynamic.current;
+        droneLabel.textContent = p.liveMode ? "实时遥测" : "演示航迹";
+        droneEl.hidden = p.liveMode
+          ? !p.livePoint || !mapReady
+          : !p.demoVisible || !p.layers.routes;
+        if (p.liveMode) {
+          lastProgress = -1;
+          if (p.livePoint && mapReady) {
+            drone.setLngLat(p.livePoint);
+            if (!focusedLive) {
+              map.jumpTo({ center: p.livePoint, zoom: 15.3 });
+              focusedLive = true;
+            }
+          }
+        } else {
+          focusedLive = false;
+        }
+        droneEl.classList.toggle(
+          "no-scan",
+          p.liveMode || !p.layers.scan || !p.playing || p.reducedMotion,
+        );
         if (disposed || !mapReady || !scene || !map.getSource("demo-route"))
           return;
-        const p = dynamic.current;
-        if (p.progress !== lastProgress) {
+        if (!p.liveMode && p.progress !== lastProgress) {
           lastProgress = p.progress;
           const point = pointAlong(scene.route, p.progress);
           drone.setLngLat(enuToLngLat(point));
@@ -505,11 +530,6 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             ]),
           );
         }
-        droneEl.hidden = !p.demoVisible || !p.layers.routes;
-        droneEl.classList.toggle(
-          "no-scan",
-          !p.layers.scan || !p.playing || p.reducedMotion,
-        );
         if ((p.preview?.route_id ?? "") !== lastPreview) {
           lastPreview = p.preview?.route_id ?? "";
           source(

@@ -19,10 +19,10 @@ v0.1 —— 骨架 + 一条能跑通的评测管道。
 - `agent/` —— M3 决策、审计恢复、M2适配、草稿确认与云服务基础接口；[最新运行与待办](docs/M3_2026-11-10基础接入与下一步.md)。本地可联调，真实MaaS/云资源/飞控仍待接入
 - `eval/` —— 评测 harness，一条命令跑 20 场景 × 3 种子 × 3 算法，产出带溯源 meta 的 CSV
 - `tests/` + `services/assistant/tests/` —— 公共契约、规划校验、M3/M4 与助手集成测试；2026-11-11 合并后实测 232 passed / 3 skipped（3 项为需真实 PostgreSQL/Redis/MQTT 的服务测试）
-- [`apps/console/`](apps/console/README.md) —— AERIS React/MapLibre 控制台：真实底图与选点、2D/3D、无人机演示仪表、地形版本变化、事件流、候选方案和可收起的调度助手
+- [`apps/console/`](apps/console/README.md) —— AERIS React/MapLibre 控制台：真实底图与选点、2D/3D、M4/PX4 SITL 实时遥测或演示回放、地形版本变化、事件流、候选方案和调度助手
 - [`services/assistant/`](services/assistant/README.md) —— 控制台本地工具服务、MaaS 工具调用适配与地点搜索；默认规则演示，不下发飞控
 
-**待完成的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（PX4 SITL 遥测通道已打通，见 [`ops/sitl/README.md`](ops/sitl/README.md)）、云端部署、机型参数，以及控制台与正式任务/遥测/规划接口的联调。
+**待完成的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（见 [`ops/sitl/README.md`](ops/sitl/README.md)）、云端部署、机型参数，以及控制台与正式任务和规划接口的联调。
 `apps/web/index.html` 有一张**硬编码静态战术态势台**（3D 倾斜俯视 + ASCII 侧栏），零依赖、不接 API、几何为草稿、数值为占位，仅用于可视化表达，不是上述正式工程。
 准确进度只看 [`事实文档.md`](事实文档.md)，别信 README 的乐观描述。
 

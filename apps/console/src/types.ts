@@ -36,6 +36,31 @@ export type Telemetry = {
   distanceToTarget: number;
   obstacleDistance: number;
 };
+export type LiveTelemetry = {
+  source: string;
+  is_simulated: boolean;
+  captured_at: string;
+  task_id: string | null;
+  plan_version: string | null;
+  position:
+    | { frame: "WGS84"; lon_deg: number; lat_deg: number }
+    | { frame: "NED" | "ENU"; x_m: number; y_m: number; z_m: number }
+    | null;
+  battery: number | null;
+  voltage: number | null;
+  current: number | null;
+  energyWh: number | null;
+  altitude: number | null;
+  altitude_ref: "rel_takeoff" | "amsl" | "agl" | null;
+  speed: number | null;
+  climb: number | null;
+  heading: number | null;
+  pitch: number | null;
+  roll: number | null;
+  in_air: boolean | null;
+  flight_mode: string | null;
+  gps_fix: string | null;
+};
 export type TerrainPatch = {
   revision: number;
   source: string;

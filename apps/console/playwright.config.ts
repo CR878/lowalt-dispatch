@@ -1,4 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolve } from "node:path";
+
+const telemetryFixture = resolve("test-results/telemetry-feed.ndjson");
 
 export default defineConfig({
   testDir: "./tests",
@@ -24,6 +27,7 @@ export default defineConfig({
       command: "npm run assistant",
       url: "http://127.0.0.1:8012/api/assistant/health",
       reuseExistingServer: !process.env.CI,
+      env: { AERIS_TELEMETRY_FILE: telemetryFixture },
     },
     {
       command: "npm run dev -- --port 5174 --strictPort",

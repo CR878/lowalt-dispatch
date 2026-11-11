@@ -198,6 +198,11 @@ class Engine:
         if re.search(r"复盘|总结|报告|飞行记录|发生了什么", text):
             flight, events = call("get_flight_status"), call("list_events")
             risk = call("inspect_terrain_risk") if turn.context.terrain else None
+            if flight.get("telemetry_mode") == "live":
+                return (
+                    f"遥测来源 {flight['source']}，最后采样 {flight['sampled_at'] or '暂无'}。"
+                    f"页面记录有 {events['total']} 条事件，属于本地会话。"
+                )
             lines = [
                 f"当前页面会话摘要：任务{flight['task_id']}，回放进度{flight['progress_pct']}%；共有{events['total']}条事件，其中{events['warnings']}条提示需要复核。",
                 "\n".join(
@@ -214,6 +219,8 @@ class Engine:
             call("get_flight_status")
             events = call("list_events")
             risk = call("inspect_terrain_risk")
+            if turn.context.telemetry_mode == "live":
+                return risk["reason"]
             return self._risk_text(risk) + (
                 f"\n\n当前还有{events['warnings']}条页面告警。请结合原始事件、数据时效及独立校验结果复核。"
                 if events["warnings"]
@@ -260,6 +267,23 @@ class Engine:
         if re.search(r"状态|电量|电池|高度|速度|姿态|链路|遥测|进度|GNSS", text, re.I):
             flight = call("get_flight_status")
             t = flight["telemetry"]
+            if flight.get("telemetry_mode") == "live":
+                if t is None:
+                    return "当前尚未收到 M4 遥测。"
+                values = (
+                    f"{label} {t[key]:.1f}{unit}"
+                    for key, label, unit in (
+                        ("battery", "电量", "%"),
+                        ("speed", "地速", " m/s"),
+                        ("roll", "横滚", "°"),
+                        ("pitch", "俯仰", "°"),
+                        ("heading", "航向", "°"),
+                    )
+                    if t[key] is not None
+                )
+                state = "遥测已过期。最后一帧" if flight["stale"] else "最新遥测"
+                status = "，".join(values) or "仪表读数暂无"
+                return f"{state} · {flight['source']} · {flight['sampled_at']}。\n\n{status}。"
             return (
                 ("该快照已经过期或时间不合法，请更新后再分析。\n\n" if flight["stale"] else "")
                 + f"任务 {flight['task_id']} · 回放进度 {flight['progress_pct']}%\n电量 {t['battery']:.1f}% / {t['voltage']:.1f}V，高度 {t['altitude']:.1f}m，地速 {t['speed']:.1f}m/s。\n链路RSSI {t['rssi']:g}dBm，GNSS {t['satellites']}颗卫星，HDOP {t['hdop']:g}。\n\n来源是浏览器演示遥测快照，未连接PX4；电量百分比不能独立证明备降可达。"

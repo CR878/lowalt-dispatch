@@ -14,6 +14,7 @@ from planner.astar import plan
 from planner.grid import build_grid
 from planner.scene import load_scene
 from services.assistant.models import Draft, DraftUpdate, NoArgs, Turn
+from services.assistant.telemetry import STALE_SECONDS
 
 ROOT = Path(__file__).resolve().parents[2]
 PLACES = {
@@ -71,7 +72,7 @@ def point_at(route, progress):
 
 class Toolset:
     SPECS = {
-        "get_flight_status": ("读取当前界面演示遥测、时间和来源，不作适航或备降安全判断。", NoArgs),
+        "get_flight_status": ("读取当前界面遥测、时间和来源，不作适航或备降安全判断。", NoArgs),
         "list_events": ("读取本次页面会话的事件记录并按类型统计。", NoArgs),
         "list_places": ("列出虚拟场景登记地点和局部ENU坐标，未知名称不能猜坐标。", NoArgs),
         "update_task_draft": ("仅更新用户明确提供的任务草稿字段；可多轮补充，缺失值保留未知。", DraftUpdate),
@@ -112,6 +113,20 @@ class Toolset:
 
     def get_flight_status(self, _args):
         ctx = self.turn.context
+        if ctx.telemetry_mode == "live":
+            frame = ctx.live_telemetry
+            age = frame.age_seconds() if frame else None
+            return {
+                "telemetry_mode": "live",
+                "source": frame.source if frame else "M4 遥测",
+                "sampled_at": frame.captured_at.isoformat() if frame else None,
+                "age_s": round(age, 1) if age is not None else None,
+                "stale": age is None or not -STALE_SECONDS <= age < STALE_SECONDS,
+                "is_simulated": frame.is_simulated if frame else None,
+                "task_id": frame.task_id if frame else None,
+                "telemetry": frame.model_dump(mode="json") if frame else None,
+            }
+        assert ctx.telemetry is not None
         age = (datetime.now(UTC) - ctx.sampled_at).total_seconds()
         return {
             "source": "浏览器演示遥测快照；非飞控数据",
@@ -205,6 +220,13 @@ class Toolset:
         }
 
     def inspect_terrain_risk(self, _args):
+        if self.turn.context.telemetry_mode == "live":
+            return {
+                "status": "no_change_data",
+                "source": "M4 遥测",
+                "reason": "实时遥测尚未关联可用于地形比对的航线。",
+                "dispatch_enabled": False,
+            }
         change = self.turn.context.terrain
         if not change or not change.count or not change.bounds:
             return {
@@ -255,7 +277,7 @@ class Toolset:
     def get_capabilities(self, _args):
         return {
             "available": [
-                "演示遥测查询",
+                "当前页面遥测查询",
                 "虚拟地点查询",
                 "多轮任务草稿",
                 "实际几何A*路线预览",

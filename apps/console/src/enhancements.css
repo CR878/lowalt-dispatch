@@ -197,6 +197,9 @@
   display: grid;
   place-items: center;
 }
+.geo-drone[hidden] {
+  display: none;
+}
 .geo-drone-body {
   font-size: 29px;
   text-shadow: 0 0 16px #98e0cf;

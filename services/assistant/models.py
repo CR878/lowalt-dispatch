@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from services.assistant.telemetry import LiveTelemetry
+
 
 class Contract(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
@@ -80,7 +82,9 @@ class Context(Contract):
     task_id: Literal["T-S1-01"] = "T-S1-01"
     route_id: Literal["S1-01-baseline"] = "S1-01-baseline"
     progress: float = Field(ge=0, le=1)
-    telemetry: Telemetry
+    telemetry_mode: Literal["demo", "live"] = "demo"
+    telemetry: Telemetry | None
+    live_telemetry: LiveTelemetry | None = None
     terrain: Terrain | None = None
     events: list[Event] = Field(default_factory=list, max_length=100)
 
@@ -90,6 +94,15 @@ class Context(Contract):
         if value.tzinfo is None:
             raise ValueError("Timezone required")
         return value
+
+    @model_validator(mode="after")
+    def telemetry_matches_mode(self):
+        if self.telemetry_mode == "demo":
+            if self.telemetry is None or self.live_telemetry is not None:
+                raise ValueError("Demo context requires demo telemetry")
+        elif self.telemetry is not None:
+            raise ValueError("Live context cannot contain demo telemetry")
+        return self
 
 
 class Draft(Contract):

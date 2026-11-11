@@ -1,4 +1,10 @@
-import type { EventItem, Point, Telemetry, TerrainChange } from "../types";
+import type {
+  EventItem,
+  LiveTelemetry,
+  Point,
+  Telemetry,
+  TerrainChange,
+} from "../types";
 
 export type AssistantDraft = {
   name: string;
@@ -13,7 +19,9 @@ export type AssistantContext = {
   task_id: "T-S1-01";
   route_id: "S1-01-baseline";
   progress: number;
-  telemetry: Telemetry;
+  telemetry_mode: "demo" | "live";
+  telemetry: Telemetry | null;
+  live_telemetry: LiveTelemetry | null;
   terrain: TerrainChange | null;
   events: EventItem[];
 };

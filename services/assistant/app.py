@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import queue
 import threading
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from services.assistant.engine import Engine, ModelUnavailable, Settings
 from services.assistant.models import Turn
 from services.assistant.places import search_places
+from services.assistant.telemetry import stream_telemetry
 
 app = FastAPI(title="AERIS assistant local BFF", docs_url="/api/assistant/docs", redoc_url=None)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
@@ -56,6 +58,18 @@ def health():
 @app.get("/api/assistant/places/search")
 def places(q: str):
     return search_places(q)
+
+
+@app.get("/api/telemetry/stream")
+async def telemetry_stream():
+    path = os.environ.get("AERIS_TELEMETRY_FILE")
+    if not path:
+        raise HTTPException(503, "M4 telemetry feed is not configured")
+    return StreamingResponse(
+        stream_telemetry(Path(path)),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 def write_audit(packet):

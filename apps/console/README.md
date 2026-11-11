@@ -40,6 +40,27 @@ node scripts/capture.mjs           # 本机 Chrome 截图，开发服务需在51
 
 图层菜单可隐藏全部演示叠加或启用全球 DEM。底图保留原 CARTO 样式及来源署名；网络不通时显示离线状态和重试按钮。地图瓦片、字体及全球 DEM 依赖外网，不需要在前端填写模型密钥。
 
+## 接收 M4 遥测
+
+后端从 AERIS_TELEMETRY_FILE 指定的 NDJSON 文件读取最近的完整帧。M4 可以持续写入现有 ExecutionObservation，或者用下列采集器直接接收 PX4 SITL 遥测。文件在采集端和控制台后端之间共享，每帧一行。M4 的 FakeExecutor 输出会被过滤。
+
+确认 PX4 在容器内运行后，从仓库根目录启动采集器。现有容器的 /work 对应宿主机 E:\px4。
+
+```powershell
+docker cp ops/sitl/stream_telemetry.py px4:/tmp/aeris-stream-telemetry.py
+docker exec px4 python3 -u /tmp/aeris-stream-telemetry.py /work/aeris-sitl-telemetry.ndjson
+```
+
+在另一个 PowerShell 从仓库根目录启动控制台。
+
+```powershell
+$env:AERIS_TELEMETRY_FILE = 'E:\px4\aeris-sitl-telemetry.ndjson'
+Set-Location apps/console
+npm.cmd run dev:all
+```
+
+打开 <http://127.0.0.1:5174/?telemetry=live>，或使用顶栏的遥测切换按钮。仪表、助手和导出使用同一采样帧。缺少的读数显示为「—」，连续 5 秒没有新帧时标记已过期。有效的 WGS84 位置会更新地图标记，局部 NED 或 ENU 则显示在遥测状态栏。采集器只订阅遥测，场景与备降余量剖面仍是示例。
+
 ## 已实现
 
 - 真实地理底图上的二维/三维相机、演示建筑体块、限制区、备降点、发光航线、进度与移动无人机。原有地形网格、等高线、河流示意保留在独立“地形实验”视图中。
@@ -65,7 +86,7 @@ node scripts/capture.mjs           # 本机 Chrome 截图，开发服务需在51
 
 航线、建筑平面、限制区、备降点来自仓库 `scenarios/v0/` 和 `planner.astar` 的 S1-01 几何基线：266个航点、20栋建筑、4处备降点；界面展示两处限制区。坐标为3×3km的虚拟局部ENU场景，不对应现实城区。路线约3.67km，仅代表几何规划结果。
 
-初始地形、建筑高度、仪表、感知参数、余量曲线和事件均为演示数据。没有连接PX4、M3决策服务或华为云。DEMO标识常驻；导出的快照包含来源标记。**这些参数和曲线不能作为比赛的算法效果、安全判定或飞行验证证据。**
+回放模式使用演示仪表。实时模式使用配置的 M4 或 PX4 SITL 遥测，导出保留采样时间和来源。初始地形、建筑高度、感知参数、余量曲线和回放事件均为演示数据。正式 M3 任务与华为云联调待完成。**演示参数和曲线仅供界面展示。**
 
 真实地图沿用码道前端的 CARTO Dark Matter 样式（`https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json`）和上海显示锚点 `[121.4737,31.2304]`。本地 ENU 几何经过显示换算叠加，**没有测绘配准，不代表该位置的真实建筑、限制区或可飞航路**。定位到其他城市不会把这些演示对象搬过去。可关闭演示叠加只看真实底图。
 

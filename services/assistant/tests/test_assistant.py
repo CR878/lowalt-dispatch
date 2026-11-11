@@ -75,6 +75,34 @@ def test_queries_have_real_tool_evidence_and_no_dispatch():
     assert [packet["type"] for packet in packets] == ["tool_start", "tool_result"]
 
 
+def test_live_status_uses_sample_and_preserves_zero_values():
+    sample_time = datetime.now(UTC).isoformat()
+    turn = make_turn(
+        "查询电量",
+        context={
+            "telemetry_mode": "live",
+            "telemetry": None,
+            "live_telemetry": {
+                "source": "test:m4",
+                "is_simulated": True,
+                "captured_at": sample_time,
+                "battery": 0,
+            },
+            "sampled_at": sample_time,
+            "progress": 0,
+        },
+    )
+    result, _ = run(turn)
+    tool = result["traces"][0]["result"]
+    assert tool["sampled_at"] == sample_time
+    assert tool["telemetry"]["battery"] == 0
+    assert tool["stale"] is False
+    assert "电量 0.0%" in result["text"]
+    turn.context.live_telemetry = None
+    result, _ = run(turn)
+    assert "尚未收到 M4 遥测" in result["text"]
+
+
 def test_multiturn_draft_and_actual_astar_preview():
     result, _ = run(make_turn("创建任务，从医疗物资中转站到北区应急中心"))
     assert result["draft"]["payload_kg"] is None
