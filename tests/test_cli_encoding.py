@@ -30,6 +30,7 @@ CLIS = [
     ("validator",),
     ("planner.astar",),
     ("tools.render_route", "S2-01"),
+    ("edge.demo", "--scenario", "S1-01"),
 ]
 
 

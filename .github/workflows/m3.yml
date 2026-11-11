@@ -1,10 +1,10 @@
-name: Test suite (M2 + M3)
+name: Test suite (M2 + M3 + M4)
 
 on:
   push:
-    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "requirements*.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "edge/**", "requirements*.txt", "pyproject.toml", ".github/workflows/m3.yml"]
   pull_request:
-    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "requirements*.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "edge/**", "requirements*.txt", "pyproject.toml", ".github/workflows/m3.yml"]
 
 permissions:
   contents: read
@@ -31,10 +31,11 @@ jobs:
       # 下面几步**故意不设** PYTHONUTF8：让 Windows runner 的真实 cp1252 控制台暴露问题。
       # 2026-11-09 的 CI 就是在这里红的（validator 打印中文 → UnicodeEncodeError），
       # 修复在 core/console.py；tests/test_cli_encoding.py 守着它。
-      - run: python -m ruff check agent validator planner sim core tests tools eval
-      - run: python -m ruff format --check agent validator core planner tools
+      - run: python -m ruff check agent validator planner sim core tests tools eval edge
+      - run: python -m ruff format --check agent validator core planner tools edge
       - run: python -m agent.demo --scenario all
       - run: python -m validator
+      - run: python -m edge.demo --scenario S1-01
       - run: python -m agent.integration check
       - run: python -m agent.integration demo --scenario S1-01
 

@@ -82,8 +82,8 @@ eval/            评测 harness + 场景集
 scenarios/v0/    草稿几何：建筑 / 限制区 / 备降点 —— 待 B 复核或重画
   vehicles/      机型平台参数 —— 待 A 填写，当前全为 null
 services/api/    FastAPI 后端 —— 未开始
-edge/            边缘 agent（云边断连时兜底）—— 未开始
-apps/web/        React + MapLibre 任务台 —— 未开始
+edge/            边缘执行端：去重/过期/ACK/遥测/重启恢复（控制流可用，SITL 未接）
+apps/web/        静态战术态势台（硬编码，不接 API）；React + MapLibre 工程未开始
 ops/             Compose 拓扑（含断连演示用的双网络）
 docs/            接口契约
 results/         评测产物；真实结果在冻结时提交，mock 永不入库

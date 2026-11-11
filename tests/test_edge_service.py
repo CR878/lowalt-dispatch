@@ -1,0 +1,179 @@
+"""端到端：受理、去重、过期、完成、重启恢复。"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+from core.models import PlanCommand
+from edge.executor import FakeExecutor
+from edge.service import EdgeService
+from edge.store import CommandStore
+from edge.telemetry import read_jsonl
+
+NOW = datetime(2026, 11, 11, 8, 0, tzinfo=UTC)
+
+
+class FakeClock:
+    def __init__(self, start: datetime) -> None:
+        self.now = start
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += timedelta(seconds=seconds)
+
+
+def _command(command_id: str = "cmd-1", *, expired: bool = False) -> PlanCommand:
+    issued = NOW - timedelta(seconds=120) if expired else NOW - timedelta(seconds=5)
+    expires = NOW - timedelta(seconds=60) if expired else NOW + timedelta(seconds=60)
+    return PlanCommand(
+        command_id=command_id,
+        task_id="task-1",
+        plan_version="v1",
+        issued_at=issued,
+        expires_at=expires,
+        payload={
+            "run_mode": "mock",
+            "waypoints": [
+                {"frame": "enu_m", "alt_ref": "agl", "x_m": 0.0, "y_m": 0.0, "alt_m": 0.0},
+                {"frame": "enu_m", "alt_ref": "agl", "x_m": 100.0, "y_m": 0.0, "alt_m": 30.0},
+            ],
+        },
+    )
+
+
+def _service(store: CommandStore, tmp_path, clock: FakeClock) -> EdgeService:
+    return EdgeService(
+        store,
+        audit_path=tmp_path / "audit.jsonl",
+        telemetry_path=tmp_path / "telemetry.jsonl",
+        clock=clock,
+        executor_factory=lambda points: FakeExecutor(points, speed_mps=50.0),
+    )
+
+
+def test_submit_and_complete(tmp_path) -> None:
+    clock = FakeClock(NOW)
+    with CommandStore(tmp_path / "edge.db") as store:
+        service = _service(store, tmp_path, clock)
+        try:
+            command = _command()
+            ack = service.submit(command)
+            assert ack.accepted
+            assert ack.fc_mode == "MOCK.AUTO.MISSION"
+
+            for _ in range(10):
+                clock.advance(1)
+                service.tick()
+
+            record = store.get(command.command_id)
+            assert record is not None
+            assert record.state == "completed"
+            assert record.execution_count == 1
+
+            samples = read_jsonl(tmp_path / "telemetry.jsonl")
+            assert samples
+            assert samples[0]["task_id"] == command.task_id
+            assert samples[0]["accepted_command_id"] == command.command_id
+            assert samples[0]["state"]["provenance"]["is_simulated"] is True
+        finally:
+            service.close()
+
+
+def test_duplicate_submit_executes_once(tmp_path) -> None:
+    clock = FakeClock(NOW)
+    with CommandStore(tmp_path / "edge.db") as store:
+        service = _service(store, tmp_path, clock)
+        try:
+            command = _command()
+            first = service.submit(command)
+            second = service.submit(command)
+            assert first.accepted
+            assert second == first
+            record = store.get(command.command_id)
+            assert record is not None
+            assert record.execution_count == 1
+        finally:
+            service.close()
+
+
+def test_expired_command_rejected_without_record(tmp_path) -> None:
+    clock = FakeClock(NOW)
+    with CommandStore(tmp_path / "edge.db") as store:
+        service = _service(store, tmp_path, clock)
+        try:
+            command = _command(expired=True)
+            ack = service.submit(command)
+            assert not ack.accepted
+            assert ack.reject_reason is not None
+            assert "过期" in ack.reject_reason
+            assert store.get(command.command_id) is None
+        finally:
+            service.close()
+
+
+def test_restart_returns_original_ack(tmp_path) -> None:
+    path = tmp_path / "edge.db"
+    command = _command()
+    with CommandStore(path) as store:
+        service = _service(store, tmp_path, FakeClock(NOW))
+        try:
+            original = service.submit(command)
+        finally:
+            service.close()
+
+    with CommandStore(path) as reopened:
+        service = _service(reopened, tmp_path, FakeClock(NOW))
+        try:
+            again = service.submit(command)
+            assert again == original
+            record = reopened.get(command.command_id)
+            assert record is not None
+            assert record.execution_count == 1
+        finally:
+            service.close()
+
+
+def test_recover_marks_pending_without_replay(tmp_path) -> None:
+    path = tmp_path / "edge.db"
+    command = _command()
+    with CommandStore(path) as store:
+        service = _service(store, tmp_path, FakeClock(NOW))
+        try:
+            service.submit(command)
+        finally:
+            service.close()
+
+    with CommandStore(path) as reopened:
+        service = _service(reopened, tmp_path, FakeClock(NOW))
+        try:
+            recovered = service.recover()
+            assert recovered == [command.command_id]
+            record = reopened.get(command.command_id)
+            assert record is not None
+            assert record.state == "recovering"
+            assert record.execution_count == 1
+        finally:
+            service.close()
+
+
+def test_executor_failure_marks_failed(tmp_path) -> None:
+    clock = FakeClock(NOW)
+    with CommandStore(tmp_path / "edge.db") as store:
+        service = EdgeService(
+            store,
+            audit_path=tmp_path / "audit.jsonl",
+            telemetry_path=tmp_path / "telemetry.jsonl",
+            clock=clock,
+            executor_factory=lambda points: FakeExecutor(points, speed_mps=-1),
+        )
+        try:
+            command = _command()
+            ack = service.submit(command)
+            assert not ack.accepted
+            record = store.get(command.command_id)
+            assert record is not None
+            assert record.state == "failed"
+        finally:
+            service.close()
