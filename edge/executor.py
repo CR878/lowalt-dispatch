@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from core.models import AltitudeReference, DataProvenance, Frame, PlanCommand, Position, VehicleState
+from edge.guard import command_waypoints
 
 
 class ExecutorError(RuntimeError):
@@ -45,7 +46,7 @@ class Executor(Protocol):
 
 def parse_waypoints(payload: dict) -> list[tuple[float, float, float]]:
     """从命令载荷里取出 ENU 航点。结构校验在 `edge.guard`，这里只做类型收敛。"""
-    raw = payload.get("waypoints")
+    raw = command_waypoints(payload)
     if not isinstance(raw, list) or len(raw) < 2:
         raise ExecutorError("payload.waypoints 缺失或少于 2 个点")
     points: list[tuple[float, float, float]] = []
@@ -98,6 +99,10 @@ class FakeExecutor:
         return self._total_m
 
     def start(self, command: PlanCommand, now: datetime) -> str:
+        refs = {point["alt_ref"] for point in command_waypoints(command.payload)}
+        if len(refs) != 1:
+            raise ExecutorError("合成执行器不接受混合高度基准")
+        self._alt_ref = AltitudeReference(refs.pop())
         self._command = command
         self._started_at = now
         self._abort_reason = None
@@ -116,7 +121,7 @@ class FakeExecutor:
             position=Position(
                 frame=Frame.ENU_M,
                 alt_m=alt_m,
-                alt_ref=AltitudeReference.AGL,
+                alt_ref=self._alt_ref,
                 x_m=x_m,
                 y_m=y_m,
             ),

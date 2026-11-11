@@ -10,8 +10,9 @@ import math
 from datetime import datetime
 from typing import Any
 
-from agent.guards import utc
-from core.models import PlanCommand
+from agent.contracts import ValidationReport
+from agent.guards import utc, version_number
+from core.models import AltitudeReference, PlanCommand, RoutePlan, route_digest
 from edge.contracts import CommandVerdict, RunMode
 
 
@@ -27,6 +28,7 @@ def check_command(
         moment = utc(now)
         issued = utc(command.issued_at)
         expires = utc(command.expires_at)
+        version_number(command.plan_version)
     except ValueError as exc:
         return CommandVerdict(
             accepted=False, reason=f"时间字段缺少时区：{exc}", reject_code="payload_invalid"
@@ -66,11 +68,63 @@ def check_command(
         )
 
     if require_waypoints:
-        problem = _waypoint_problem(command.payload.get("waypoints"))
+        try:
+            points = command_waypoints(command.payload)
+            route_data = command.payload.get("route")
+            if route_data is not None:
+                route = RoutePlan.model_validate(route_data)
+                if (route.plan_version, route.snapshot_id) != (
+                    command.plan_version,
+                    command.payload.get("snapshot_id"),
+                ):
+                    raise ValueError("命令与航线的任务、版本或快照不一致")
+                report = ValidationReport.model_validate(command.payload.get("validation"))
+                if not utc(report.verified_at) <= issued:
+                    raise ValueError("校验报告时间晚于命令签发时间")
+                if route.valid_until is not None and utc(route.valid_until) <= moment:
+                    raise ValueError("航线已失效")
+                if (
+                    report.task_id,
+                    report.route_id,
+                    report.plan_version,
+                    report.snapshot_id,
+                    report.route_digest,
+                ) != (
+                    command.task_id,
+                    route.route_id,
+                    route.plan_version,
+                    route.snapshot_id,
+                    route_digest(route),
+                ):
+                    raise ValueError("独立校验报告未绑定当前航线")
+                required = {"clearance", "restriction_zone", "energy", "diversion_reachability"}
+                names = [check.name for check in report.checks]
+                if (
+                    not required.issubset(names)
+                    or len(names) != len(set(names))
+                    or any(not check.passed or not check.detail.strip() for check in report.checks)
+                ):
+                    raise ValueError("独立校验项不全或存在拒绝项")
+            elif run_mode != "mock":
+                raise ValueError("integration命令必须包含完整route和独立校验报告")
+            problem = _waypoint_problem(points)
+        except (ValueError, TypeError) as exc:
+            problem = str(exc)
         if problem is not None:
             return CommandVerdict(accepted=False, reason=problem, reject_code="payload_invalid")
 
     return CommandVerdict(accepted=True, reason="命令有效")
+
+
+def command_waypoints(payload: dict) -> list | None:
+    """M3's full route is canonical; flat waypoints remain a MOCK demo format."""
+    if "route" in payload:
+        route = RoutePlan.model_validate(payload["route"])
+        points = [point.model_dump(mode="json", exclude_none=True) for point in route.waypoints]
+        if "waypoints" in payload and payload["waypoints"] != points:
+            raise ValueError("同一命令包含相互矛盾的航点")
+        return points
+    return payload.get("waypoints")
 
 
 def _waypoint_problem(waypoints: Any) -> str | None:
@@ -86,6 +140,8 @@ def _waypoint_problem(waypoints: Any) -> str | None:
             return f"waypoints[{index}] 缺字段：{', '.join(missing)}"
         if point.get("frame", "enu_m") != "enu_m":
             return f"waypoints[{index}] frame 只支持 enu_m（WGS84 转换需先定 ENU 原点）"
+        if point["alt_ref"] not in {ref.value for ref in AltitudeReference}:
+            return f"waypoints[{index}] 高度基准无效"
         for key in ("x_m", "y_m", "alt_m"):
             value = point[key]
             if isinstance(value, bool) or not isinstance(value, (int, float)):

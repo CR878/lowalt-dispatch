@@ -1,3 +1,4 @@
+import { DispatchPanel } from "./DispatchPanel";
 import {
   useCallback,
   useEffect,
@@ -301,6 +302,7 @@ export default function App() {
     | "help"
     | "new"
     | "routes"
+    | "dispatch"
     | null
   >(null);
   const [layers, setLayers] = useState<Layers>({
@@ -866,6 +868,12 @@ export default function App() {
             </button>
             <button className="button primary" onClick={() => setDrawer("new")}>
               <Plus size={16} /> 新建任务
+            </button>
+            <button
+              className="button subtle"
+              onClick={() => setDrawer("dispatch")}
+            >
+              <Link2 size={15} /> 本地任务联调
             </button>
           </div>
         </div>
@@ -1936,6 +1944,7 @@ export default function App() {
                 help: "操作说明",
                 new: "新建任务草稿",
                 routes: "候选与历史方案",
+                dispatch: "本地任务联调",
               }[drawer]
             }
           >
@@ -1952,6 +1961,7 @@ export default function App() {
                       help: "操作说明",
                       new: "新建任务草稿",
                       routes: "候选与历史方案",
+                      dispatch: "本地任务联调",
                     }[drawer]
                   }
                 </h2>
@@ -1961,6 +1971,7 @@ export default function App() {
               </IconButton>
             </div>
             <div className="drawer-body">
+              {drawer === "dispatch" && <DispatchPanel />}
               {drawer === "routes" && (
                 <RouteReview
                   onSelect={(route) => {

@@ -34,6 +34,8 @@ class EdgeService:
         task_id: str | None = None,
     ) -> None:
         self.store = store
+        if run_mode != "mock" and executor_factory is None:
+            raise ValueError("integration 模式必须显式提供真实执行器，禁止默认使用 FakeExecutor")
         self.run_mode = run_mode
         self.clock = clock or (lambda: datetime.now(UTC))
         self.task_id = task_id
@@ -50,6 +52,10 @@ class EdgeService:
 
     # ---------------------------------------------------------------- 受理
     def submit(self, command: PlanCommand) -> PlanAck:
+        with self._lock:
+            return self._submit(command)
+
+    def _submit(self, command: PlanCommand) -> PlanAck:
         self._ensure_open()
         now = self.clock()
         verdict = check_command(command, now, run_mode=self.run_mode, expected_task_id=self.task_id)
@@ -62,7 +68,7 @@ class EdgeService:
             )
             return self._reject_ack(command, now, verdict.reason)
 
-        duplicate, record = self.store.claim(command, now, self.run_mode)
+        duplicate, record = self.store.claim(command, now, self.run_mode, enforce_single_vehicle=True)
         if not duplicate.accepted:
             self._audit(
                 "command_duplicate",
@@ -80,20 +86,33 @@ class EdgeService:
                     task_id=record.task_id,
                     plan_version=record.plan_version,
                     received_at=now,
-                    accepted=True,
-                    reject_reason=None,
+                    accepted=False,
+                    reject_reason="原命令受理结果未知，等待人工对账，禁止重放",
                     fc_mode="RECOVERING",
                 )
+            if duplicate.reject_code in {"vehicle_busy", "stale_version"} and record.ack is not None:
+                return record.ack
             return self._reject_ack(command, now, duplicate.reason)
 
         try:
             points = parse_waypoints(command.payload)
             executor = self._factory(points)
-            mode = executor.start(command, now)
+            if self.run_mode != "mock" and executor.name == "fake":
+                raise ExecutorError("integration 模式禁止使用合成执行器")
         except (ExecutorError, ValueError) as exc:
-            self.store.finish(command.command_id, "failed", now, reason=str(exc))
+            ack = self._reject_ack(command, now, str(exc))
+            self.store.finish(command.command_id, "failed", now, ack=ack, reason=str(exc))
             self._audit("executor_failed", command=command, reason=str(exc))
-            return self._reject_ack(command, now, str(exc))
+            return ack
+        try:
+            mode = executor.start(command, now)
+        except Exception as exc:
+            # A driver may have acted before raising. Keep the vehicle locked
+            # for reconciliation instead of guessing that nothing happened.
+            ack = self._reject_ack(command, now, f"执行器启动失败，需对账：{type(exc).__name__}")
+            self.store.finish(command.command_id, "recovering", now, ack=ack, reason=str(exc))
+            self._audit("executor_failed", command=command, reason=str(exc))
+            return ack
 
         ack = PlanAck(
             command_id=command.command_id,
@@ -125,10 +144,11 @@ class EdgeService:
         for command_id, (executor, command) in active:
             try:
                 state = executor.sample(moment)
+                done = executor.is_done(moment)
             except Exception as exc:
                 # 执行器可能抛 ExecutorError，也可能抛别的东西（驱动异常、编码错误）。
-                # 一律按失败落库，不能让一条命令把整个 tick 循环带崩。
-                self.store.finish(command_id, "failed", moment, reason=f"{type(exc).__name__}: {exc}")
+                # 无法证明设备已停止，锁住车辆等待对账，禁止启动另一条命令。
+                self.store.mark_recovering(command_id, moment, reason=f"{type(exc).__name__}: {exc}")
                 with self._lock:
                     self._active.pop(command_id, None)
                 self._audit("sample_failed", command_id=command_id, reason=f"{type(exc).__name__}: {exc}")
@@ -141,7 +161,7 @@ class EdgeService:
             )
             self.telemetry.append(observation)
             produced.append(observation)
-            if executor.is_done(moment):
+            if done:
                 record = self.store.get(command_id)
                 self.store.finish(
                     command_id,
@@ -156,6 +176,8 @@ class EdgeService:
         return produced
 
     def run_to_completion(self, command: PlanCommand, *, step_s: float = 1.0, max_ticks: int = 10000):
+        if self.run_mode != "mock":
+            raise ValueError("加速时钟只允许用于 MOCK 合成测试")
         ack = self.submit(command)
         if not ack.accepted:
             return ack, []
@@ -183,6 +205,29 @@ class EdgeService:
         return ack, samples
 
     # ---------------------------------------------------------------- 恢复
+    def abandon_mock(self, command_id: str, reason: str) -> None:
+        """Explicitly end a synthetic test; never offers an actual flight abort."""
+        with self._lock:
+            self._ensure_open()
+            if self.run_mode != "mock" or not reason.strip():
+                raise ValueError("只允许明确说明原因后结束 MOCK 测试")
+            record = self.store.get(command_id)
+            if record is None or record.run_mode != "mock":
+                raise ValueError("未知合成命令")
+            if record.state not in {"accepted", "executing", "recovering"}:
+                return
+            active = self._active.get(command_id)
+            if active:
+                executor, _command = active
+                if executor.name != "fake":
+                    raise ValueError("此操作仅适用于 FakeExecutor")
+                executor.abort(reason)
+                self._active.pop(command_id)
+            self.store.finish(
+                command_id, "failed", self.clock(), ack=record.ack, reason="人工结束合成测试：" + reason
+            )
+            self._audit("mock_abandoned", command_id=command_id, task_id=record.task_id, reason=reason)
+
     def recover(self) -> list[str]:
         """进程重启后把未完成记录标成 recovering，不重放、不重发。"""
         self._ensure_open()

@@ -18,13 +18,14 @@ from pydantic import Field
 
 from agent.contracts import Contract
 from agent.edge_decisions import ExecutionObservation
+from agent.execution import ExecutionStatus
 from agent.guards import utc
 from core.models import PlanAck, PlanCommand
 
 
 class MessageEnvelope(Contract):
     schema_version: Literal["m3-message-0.1"] = "m3-message-0.1"
-    kind: Literal["command", "ack", "telemetry", "heartbeat"]
+    kind: Literal["command", "ack", "telemetry", "heartbeat", "status"]
     run_mode: Literal["mock", "integration"]
     sent_at: datetime
     body: dict
@@ -54,6 +55,7 @@ class MqttCommandChannel:
         self._ready, self._mutex = Event(), RLock()
         self._pending: dict[str, tuple[PlanCommand, Event]] = {}
         self._acks: dict[str, PlanAck] = {}
+        self._statuses: dict[str, ExecutionStatus] = {}
         self._events = deque(maxlen=1024)
         self._subscription_mid = None
         self.invalid_messages = 0
@@ -78,7 +80,7 @@ class MqttCommandChannel:
         if reason_code != 0:
             return
         status, mid = client.subscribe(
-            [(f"{self.prefix}/{suffix}", 1) for suffix in ("acks", "telemetry", "heartbeat")]
+            [(f"{self.prefix}/{suffix}", 1) for suffix in ("acks", "telemetry", "heartbeat", "status")]
         )
         if status == 0:
             self._subscription_mid = mid
@@ -162,7 +164,12 @@ class MqttCommandChannel:
             if message.retain or len(message.payload) > 1024 * 1024:
                 raise ValueError("Retained or oversized message")
             envelope = MessageEnvelope.model_validate_json(message.payload)
-            suffix = {"ack": "acks", "telemetry": "telemetry", "heartbeat": "heartbeat"}.get(envelope.kind)
+            suffix = {
+                "ack": "acks",
+                "telemetry": "telemetry",
+                "heartbeat": "heartbeat",
+                "status": "status",
+            }.get(envelope.kind)
             received_at = utc(self.clock())
             if (
                 suffix is None
@@ -194,6 +201,45 @@ class MqttCommandChannel:
                     body = ack
                 elif envelope.kind == "telemetry":
                     body = ExecutionObservation.model_validate(envelope.body)
+                    pending = self._pending.get(body.accepted_command_id)
+                    if pending is None or (body.task_id, body.state.executing_plan_version) != (
+                        pending[0].task_id,
+                        pending[0].plan_version,
+                    ):
+                        raise ValueError("Telemetry identity mismatch")
+                    source = body.state.provenance.source.lower()
+                    if (self.run_mode == "mock" and not body.state.provenance.is_simulated) or (
+                        self.run_mode == "integration"
+                        and (source == "sim:edge.fake_executor" or source.startswith("mock"))
+                    ):
+                        raise ValueError("Telemetry source and channel mode differ")
+                    if (
+                        not utc(pending[0].issued_at)
+                        <= utc(body.state.ts)
+                        <= utc(body.received_at)
+                        <= received_at
+                    ):
+                        raise ValueError("Telemetry timestamp mismatch")
+                elif envelope.kind == "status":
+                    body = ExecutionStatus.model_validate(envelope.body)
+                    pending = self._pending.get(body.command_id)
+                    if pending is None or (body.task_id, body.plan_version) != (
+                        pending[0].task_id,
+                        pending[0].plan_version,
+                    ):
+                        raise ValueError("Execution status identity mismatch")
+                    if not utc(pending[0].issued_at) <= utc(body.updated_at) <= received_at:
+                        raise ValueError("Execution status timestamp mismatch")
+                    previous = self._statuses.get(body.command_id)
+                    if previous is not None:
+                        if utc(body.updated_at) < utc(previous.updated_at):
+                            raise ValueError("Out-of-order status")
+                        if (
+                            previous.state in {"completed", "failed", "rejected"}
+                            and body.state != previous.state
+                        ):
+                            raise ValueError("Terminal execution state cannot regress")
+                    self._statuses[body.command_id] = body
                 else:
                     body = Heartbeat.model_validate(envelope.body)
                 # Application consumes events and calls TaskService.recover() or

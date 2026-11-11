@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from threading import RLock
 
+from agent.guards import version_number
 from core.models import PlanAck, PlanCommand
 from edge.contracts import CommandVerdict, ExecutionRecord, RecordState, RunMode
 
@@ -49,7 +50,7 @@ class CommandStore:
 
     # ---------------------------------------------------------------- 写入
     def claim(
-        self, command: PlanCommand, now: datetime, run_mode: RunMode
+        self, command: PlanCommand, now: datetime, run_mode: RunMode, *, enforce_single_vehicle: bool = False
     ) -> tuple[CommandVerdict, ExecutionRecord]:
         """原子占用一个 command_id。并发调用只有一个能拿到 accepted=True。"""
         with self._lock:
@@ -81,20 +82,58 @@ class CommandStore:
                         ),
                         existing,
                     )
+                verdict = CommandVerdict(accepted=True, reason="已接受")
+                if enforce_single_vehicle:
+                    # This database belongs to ONE vehicle. The transaction is
+                    # the lock across threads, services and process restarts.
+                    rows = cursor.execute("SELECT * FROM edge_commands").fetchall()
+                    records = [self._record(item) for item in rows]
+                    for previous in records:
+                        if previous.task_id == command.task_id and version_number(
+                            command.plan_version
+                        ) <= version_number(previous.plan_version):
+                            verdict = CommandVerdict(
+                                accepted=False,
+                                reason="拒绝旧版本或复用已占用版本",
+                                reject_code="stale_version",
+                            )
+                            break
+                    for previous in records:
+                        if verdict.accepted and previous.state in {"accepted", "executing", "recovering"}:
+                            verdict = CommandVerdict(
+                                accepted=False,
+                                reason="执行端已有活动命令或待对账命令，禁止并行启动",
+                                reject_code="vehicle_busy",
+                            )
+                            break
+                rejection = (
+                    None
+                    if verdict.accepted
+                    else PlanAck(
+                        command_id=command.command_id,
+                        task_id=command.task_id,
+                        plan_version=command.plan_version,
+                        received_at=now,
+                        accepted=False,
+                        reject_reason=verdict.reason,
+                    )
+                )
                 record = ExecutionRecord(
                     command_id=command.command_id,
                     task_id=command.task_id,
                     plan_version=command.plan_version,
                     run_mode=run_mode,
                     command=command,
-                    state="accepted",
+                    state="accepted" if verdict.accepted else "rejected",
+                    ack=rejection,
+                    last_reason=None if verdict.accepted else verdict.reason,
                     accepted_at=now,
                     updated_at=now,
                 )
                 cursor.execute(
                     "INSERT INTO edge_commands (command_id, task_id, plan_version, run_mode,"
                     " command_json, state, ack_json, accepted_at, updated_at, execution_count,"
-                    " last_reason) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, 0, NULL)",
+                    " last_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
                     (
                         record.command_id,
                         record.task_id,
@@ -102,12 +141,14 @@ class CommandStore:
                         record.run_mode,
                         command.model_dump_json(),
                         record.state,
+                        rejection.model_dump_json() if rejection else None,
                         now.isoformat(),
                         now.isoformat(),
+                        record.last_reason,
                     ),
                 )
                 cursor.execute("COMMIT")
-                return CommandVerdict(accepted=True, reason="已接受"), record
+                return verdict, record
             except Exception:
                 try:
                     cursor.execute("ROLLBACK")

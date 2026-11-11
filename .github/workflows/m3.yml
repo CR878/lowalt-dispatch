@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: python -m pip install -r requirements-m3.txt ruff
+      - run: python -m pip install -r requirements-m3.txt -r services/assistant/requirements.txt ruff
       # pytest 单独开 UTF-8：失败信息里一旦出现中文，cp1252 的控制台连报错都打不出来。
       - run: python -m pytest
         env:
@@ -64,11 +64,12 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
-      - run: python -m pip install -r requirements-m3.txt
+      - run: python -m pip install -r requirements-m3.txt -r services/assistant/requirements.txt
       # This anonymous broker is bound to runner loopback only. No public/cloud deployment.
       - run: docker run -d --name m3-test-broker -p 127.0.0.1:1883:1883 -v "$PWD/ops/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" eclipse-mosquitto:2
-      - run: python -m pytest tests/test_m3_external.py
+      - run: python -m pytest tests/test_m3_external.py tests/test_local_mqtt.py
         env:
+          LOWALT_TEST_MQTT: "1"
           M3_TEST_POSTGRES_DSN: postgresql+psycopg://m3_test:m3_ci_only@127.0.0.1:5432/m3_test
           M3_TEST_REDIS_URL: redis://127.0.0.1:6379/0
           M3_TEST_MQTT_HOST: 127.0.0.1

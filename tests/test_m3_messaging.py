@@ -139,3 +139,81 @@ def test_consumer_cannot_mutate_cached_ack():
     returned.accepted = False
     channel.drain_events()[0][2].accepted = False
     assert channel.get_ack("cmd1").accepted
+
+
+def test_execution_status_is_bound_and_terminal_state_cannot_regress():
+    from agent.execution import ExecutionStatus
+
+    channel, client = make_channel()
+    channel.watch_command(command())
+
+    def send(state, task_id="task1"):
+        status = ExecutionStatus(
+            command_id="cmd1",
+            task_id=task_id,
+            plan_version="v1",
+            state=state,
+            updated_at=NOW,
+            execution_count=1,
+        )
+        envelope = MessageEnvelope(
+            kind="status", run_mode="mock", sent_at=NOW, body=status.model_dump(mode="json")
+        )
+        channel._on_message(
+            client,
+            None,
+            SimpleNamespace(
+                topic=channel.prefix + "/status", payload=envelope.model_dump_json().encode(), retain=False
+            ),
+        )
+
+    send("completed", task_id="other-task")
+    assert channel.drain_events() == []
+    send("completed")
+    send("executing")
+    events = channel.drain_events()
+    assert [body.state for kind, ts, body in events] == ["completed"]
+    assert channel.invalid_messages == 2
+
+
+def test_integration_can_receive_actual_sitl_telemetry_but_excludes_fake_executor():
+    from agent.edge_decisions import ExecutionObservation
+    from agent.fixtures import fixture_task
+    from core.models import DataProvenance, VehicleState
+
+    client = Client()
+    channel = MqttCommandChannel(client, "sitl", run_mode="integration", clock=lambda: NOW)
+    cmd = command().model_copy(deep=True)
+    cmd.payload["run_mode"] = "integration"
+    channel.watch_command(cmd)
+    state = VehicleState(
+        ts=NOW,
+        position=fixture_task(NOW).origin,
+        groundspeed_mps=0,
+        flight_mode="HOLD",
+        gps_fix="3d",
+        executing_plan_version="v1",
+        provenance=DataProvenance(source="px4:sitl", version="1", captured_at=NOW, is_simulated=True),
+    )
+    observation = ExecutionObservation(
+        task_id="task1", state=state, received_at=NOW, accepted_command_id="cmd1"
+    )
+
+    def send():
+        envelope = MessageEnvelope(
+            kind="telemetry", run_mode="integration", sent_at=NOW, body=observation.model_dump(mode="json")
+        )
+        channel._on_message(
+            client,
+            None,
+            SimpleNamespace(
+                topic=channel.prefix + "/telemetry", payload=envelope.model_dump_json().encode(), retain=False
+            ),
+        )
+
+    send()
+    assert channel.drain_events()[0][2].state.provenance.source == "px4:sitl"
+    observation.state.provenance.source = "sim:edge.fake_executor"
+    send()
+    assert channel.drain_events() == []
+    assert channel.invalid_messages == 1

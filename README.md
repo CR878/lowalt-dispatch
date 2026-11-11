@@ -18,11 +18,12 @@ v0.1 —— 骨架 + 一条能跑通的评测管道。
 - `validator/` —— **独立校验器**：只读航线航点，按自己的采样重新判净空、限制区（按生效时刻）、载荷、能量、备降可达性
 - `agent/` —— M3 决策、审计恢复、M2适配、草稿确认与云服务基础接口；[最新运行与待办](docs/M3_2026-11-10基础接入与下一步.md)。本地可联调，真实MaaS/云资源/飞控仍待接入
 - `eval/` —— 评测 harness，一条命令跑 20 场景 × 3 种子 × 3 算法，产出带溯源 meta 的 CSV
-- `tests/` + `services/assistant/tests/` —— 公共契约、规划校验、M3/M4 与助手集成测试；2026-11-11 合并后实测 232 passed / 3 skipped（3 项为需真实 PostgreSQL/Redis/MQTT 的服务测试）
+- `tests/` + `services/assistant/tests/` —— 公共契约、规划校验、M3/M4与助手集成测试；本轮全量243项通过，后续含真实本机MQTT的定向回归25项通过，浏览器23项通过；详见事实文档
 - [`apps/console/`](apps/console/README.md) —— AERIS React/MapLibre 控制台：真实底图与选点、2D/3D、M4/PX4 SITL 实时遥测或演示回放、地形版本变化、事件流、候选方案和调度助手
 - [`services/assistant/`](services/assistant/README.md) —— 控制台本地工具服务、MaaS 工具调用适配与地点搜索；默认规则演示，不下发飞控
+- [`services/api/`](services/api/README.md) —— 本地合成任务入口：确认 → 真实 M3/M2/独立校验 → M4 FakeExecutor → ACK/状态回传，支持直连及真实本机 MQTT Broker；不控制PX4
 
-**待完成的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（见 [`ops/sitl/README.md`](ops/sitl/README.md)）、云端部署、机型参数，以及控制台与正式任务和规划接口的联调。
+**待完成的**：备降余量进入**搜索**的剪枝（`astar_diversion`）、飞控任务上传与起飞（见 [`ops/sitl/README.md`](ops/sitl/README.md)）、机型参数、真实地理草稿与正式执行的坐标绑定，以及当前状态下备用航线复核/切换。当前优先本地运行，云部署暂不要求。
 `apps/web/index.html` 有一张**硬编码静态战术态势台**（3D 倾斜俯视 + ASCII 侧栏），零依赖、不接 API、几何为草稿、数值为占位，仅用于可视化表达，不是上述正式工程。
 准确进度只看 [`事实文档.md`](事实文档.md)，别信 README 的乐观描述。
 

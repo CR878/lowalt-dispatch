@@ -2,6 +2,8 @@
 
 前端位于 `apps/console/src/assistant/`，后端位于本目录。此服务支持独立控制台演示，保留现有 M2/M3/PX4 接口。
 
+2026-11-11：同一服务现已挂载 `/api/dispatch/*` 本地合成任务链路。顶部「本地任务联调」可调用真实 M3/M2/独立校验及 M4 FakeExecutor，支持直连或 MQTT；操作见 [`services/api/README.md`](../api/README.md)。这与下面仅问答/草稿的助手工具是两个明确入口，不会把对话中的任务自动下发。
+
 ## 已实现什么
 
 | 能力 | 实际行为 | 适用范围 |

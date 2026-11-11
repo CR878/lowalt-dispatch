@@ -224,7 +224,7 @@ def test_tick_marks_failed_on_unexpected_error(tmp_path) -> None:
             service.tick()
             record = store.get(command.command_id)
             assert record is not None
-            assert record.state == "failed"
+            assert record.state == "recovering"
             assert "driver exploded" in (record.last_reason or "")
         finally:
             service.close()

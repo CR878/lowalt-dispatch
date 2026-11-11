@@ -25,6 +25,8 @@ RejectCode = Literal[
     "mode_mismatch",
     "task_mismatch",
     "payload_invalid",
+    "vehicle_busy",
+    "stale_version",
 ]
 
 

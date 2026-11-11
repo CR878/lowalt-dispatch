@@ -6,6 +6,7 @@ import json
 import os
 import queue
 import threading
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -14,12 +15,46 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from services.api.routes import router as dispatch_router
 from services.assistant.engine import Engine, ModelUnavailable, Settings
 from services.assistant.models import Turn
 from services.assistant.places import search_places
 from services.assistant.telemetry import stream_telemetry
 
-app = FastAPI(title="AERIS assistant local BFF", docs_url="/api/assistant/docs", redoc_url=None)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from services.api.runtime import from_env
+
+    dispatch = from_env()
+    app.state.dispatch = dispatch
+    app.state.dispatch_error = False
+    stop = threading.Event()
+
+    def advance():
+        while not stop.wait(0.5):
+            try:
+                dispatch.tick()
+            except Exception:
+                # Surface a failed pump instead of silently advertising health.
+                app.state.dispatch_error = True
+                break
+
+    worker = threading.Thread(target=advance, daemon=True)
+    worker.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        worker.join(timeout=10)
+        dispatch.close()
+        app.state.dispatch = None
+
+
+app = FastAPI(
+    title="AERIS assistant local BFF", docs_url="/api/assistant/docs", redoc_url=None, lifespan=lifespan
+)
+app.include_router(dispatch_router)
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 settings = Settings.from_env()
 engine = Engine(settings)
