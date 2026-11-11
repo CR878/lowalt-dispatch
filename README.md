@@ -48,6 +48,12 @@ python -m venv .venv
 .venv/Scripts/python -m agent.integration check
 .venv/Scripts/python -m agent.integration demo --scenario S1-01
 
+# 本地 Docker 模式：用容器替身 RDS / DCS / MQTT（仍然不是华为云）
+docker compose -f ops/docker-compose.yml up -d
+cp ops/local.env.example .env
+.venv/Scripts/python -m agent.integration --env-file .env check
+# 起停、验证、断连演示见 ops/README.md；三个真实服务测试需要 Docker daemon 在跑
+
 # 跑测试
 .venv/Scripts/python -m pytest
 ```
