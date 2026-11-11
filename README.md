@@ -22,7 +22,9 @@ v0.1 —— 骨架 + 几何基线 + 备降硬约束的第一版搜索。仍无�
 - `services/api/` —— FastAPI：任务、v0 场景、默认调用几何基线。余量 URL 在；入口还没切到备降规划器，所以剖面返回未实现
 - `tests/` —— 契约、基线、剪枝、无解、余量公式，以及 API 的 TestClient。当前全量见事实文档 3.7
 
-**没有的**：另一人实现的独立校验器、动态重规划（`astar_dynamic` 仍是 mock）、风场、飞控连接、云端部署、前端页面、真实机型参数。
+**没有的**：另一人实现的独立校验器、动态重规划（`astar_dynamic` 仍是 mock）、风场、飞控连接、云端部署、调度任务台页面（`apps/web/` 仍只有 README）、天地图 / Cesium ion token 接入、前端与后端接线、真实机型参数。
+
+三维 / 视觉前端的阶段 0–1 在 [`apps/web-3d/`](apps/web-3d/)：工程骨架、demo 存档、ENU 换算、锚点决议，以及 M350 RTK 比例骨架（69 个部件）和四段高光镜头预演脚本。无真实材质，60 fps 展厅未做。
 备降路径是栅格八邻域近似，不是连续轨迹。准确进度只看 [`事实文档.md`](事实文档.md)。
 
 ## 文档
@@ -88,6 +90,7 @@ scenarios/v0/    草稿几何：建筑 / 限制区 / 备降点 —— 待 B 复�
 services/api/    FastAPI 后端（任务 / 场景 / 规划；默认仍是几何基线，余量接口在、剖面还没从规划器接到 HTTP）
 edge/            边缘 agent（云边断连时兜底）—— 未开始
 apps/web/        React + MapLibre 任务台 —— 未开始
+apps/web-3d/     三维/视觉前端（Vite + React + TS，R3F 展厅 / 计划中的 Cesium 态势）—— 阶段 0–1；见 [`apps/web-3d/README.md`](apps/web-3d/README.md)
 ops/             Compose 拓扑（含断连演示用的双网络）
 docs/            接口契约、功能树、关键接口
 results/         评测产物；真实结果在冻结时提交，mock 永不入库
