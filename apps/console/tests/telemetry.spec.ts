@@ -16,6 +16,7 @@ test("M4 telemetry updates, becomes stale and recovers without demo values", asy
         is_simulated: true,
         captured_at: new Date().toISOString(),
         battery,
+        speed: battery / 10,
         pitch: 0,
         roll: 0,
         in_air: false,
@@ -34,10 +35,18 @@ test("M4 telemetry updates, becomes stale and recovers without demo values", asy
   await expect(playback).toContainText("test:m4 · 实时 · 仿真");
   await expect(playback).toContainText("NED");
   await expect(battery).toHaveText("0.0");
+  const marker = page.getByTestId("live-aircraft-marker");
+  await expect(marker).toBeVisible();
+  await expect(page.getByRole("table", { name: "定位 · NED" })).toContainText(
+    "北向位置",
+  );
+  await expect(page.getByRole("img", { name: "地速遥测趋势" })).toBeVisible();
   await expect(playback).toContainText("遥测已过期", { timeout: 8000 });
+  await expect(marker).toHaveAttribute("data-active", "false");
   await expect(battery).toHaveText("0.0");
 
   publish(42.5);
   await expect(playback).toContainText("test:m4 · 实时 · 仿真");
   await expect(battery).toHaveText("42.5");
+  await expect(marker).toHaveAttribute("data-active", "true");
 });

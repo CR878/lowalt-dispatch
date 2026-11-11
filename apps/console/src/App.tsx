@@ -65,6 +65,11 @@ import {
 } from "lucide-react";
 import MapSurface, { type MapSurfaceHandle } from "./MapSurface";
 import LocationPanel from "./LocationPanel";
+import {
+  Drone,
+  LiveLocalTrack,
+  LiveTelemetryDetails,
+} from "./LiveTelemetryPanel";
 import EventFeed, { replayEvents } from "./EventFeed";
 import RadarDisplay from "./RadarDisplay";
 import Onboarding from "./Onboarding";
@@ -165,30 +170,6 @@ const time = () =>
     hour12: false,
     timeZone: "Asia/Shanghai",
   });
-function Drone({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      aria-hidden="true"
-    >
-      <path d="m6 6 12 12M6 18 18 6" />
-      <rect x="9" y="9" width="6" height="6" rx="2" />
-      {[
-        [5, 5],
-        [19, 5],
-        [5, 19],
-        [19, 19],
-      ].map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="3.5" />
-      ))}
-    </svg>
-  );
-}
 function loadPreferences() {
   try {
     const stored = JSON.parse(localStorage.getItem("aeris-console-v1") || "{}");
@@ -333,6 +314,7 @@ export default function App() {
   const [compare, setCompare] = useState(true);
   const [reviewRoute, setReviewRoute] = useState<ReviewRoute | null>(null);
   const [mapKind, setMapKind] = useState<"world" | "terrain">("world");
+  const [showGeographic, setShowGeographic] = useState(false);
   const [demoVisible, setDemoVisible] = useState(true);
   const [realTerrain, setRealTerrain] = useState(false);
   const [mapStatus, setMapStatus] = useState("连接真实底图");
@@ -381,7 +363,11 @@ export default function App() {
     tick,
     setProgress,
   } = useFlight(playing && !liveMode);
-  const { frame: liveFrame, status: liveStatus } = useLiveTelemetry(liveMode);
+  const {
+    frame: liveFrame,
+    history: liveHistory,
+    status: liveStatus,
+  } = useLiveTelemetry(liveMode);
   const readings = liveMode ? liveFrame : t;
   const liveSource =
     liveFrame?.source === "sim:px4_sitl" || liveFrame?.source === "fc:px4_sitl"
@@ -395,6 +381,9 @@ export default function App() {
     offline: "遥测连接中断",
   }[liveStatus];
   const position = liveFrame?.position;
+  const localTrackAvailable = liveMode && position?.frame !== "WGS84";
+  const showLocalTrack =
+    localTrackAvailable && !showGeographic && !locationOpen;
   const coordinates =
     liveMode && liveStatus === "live" && position?.frame === "WGS84"
       ? [position.lon_deg, position.lat_deg]
@@ -988,6 +977,13 @@ export default function App() {
           </div>
         </section>
 
+        {liveMode && !focus && (
+          <div className="telemetry-section-nav">
+            <a href="#live-telemetry-details">
+              <Activity size={13} /> 遥测明细与趋势 <ArrowDownRight size={12} />
+            </a>
+          </div>
+        )}
         <div
           className={`workspace ${panels.instruments && !focus ? "" : "no-instruments"}`}
         >
@@ -995,11 +991,13 @@ export default function App() {
             <div className="map-toolbar">
               <div className="map-title">
                 <span className="live-dot" />
-                <strong>空域态势</strong>
+                <strong>{showLocalTrack ? "局部轨迹" : "空域态势"}</strong>
                 <span className="map-breadcrumb">
-                  {mapKind === "world"
-                    ? "CARTO DARK MATTER / WGS84"
-                    : "地形实验 / ENU · 3 × 3 km"}
+                  {showLocalTrack
+                    ? (position?.frame ?? "局部定位")
+                    : mapKind === "world"
+                      ? "CARTO DARK MATTER / WGS84"
+                      : "地形实验 / ENU · 3 × 3 km"}
                 </span>
               </div>
               <div className="map-toolbar-actions">
@@ -1015,6 +1013,23 @@ export default function App() {
                   <MapPin size={13} />
                   <span>地点定位</span>
                 </button>
+                {localTrackAvailable && !locationOpen && (
+                  <button
+                    className="map-surface-toggle live-map-toggle"
+                    onClick={() => {
+                      setShowGeographic((value) => !value);
+                      setReady(false);
+                      setMapError("");
+                    }}
+                  >
+                    {showLocalTrack ? (
+                      <Globe2 size={13} />
+                    ) : (
+                      <Compass size={13} />
+                    )}
+                    {showLocalTrack ? "真实底图" : "局部轨迹"}
+                  </button>
+                )}
                 {!liveMode && (
                   <button
                     className="map-surface-toggle"
@@ -1038,7 +1053,7 @@ export default function App() {
                     )}
                   </button>
                 )}
-                <div className="segmented">
+                <div className="segmented" hidden={showLocalTrack}>
                   <button
                     className={mode === "2d" ? "selected" : ""}
                     aria-pressed={mode === "2d"}
@@ -1054,13 +1069,15 @@ export default function App() {
                     <Box size={12} /> 3D
                   </button>
                 </div>
-                <IconButton
-                  label="地图图层"
-                  active={showLayers}
-                  onClick={() => setShowLayers((v) => !v)}
-                >
-                  <Layers3 size={15} />
-                </IconButton>
+                {!showLocalTrack && (
+                  <IconButton
+                    label="地图图层"
+                    active={showLayers}
+                    onClick={() => setShowLayers((v) => !v)}
+                  >
+                    <Layers3 size={15} />
+                  </IconButton>
+                )}
                 <IconButton
                   label={focus ? "退出专注视图" : "专注视图 F"}
                   active={focus}
@@ -1070,36 +1087,44 @@ export default function App() {
                 </IconButton>
               </div>
             </div>
-            <div className="map-stage">
-              <MapSurface
-                ref={map}
-                mode={mode}
-                layers={layers}
-                progress={progress}
-                playing={playing}
-                onReady={() => setReady(true)}
-                onError={setMapError}
-                onPoint={(point) =>
-                  selectPlace({
-                    name: "地图选点",
-                    point,
-                    source: "map_click",
-                    capturedAt: new Date().toISOString(),
-                  })
-                }
-                preview={assistantPreview}
-                comparison={reviewRoute}
-                kind={liveMode ? "world" : mapKind}
-                demoVisible={!liveMode && demoVisible}
-                liveMode={liveMode}
-                livePoint={livePoint}
-                realTerrain={realTerrain}
-                reducedMotion={motionReduced}
-                terrainModel={terrainModel}
-                mission={geoMission}
-                selected={selectedPlace}
-                onStatus={setMapStatus}
+            {showLocalTrack && (
+              <LiveLocalTrack
+                history={liveHistory}
+                active={liveStatus === "live"}
               />
+            )}
+            <div className="map-stage" hidden={showLocalTrack}>
+              {!showLocalTrack && (
+                <MapSurface
+                  ref={map}
+                  mode={mode}
+                  layers={layers}
+                  progress={progress}
+                  playing={playing}
+                  onReady={() => setReady(true)}
+                  onError={setMapError}
+                  onPoint={(point) =>
+                    selectPlace({
+                      name: "地图选点",
+                      point,
+                      source: "map_click",
+                      capturedAt: new Date().toISOString(),
+                    })
+                  }
+                  preview={assistantPreview}
+                  comparison={reviewRoute}
+                  kind={liveMode ? "world" : mapKind}
+                  demoVisible={!liveMode && demoVisible}
+                  liveMode={liveMode}
+                  livePoint={livePoint}
+                  realTerrain={realTerrain}
+                  reducedMotion={motionReduced}
+                  terrainModel={terrainModel}
+                  mission={geoMission}
+                  selected={selectedPlace}
+                  onStatus={setMapStatus}
+                />
+              )}
               {mapKind === "world" && (
                 <LocationPanel
                   open={locationOpen}
@@ -1690,6 +1715,9 @@ export default function App() {
           )}
         </div>
 
+        {liveMode && !focus && (
+          <LiveTelemetryDetails history={liveHistory} status={liveStatusText} />
+        )}
         {!focus && (panels.analysis || panels.events) && (
           <div
             className={`bottom-grid ${!panels.analysis ? "events-only" : ""} ${!panels.events ? "analysis-only" : ""}`}

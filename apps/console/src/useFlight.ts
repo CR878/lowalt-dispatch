@@ -2,16 +2,18 @@ import { useEffect, useState } from "react";
 import type { LiveTelemetry, Telemetry } from "./types";
 
 const STALE_MS = 5000;
+const HISTORY_MS = 60_000;
+const MAX_FRAMES = 120;
 
 export function useLiveTelemetry(enabled: boolean) {
-  const [frame, setFrame] = useState<LiveTelemetry | null>(null);
+  const [history, setHistory] = useState<LiveTelemetry[]>([]);
   const [status, setStatus] = useState<
     "connecting" | "waiting" | "live" | "stale" | "offline"
   >("connecting");
 
   useEffect(() => {
     if (!enabled) {
-      setFrame(null);
+      setHistory([]);
       setStatus("connecting");
       return;
     }
@@ -39,8 +41,20 @@ export function useLiveTelemetry(enabled: boolean) {
       if (!Number.isFinite(captured) || captured < newest) return;
       const remaining = captured + STALE_MS - Date.now();
       if (remaining > 2 * STALE_MS) return;
-      newest = captured;
-      setFrame(sample);
+      if (captured > newest) {
+        newest = captured;
+        setHistory((previous) => {
+          const last = previous.at(-1);
+          const recent =
+            last?.source === sample.source
+              ? previous.filter(
+                  (item) =>
+                    Date.parse(item.captured_at) >= captured - HISTORY_MS,
+                )
+              : [];
+          return [...recent.slice(1 - MAX_FRAMES), sample];
+        });
+      }
       setStatus(remaining > 0 ? "live" : "stale");
       window.clearTimeout(expiration);
       if (remaining > 0)
@@ -52,7 +66,7 @@ export function useLiveTelemetry(enabled: boolean) {
     };
   }, [enabled]);
 
-  return { frame, status };
+  return { frame: history.at(-1) ?? null, history, status };
 }
 
 export const initialTelemetry: Telemetry = {
