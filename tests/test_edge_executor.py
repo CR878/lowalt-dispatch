@@ -94,6 +94,11 @@ def test_invalid_speed_rejected() -> None:
         FakeExecutor([(0.0, 0.0, 0.0), (1.0, 0.0, 0.0)], speed_mps=0)
 
 
+def test_non_finite_waypoint_rejected() -> None:
+    with pytest.raises(ValueError, match="有限"):
+        FakeExecutor([(0.0, 0.0, 0.0), (float("nan"), 0.0, 0.0)])
+
+
 def test_parse_waypoints_ok_and_bad() -> None:
     points = parse_waypoints(
         {

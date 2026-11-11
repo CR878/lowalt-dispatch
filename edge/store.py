@@ -40,6 +40,7 @@ class CommandStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
+        self._closed = False
         self._conn = sqlite3.connect(self.path, timeout=10, isolation_level=None, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
@@ -108,16 +109,21 @@ class CommandStore:
                 cursor.execute("COMMIT")
                 return CommandVerdict(accepted=True, reason="已接受"), record
             except Exception:
-                cursor.execute("ROLLBACK")
+                try:
+                    cursor.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass  # 事务可能已经结束，别让回滚错误掩盖真正的异常
                 raise
 
     def mark_executing(self, command_id: str, now: datetime) -> None:
         with self._lock:
-            self._conn.execute(
+            cursor = self._conn.execute(
                 "UPDATE edge_commands SET state = 'executing', execution_count = execution_count + 1,"
                 " updated_at = ? WHERE command_id = ?",
                 (now.isoformat(), command_id),
             )
+            if cursor.rowcount == 0:
+                raise KeyError(f"命令不存在：{command_id}")
 
     def finish(
         self,
@@ -129,7 +135,7 @@ class CommandStore:
         reason: str | None = None,
     ) -> None:
         with self._lock:
-            self._conn.execute(
+            cursor = self._conn.execute(
                 "UPDATE edge_commands SET state = ?, ack_json = ?, updated_at = ?, last_reason = ?"
                 " WHERE command_id = ?",
                 (
@@ -140,14 +146,18 @@ class CommandStore:
                     command_id,
                 ),
             )
+            if cursor.rowcount == 0:
+                raise KeyError(f"命令不存在：{command_id}")
 
     def mark_recovering(self, command_id: str, now: datetime, reason: str) -> None:
         with self._lock:
-            self._conn.execute(
+            cursor = self._conn.execute(
                 "UPDATE edge_commands SET state = 'recovering', updated_at = ?, last_reason = ?"
                 " WHERE command_id = ?",
                 (now.isoformat(), reason, command_id),
             )
+            if cursor.rowcount == 0:
+                raise KeyError(f"命令不存在：{command_id}")
 
     # ---------------------------------------------------------------- 读取
     def get(self, command_id: str) -> ExecutionRecord | None:
@@ -181,6 +191,9 @@ class CommandStore:
     # ---------------------------------------------------------------- 生命周期
     def close(self) -> None:
         with self._lock:
+            if self._closed:
+                return
+            self._closed = True
             self._conn.close()
 
     def __enter__(self) -> CommandStore:

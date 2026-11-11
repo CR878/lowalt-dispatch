@@ -5,6 +5,8 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from core.models import PlanAck, PlanCommand
 from edge.store import CommandStore
 
@@ -115,3 +117,15 @@ def test_mark_recovering(tmp_path) -> None:
         assert record is not None
         assert record.state == "recovering"
         assert record.last_reason == "进程重启"
+
+
+def test_finish_unknown_command_raises(tmp_path) -> None:
+    with CommandStore(tmp_path / "edge.db") as store:
+        with pytest.raises(KeyError):
+            store.finish("missing", "completed", NOW, reason="x")
+
+
+def test_close_is_idempotent(tmp_path) -> None:
+    store = CommandStore(tmp_path / "edge.db")
+    store.close()
+    store.close()

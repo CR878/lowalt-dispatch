@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime
 from typing import Any
 
@@ -85,6 +86,10 @@ def _waypoint_problem(waypoints: Any) -> str | None:
             return f"waypoints[{index}] 缺字段：{', '.join(missing)}"
         if point.get("frame", "enu_m") != "enu_m":
             return f"waypoints[{index}] frame 只支持 enu_m（WGS84 转换需先定 ENU 原点）"
-        if not all(isinstance(point[key], (int, float)) for key in ("x_m", "y_m", "alt_m")):
-            return f"waypoints[{index}] 的 x_m / y_m / alt_m 必须是数字"
+        for key in ("x_m", "y_m", "alt_m"):
+            value = point[key]
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                return f"waypoints[{index}].{key} 必须是数字"
+            if not math.isfinite(float(value)):
+                return f"waypoints[{index}].{key} 必须是有限数值（不能是 NaN/Inf）"
     return None

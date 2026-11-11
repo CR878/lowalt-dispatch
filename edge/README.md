@@ -55,6 +55,8 @@
 - **真实 MQTT 接入**：`agent/messaging.py` 是云侧客户端；边缘侧还需要一个订阅 `.../commands`、发布 `.../acks` 与 `.../telemetry` 的适配器。契约已定，代码未写。
 - **真实 PX4**：`MavsdkExecutor` 只做依赖探测与坐标准入。`upload_mission` / 遥测流 / abort 都还是 `NotImplementedError`——没装 `mavsdk`、没有 SITL，写了也验证不了。
 - **断连时延实测**：`CloudLinkMonitor` 的阈值是示例值，检测/恢复时延必须在真实网络条件下测，不能拿默认值当结论。
+- **过期 ACK 会被云侧丢弃**：M3 的云侧通道只接受落在命令有效期内的 ACK。边缘端仍会
+  本地记录拒绝原因，但这类 ACK 不要指望云端收到——查问题看 `audit_MOCK.jsonl`。
 - **命令去重跨进程**：目前靠 SQLite 主键；多实例部署时还要考虑同一 `command_id` 落到不同实例的竞态（当前设计是单编排实例）。
 
 ## 边界（写材料前自查）

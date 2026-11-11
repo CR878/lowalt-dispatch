@@ -114,3 +114,13 @@ def test_naive_datetime_rejected() -> None:
 def test_waypoints_can_be_optional_when_disabled() -> None:
     command = _command(payload={"run_mode": "mock"})
     assert check_command(command, NOW, require_waypoints=False).accepted
+
+
+def test_nan_waypoint_rejected() -> None:
+    points = [dict(point) for point in _waypoints()]
+    points[1]["alt_m"] = float("nan")
+    command = _command(payload={"run_mode": "mock", "waypoints": points})
+    verdict = check_command(command, NOW)
+    assert not verdict.accepted
+    assert verdict.reject_code == "payload_invalid"
+    assert "有限数值" in verdict.reason

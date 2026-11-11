@@ -72,6 +72,9 @@ class FakeExecutor:
     ):
         if len(waypoints) < 2:
             raise ValueError("至少需要 2 个航点")
+        for index, point in enumerate(waypoints):
+            if len(point) != 3 or not all(math.isfinite(value) for value in point):
+                raise ValueError(f"waypoints[{index}] 必须是有限的 (x, y, alt)")
         if not math.isfinite(speed_mps) or speed_mps <= 0:
             raise ValueError("speed_mps 必须是有限正数")
         if battery_wh <= 0 or energy_per_m_wh < 0:
