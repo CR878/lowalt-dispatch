@@ -44,10 +44,10 @@ def agent_status(entry: str) -> AgentStatus:
     return AgentStatus(
         status="entry_configured",
         entry_configured=True,
-            detail=(
-                "已配置 M3 入口。规划完成后会调用它。本服务不解释、不执行它的返回值。"
-                "模块路径写在规划响应的 agent.entry 里，不要把密钥放进 AGENT_ENTRY。"
-            ),
+        detail=(
+            "已配置 M3 入口。规划完成后会调用它。本服务不解释、不执行它的返回值。"
+            "模块路径写在规划响应的 agent.entry 里，不要把密钥放进 AGENT_ENTRY。"
+        ),
     )
 
 

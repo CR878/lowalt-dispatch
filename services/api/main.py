@@ -67,7 +67,11 @@ def _check_id(value: str, name: str) -> str:
 
 
 def _postgres_slot(settings: Settings) -> SlotStatus:
-    names = [name for name, value in (("RDS_DSN", settings.rds_dsn), ("DATABASE_URL", settings.database_url)) if value]
+    names = [
+        name
+        for name, value in (("RDS_DSN", settings.rds_dsn), ("DATABASE_URL", settings.database_url))
+        if value
+    ]
     if not names:
         note = "未配置。RDS_DSN 和 DATABASE_URL 都是空的，当前不会连接 PostgreSQL。"
     else:
@@ -79,11 +83,15 @@ def _postgres_slot(settings: Settings) -> SlotStatus:
 
 
 def _redis_slot(settings: Settings) -> SlotStatus:
-    names = [name for name, value in (("DCS_HOST", settings.dcs_host), ("REDIS_URL", settings.redis_url)) if value]
+    names = [
+        name for name, value in (("DCS_HOST", settings.dcs_host), ("REDIS_URL", settings.redis_url)) if value
+    ]
     if not names:
         note = "未配置。DCS_HOST 和 REDIS_URL 都是空的，当前不会连接 Redis。"
     else:
-        note = f"{'、'.join(names)} 已填写。本版本不建立连接，也不把任务状态放进 Redis。地址不会出现在响应中。"
+        note = (
+            f"{'、'.join(names)} 已填写。本版本不建立连接，也不把任务状态放进 Redis。地址不会出现在响应中。"
+        )
     return SlotStatus(name="redis", configured=bool(names), connected=False, note=note)
 
 
