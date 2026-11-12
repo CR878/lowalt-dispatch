@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A · CRT 纯字符终端 / lowalt-dispatch</title>
+<style>
+:root{--bg:#050a06;--fg:#39ff88;--dim:#1f7a48;--hot:#ff5f56;--warn:#ffc44d;--line:#145c34}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font-family:"Cascadia Mono",Consolas,"Courier New",monospace;overflow:hidden}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.26) 0 1px,transparent 1px 3px),
+             radial-gradient(ellipse at 50% 50%,transparent 52%,rgba(0,0,0,.72) 100%)}
+.crt{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto;
+  gap:10px;padding:14px 18px;max-width:1180px;margin:0 auto}
+.banner{border:1px solid var(--line);padding:8px 12px;font-size:12px;letter-spacing:1px;
+  text-shadow:0 0 6px rgba(57,255,136,.45)}
+.banner b{color:var(--warn)}
+.cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(250px,1fr);gap:14px;min-height:0}
+pre{margin:0;font:inherit;font-size:12px;line-height:1.14;white-space:pre;letter-spacing:0}
+#map{overflow:hidden;display:grid;place-items:center;text-shadow:0 0 5px rgba(57,255,136,.35)}
+.side{display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.pane{border:1px solid var(--line);padding:8px 10px;overflow:hidden}
+.pane .t{color:var(--dim);font-size:11px;letter-spacing:1.5px;margin-bottom:5px}
+.route{color:#b6ffd4;font-weight:700;text-shadow:0 0 7px #39ff88}
+.zone{color:var(--hot);font-weight:700}
+.land{color:var(--warn);font-weight:700}
+.wall{color:#176c3d}
+.ok{color:#b6ffd4}.bad{color:var(--hot)}.warn{color:var(--warn)}.dim{color:var(--dim)}
+#log{border:1px solid var(--line);padding:8px 10px;height:104px;overflow:hidden;
+  font-size:11px;color:var(--dim)}
+#log .last{color:var(--fg)}
+.prompt{font-size:13px;letter-spacing:1px}
+.cursor{animation:bl 1s steps(1) infinite}
+@keyframes bl{50%{opacity:0}}
+.foot{font-size:10px;color:var(--dim);line-height:1.5;border-top:1px dashed var(--line);padding-top:6px}
+@media(max-width:820px){html,body{overflow:auto}.cols{grid-template-columns:1fr}#log{height:90px}}
+</style>
+</head>
+<body>
+<div class="crt">
+  <div class="banner">
+    <b>[ SIMULATION ONLY ]</b> &nbsp;LOWALT-DISPATCH / SITL CONSOLE v0.1
+    &nbsp;·&nbsp; ALL VALUES ARE PLACEHOLDERS &nbsp;·&nbsp; NOT FOR SUBMISSION
+  </div>
+
+  <div class="cols">
+    <pre id="map"><span id="mi"></span></pre>
+    <div class="side">
+      <div class="pane"><div class="t">// TASK</div><pre id="task"></pre></div>
+      <div class="pane" style="flex:1"><div class="t">// VALIDATION REPORT</div><pre id="checks"></pre></div>
+    </div>
+  </div>
+
+  <pre id="log"></pre>
+  <div class="prompt">dispatch&gt; <span class="cursor">_</span></div>
+  <div class="foot">
+    硬编码候选 A · 纯 ASCII 栅格，无 Canvas / 无依赖 / 无后端。
+    场景、检查项、模块名取自仓库真实定义；所有数值均为占位示意，不得写入参赛材料。
+    真实结果以 事实文档.md 与 results/ 为准。
+  </div>
+</div>
+
+<script>
+const W = 60, H = 22;
+const g = Array.from({length:H}, () => Array(W).fill(' '));
+
+const buildings = [[5,3,3,2],[12,6,2,3],[20,2,4,2],[38,2,3,3],[50,7,3,2],
+  [7,11,2,2],[33,17,3,2],[44,18,4,2],[17,19,3,1],[41,12,2,3],
+  [54,14,2,2],[26,4,2,2],[11,14,3,1],[47,9,2,2]];
+const zones = [[24,9,11,6,'R01'],[45,5,7,3,'R02'],[8,7,5,3,'R03'],[49,1,5,3,'R04']];
+const landing = [[6,16],[29,18],[48,15],[55,3]];
+const waypoints = [[2,19],[9,19],[9,16],[16,16],[16,12],[22,12],[28,8],[36,8],[42,4],[56,4]];
+
+for (const [x,y,w,h] of buildings)
+  for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) if(g[j]&&i<W) g[j][i]='#';
+for (const [x,y,w,h] of zones)
+  for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) if(g[j]&&i<W) g[j][i]='X';
+function line(a,b,ch){
+  let [x0,y0]=a,[x1,y1]=b, dx=Math.abs(x1-x0), dy=Math.abs(y1-y0);
+  let sx=x0<x1?1:-1, sy=y0<y1?1:-1, err=dx-dy;
+  while(true){
+    if(g[y0]&&x0>=0&&x0<W) g[y0][x0]=ch;
+    if(x0===x1&&y0===y1) break;
+    const e2=2*err;
+    if(e2>-dy){err-=dy;x0+=sx}
+    if(e2<dx){err+=dx;y0+=sy}
+  }
+}
+for(let i=0;i<waypoints.length-1;i++) line(waypoints[i],waypoints[i+1],'*');
+landing.forEach(([x,y]) => { if(g[y]) g[y][x]='L'; });
+g[waypoints[0][1]][waypoints[0][0]]='S';
+const end=waypoints[waypoints.length-1]; g[end[1]][end[0]]='D';
+
+const esc = c => c==='&'?'&amp;':c==='<'?'&lt;':c==='>'?'&gt;':c;
+function colorize(row){
+  let out='';
+  for(const ch of row){
+    const e=esc(ch);
+    if(ch==='*'||ch==='S'||ch==='D') out+='<span class="route">'+e+'</span>';
+    else if(ch==='X') out+='<span class="zone">'+e+'</span>';
+    else if(ch==='L') out+='<span class="land">'+e+'</span>';
+    else if(ch==='#') out+='<span class="wall">'+e+'</span>';
+    else out+=e;
+  }
+  return out;
+}
+const bar='+'+'-'.repeat(W)+'+';
+document.getElementById('mi').innerHTML =
+  '<span class="dim">'+bar+'</span>\n' +
+  g.map((row,i)=>'<span class="dim">|</span>'+colorize(row.join(''))+'<span class="dim">|</span>').join('\n') +
+  '\n<span class="dim">'+bar+'</span>\n' +
+  '<span class="dim">  S/D 起终点   * A* 基线   X 限制区   L 备降点   # 建筑草稿   局部 ENU 3000x3000 m</span>';
+
+document.getElementById('task').innerHTML =
+  '  <span class="dim">+--------------------------+</span>\n' +
+  '  | TASK     <span class="route">S2-01</span>                |\n' +
+  '  | CLASS    S2 动态风险         |\n' +
+  '  | ORIGIN   (150,150)  ENU m   |\n' +
+  '  | DEST     (2650,2750)        |\n' +
+  '  | ROUTE    <span class="route">astar_static</span>       |\n' +
+  '  | GRID     300x300 @ 10 m     |\n' +
+  '  | CLEAR    30 m (栅格)        |\n' +
+  '  | STATUS   <span class="warn">MOCK / 待真机</span>       |\n' +
+  '  <span class="dim">+--------------------------+</span>\n\n' +
+  '  A* 基线：19 / 20 找到路线\n' +
+  '  S4-04  <span class="bad">无解</span>（目的地被 R04 覆盖）\n' +
+  '  R01    (1300,1300)-(1700,1700)\n' +
+  '         +40 s 生效，基线不知道\n';
+
+const checks = [
+  ['PASS','endpoint_binding','起终点与任务一致'],
+  ['PASS','clearance','最小净空 >= 20 m'],
+  ['FAIL','restriction_zone','t=+98 s 穿越 R01'],
+  ['PASS','payload_limit','1.0 kg'],
+  ['WARN','energy','合成参数 · 无物理意义'],
+  ['WARN','diversion_reachability','合成参数 · 无物理意义'],
+  ['PASS','time_limit','600 s'],
+];
+let ck = '  <span class="dim">7 项独立检查 · 只读 waypoints</span>\n\n';
+for(const [r,n,d] of checks){
+  const cls = r==='PASS'?'ok':r==='FAIL'?'bad':'warn';
+  ck += '  [<span class="'+cls+'">'+r.padEnd(4)+'</span>]  '+n+'\n';
+  ck += '           <span class="dim">'+d+'</span>\n';
+}
+ck += '\n  <span class="dim">route_digest 绑定航线内容</span>\n';
+ck += '  <span class="dim">缺机型参数 -> 无法判定，不放行</span>';
+document.getElementById('checks').innerHTML = ck;
+
+const lines = [
+ '[t+000] snapshot v1 loaded (20 scenarios / suite v0)',
+ '[t+008] plan_route S2-01 -> astar_static  19/20',
+ '[t+040] risk_event R01 ACTIVE  zone (1300,1300)-(1700,1700)',
+ '[t+098] verify_route -> FAIL restriction_zone',
+ '[t+098] digest mismatch guard  report bound to route',
+ '[t+102] command_prepared  state=WAITING_ACK',
+ '[t+103] ack timeout -> 投递未知，不自动重发',
+ '[t+110] fallback: 按已同步且仍有效的快照执行',
+];
+const log=document.getElementById('log'); let n=0;
+setInterval(()=>{
+  if(n>=lines.length) n=0;
+  log.innerHTML = lines.slice(0,n+1).map((l,i)=>
+    '<div'+(i===n?' class="last"':'')+'>'+l+'</div>').join('');
+  n++;
+},900);
+
+const mapBox=document.getElementById('map'), mi=document.getElementById('mi');
+function fit(inner, box, cols, rows, max){
+  const r=box.getBoundingClientRect();
+  if(r.width<40||r.height<40) return;
+  const fs=Math.min(r.width/(cols*0.62), r.height/(rows*1.18), max);
+  inner.style.fontSize=Math.max(9,fs).toFixed(2)+'px';
+}
+function fitAll(){ fit(mi, mapBox, W+2, H+3, 26); }
+new ResizeObserver(fitAll).observe(mapBox);
+fitAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D2 · CHASE 跟拍视角 / lowalt-dispatch</title>
+<style>
+:root{--bg:#070b10;--panel:#0d131a;--line:#22303c;--line2:#35485a;
+  --text:#c7d3dc;--dim:#6c7f8d;--white:#e8f1f4;--teal:#5ad1c0;--hot:#ff7a6b;--warn:#ffc46b}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"JetBrains Mono","Cascadia Mono",Consolas,monospace;overflow:hidden}
+.app{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto}
+header{display:grid;grid-template-columns:minmax(240px,1.6fr) repeat(4,minmax(0,1fr));
+  align-items:end;border-bottom:1px solid var(--line);padding:9px 16px 0;background:var(--panel)}
+header h1{margin:0;font-size:18px;letter-spacing:1.5px;color:var(--white);font-weight:800}
+header p{margin:3px 0 8px;font-size:9px;color:var(--dim);letter-spacing:1.2px}
+.kpi{padding:0 10px 8px}.kpi .k{font-size:9px;color:var(--dim);letter-spacing:1.2px}
+.kpi .v{font-size:14px;font-weight:800;color:var(--white)}.kpi .v.t{color:var(--teal)}.kpi .v.h{color:var(--hot)}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 310px;min-height:0}
+.stage{position:relative;min-height:0;overflow:hidden}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 1px,transparent 1px 3px),
+             radial-gradient(ellipse at 45% 50%,transparent 52%,rgba(0,0,0,.6) 100%)}
+.ov{position:absolute;z-index:4;font-size:10px;pointer-events:none;letter-spacing:.5px}
+.ov.tag{left:12px;top:10px;border:1px solid var(--hot);color:var(--hot);padding:3px 8px;background:rgba(7,11,16,.85)}
+.ov.tgt{right:12px;bottom:10px;color:var(--dim);text-align:right;line-height:1.5}
+.side{border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.side .h{font-size:9px;letter-spacing:1.2px;color:var(--white);border-bottom:1px solid var(--line);
+  padding:7px 10px 5px;white-space:nowrap;overflow:hidden}
+.mini{flex:0 0 auto;border-bottom:1px solid var(--line);padding:0 8px 8px}
+.mini pre{margin:0;height:186px;overflow:hidden;font-size:8.5px;line-height:1.14;white-space:pre}
+.mini .r{color:#a8f0e2;font-weight:700}.mini .z{color:var(--hot);font-weight:700}
+.mini .l{color:var(--warn);font-weight:700}.mini .a{color:#3d5464}
+.blk{padding:8px 10px;border-bottom:1px solid var(--line);font-size:10px;line-height:1.6;overflow:hidden}
+.blk .t{color:var(--dim);font-size:9px;letter-spacing:1.2px;margin-bottom:4px}
+.ok{color:var(--teal)}.bad{color:var(--hot)}.w{color:var(--warn)}.dim{color:var(--dim)}
+.strip{border-top:1px solid var(--line);background:var(--panel);padding:6px 14px;font-size:10px;
+  display:flex;justify-content:space-between;gap:16px;color:var(--dim)}
+.foot{border-top:1px solid var(--line);padding:5px 14px;font-size:9px;color:var(--dim);background:var(--panel)}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div><h1>LOWALT / DISPATCH</h1><p>CHASE CAM · 3D PURSUIT VIEW · SOFTWARE RENDERER</p></div>
+    <div class="kpi"><div class="k">SCENARIOS</div><div class="v">20</div></div>
+    <div class="kpi"><div class="k">ROUTES FOUND</div><div class="v t">19 / 20</div></div>
+    <div class="kpi"><div class="k">CHECKS</div><div class="v">7</div></div>
+    <div class="kpi"><div class="k">REAL FLIGHT</div><div class="v h">NONE</div></div>
+  </header>
+
+  <div class="main">
+    <div class="stage">
+      <canvas id="view"></canvas>
+      <div class="ov tag">SIMULATION ONLY · NO REAL FLIGHT</div>
+      <div class="ov tgt">TRACKING UAV / WIREFRAME<br><span id="track">--</span></div>
+    </div>
+    <aside class="side">
+      <div class="h">01 ROUTE / LOCAL ENU 3000 x 3000 m (DRAFT)</div>
+      <div class="mini"><pre id="map"></pre></div>
+      <div class="blk">
+        <div class="t">// 02 UAV TELEMETRY (PLACEHOLDER)</div>
+        <div>ALT   <span id="alt">---</span> m AGL</div>
+        <div>HDG   <span id="hdg">---</span> deg</div>
+        <div>SHOT  <span id="cam">---</span></div>
+        <div>BEAT  env <span id="beat">--</span></div>
+      </div>
+      <div class="blk" style="flex:1">
+        <div class="t">// 03 VALIDATION REPORT</div>
+        <div class="ok">[PASS]</div><div class="dim"> endpoint_binding</div>
+        <div class="ok">[PASS]</div><div class="dim"> clearance</div>
+        <div class="bad">[FAIL]</div><div class="dim"> restriction_zone (R01 +40s)</div>
+        <div class="w">[ -- ]</div><div class="dim"> energy / diversion</div>
+        <div class="dim" style="margin-top:5px">合成参数 · 无物理意义</div>
+        <div class="dim">缺机型参数 -> 不放行</div>
+      </div>
+      <div class="blk">
+        <div class="t">// 04 CLOUD / EDGE</div>
+        <div class="ok">flight_control &nbsp; UP</div>
+        <div class="w">cloud_link &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; DEGRADED</div>
+        <div class="dim">fallback = 已同步且仍有效快照</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="strip">
+    <span>A* 基线 19/20 · S4-04 无解（目的地被 R04 覆盖）· 独立校验器只读 waypoints</span>
+    <span>MOCK 产物不入库 · 数字不进参赛材料</span>
+  </div>
+  <div class="foot">硬编码候选 D2 · 后上方跟拍 / 线框四旋翼 / 3D 航线光带 / 右侧终端栏保留 C 的 ASCII 战术图 · 节拍时钟 + glow 缓冲 + 四机位自动运镜</div>
+</div>
+<script src="view3d.js"></script>
+<script>
+var info=View3D.asciiMap(document.getElementById('map'));
+(function fit(){var el=document.getElementById('map'),r=el.getBoundingClientRect();
+  el.style.fontSize=Math.max(7,Math.min(r.width/(info.cols*.62),r.height/(info.rows*1.14),11)).toFixed(2)+'px';})();
+var pal={
+  sky0:'#04080d', sky1:'#0a1a24', sky2:'#050b10',
+  grid:'rgba(90,180,190,ALPHA)', zoneFill:'rgba(255,122,107,.10)',
+  boxTop:'rgba(120,200,205,ALPHA)', boxSide:'rgba(35,80,95,ALPHA)', boxEdge:'rgba(95,190,195,ALPHA)',
+  site:'#ffd98a', route:'#5ad1c0', glow:'rgba(90,209,192,ALPHA)', hud:'#a8f0e2'
+};
+View3D.create(document.getElementById('view'),{
+  mode:'chase',pal:pal,tempo:.9,glowScale:3,
+  views:[
+    {eye:[300,120,280],yaw:Math.PI/4,pitch:-0.34,fov:66,hold:5},
+    {eye:[1100,900,320],yaw:Math.PI/4,pitch:-0.40,fov:62,hold:5},
+    {eye:[1900,1700,300],yaw:Math.PI/4,pitch:-0.32,fov:68,hold:5},
+    {eye:[2500,2350,270],yaw:Math.PI/4,pitch:-0.38,fov:64,hold:5}
+  ],
+  onFrame:function(s){
+    document.getElementById('alt').textContent=Math.round(s.cam.eye[2]);
+    document.getElementById('hdg').textContent=Math.round(s.cam.yaw*180/Math.PI);
+    document.getElementById('cam').textContent=(s.view+1)+'/4';
+    document.getElementById('beat').textContent=s.env.toFixed(2);
+    document.getElementById('track').textContent='ENU '+Math.round(s.cam.eye[0])+', '+Math.round(s.cam.eye[1]);
+  }
+});
+</script>
+</body>
+</html>

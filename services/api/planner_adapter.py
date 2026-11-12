@@ -187,7 +187,9 @@ def _call(fn: Any, *, task: Task, snapshot: RiskSnapshot, scenario: dict[str, An
             f"规划入口参数无法填充：{joined}。目前只能提供 task、snapshot、scenario、scene。"
         )
     if not kwargs:
-        raise PlannerIntegrationError("规划入口没有可绑定的参数。需要具名参数 task、snapshot、scenario 或 scene。")
+        raise PlannerIntegrationError(
+            "规划入口没有可绑定的参数。需要具名参数 task、snapshot、scenario 或 scene。"
+        )
     return fn(**kwargs)
 
 

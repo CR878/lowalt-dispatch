@@ -21,6 +21,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from core.console import ensure_utf8_stdout
 from core.geometry import polyline_length
 from planner.grid import DEFAULT_CLEARANCE_M, DEFAULT_RES_M, Grid, build_grid, snap_to_free
 from planner.scene import endpoint_xy, load_scene, load_suite, zones_known_at_t0
@@ -173,6 +174,12 @@ def plan(
             ny, nx = iy + dy, ix + dx
             if not grid.free(ny, nx):
                 continue
+            if dy and dx:
+                # 禁止切角：对角移动要求两个正交邻格也可用。
+                # 否则两个单元中心之间的直线会擦着障碍拐角过去，
+                # 栅格里看着"没碰"，连续几何里已经侵入净空。
+                if not grid.free(iy + dy, ix) or not grid.free(iy, ix + dx):
+                    continue
             nxt = (ny, nx)
             if nxt in closed:
                 continue
@@ -225,6 +232,7 @@ def plan_scenario(
 # CLI
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     import sys
 
     args = argv if argv is not None else sys.argv[1:]
@@ -259,8 +267,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"{detour * 100:>7.0f}%{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  —"
             )
         else:
-            print(f"{sc['id']:<9}{'否':>6}{'-':>9}{straight:>9.0f}{'-':>8}"
-                  f"{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  {res.reason}")
+            print(
+                f"{sc['id']:<9}{'否':>6}{'-':>9}{straight:>9.0f}{'-':>8}"
+                f"{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  {res.reason}"
+            )
 
     print("-" * 78)
     print(f"找到路线 {n_found}/{total}")

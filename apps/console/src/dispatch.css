@@ -1,0 +1,143 @@
+.dispatch-panel {
+  display: grid;
+  gap: 16px;
+}
+.dispatch-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  color: #82e3d5;
+  border: 1px solid #295b59;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #12322f, #13202a);
+}
+.dispatch-banner p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #9ab5bc;
+}
+.dispatch-chain {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dispatch-chain span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #c0d3df;
+}
+.dispatch-chain b {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: #1c3a46;
+  border-radius: 50%;
+}
+.dispatch-muted {
+  color: #93a9b8;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.dispatch-field {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: #adbdc9;
+}
+.dispatch-field select {
+  width: 100%;
+  padding: 10px;
+  color: #e3edf3;
+  background: #12232f;
+  border: 1px solid #304858;
+  border-radius: 8px;
+}
+.dispatch-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #2b414f;
+  border-radius: 12px;
+  background: #0d1c27;
+}
+.dispatch-card h3 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  color: #d9e9ef;
+}
+.dispatch-card h3 > span {
+  margin-left: auto;
+  font-size: 11px;
+}
+.dispatch-card dl {
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 10px;
+  margin: 0;
+  font-size: 12px;
+}
+.dispatch-card dt {
+  color: #93a9b8;
+}
+.dispatch-card dd {
+  margin: 0;
+  color: #e0edf2;
+  overflow-wrap: anywhere;
+}
+.dispatch-id {
+  font-size: 11px;
+  color: #8da3b3;
+  overflow-wrap: anywhere;
+}
+.dispatch-consent {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dispatch-online {
+  color: #75d8b7;
+}
+.dispatch-error {
+  padding: 12px;
+  color: #ffc0a9;
+  background: #352626;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.dispatch-card summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #9bb9c8;
+}
+.dispatch-events {
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px 0;
+  margin: 0;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.dispatch-events li {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 11px;
+  border-bottom: 1px solid #233441;
+  color: #c0d2df;
+}
+.dispatch-events time {
+  color: #8da3b3;
+  flex-shrink: 0;
+}
