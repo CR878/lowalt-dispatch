@@ -566,6 +566,7 @@ kbd {
   position: relative;
 }
 .map-toolbar {
+  position: relative;
   height: 48px;
   display: flex;
   align-items: center;
@@ -601,6 +602,14 @@ kbd {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+@media (max-width: 375px) {
+  .map-panel .map-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 43px;
+    padding-block: 6px;
+  }
 }
 .segmented {
   display: flex;
@@ -915,7 +924,7 @@ kbd {
 .layer-menu {
   position: absolute;
   right: 50px;
-  top: 12px;
+  top: calc(100% + 12px);
   z-index: 7;
   min-width: 195px;
   padding: 13px;

@@ -24,6 +24,17 @@ test("reviewed local task reaches actual M3/M2/M4 and survives panel reopening",
   await expect(panel.locator(".dispatch-events li").first()).toBeVisible();
   const taskId = await panel.locator(".dispatch-id").innerText();
   await panel.getByRole("button", { name: "关闭面板" }).click();
+  await page.getByRole("button", { name: "打开调度助手", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "向调度助手提问" })
+    .fill("这单现在到哪了？");
+  await page.getByRole("button", { name: "发送给调度助手" }).click();
+  const status = page.getByRole("region", { name: "本地任务状态" });
+  await expect(status.getByText(taskId, { exact: true })).toBeVisible();
+  await expect(status.getByText("v1", { exact: true })).toBeVisible();
+  await expect(status.getByText("已受理", { exact: true })).toBeVisible();
+  await expect(status.getByText("合成执行中", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "收起调度助手" }).click();
   await page.getByRole("button", { name: "本地任务联调", exact: true }).click();
   await expect(page.locator(".dispatch-id")).toHaveText(taskId);
   await expect(page.getByText("v1 / 1", { exact: true })).toBeVisible();

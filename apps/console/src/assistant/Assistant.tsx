@@ -104,6 +104,45 @@ function download(value: unknown) {
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
+function TaskStatusCard({
+  task,
+}: {
+  task: NonNullable<AssistantResult["task_status"]>;
+}) {
+  return (
+    <section
+      className="assistant-result-card assistant-task-status"
+      aria-label="本地任务状态"
+    >
+      <div className="assistant-card-title">
+        <ShieldCheck size={14} />
+        <strong>{task.source}</strong>
+        <span>{task.scenario_id}</span>
+      </div>
+      <dl>
+        <dt>任务 ID</dt>
+        <dd>
+          <code>{task.task_id}</code>
+        </dd>
+        <dt>航线版本</dt>
+        <dd>{task.plan_version ?? "—"}</dd>
+        <dt>规划状态</dt>
+        <dd>{task.planning_label}</dd>
+        <dt>执行回执</dt>
+        <dd>
+          {task.ack_accepted === null
+            ? "暂无"
+            : task.ack_accepted
+              ? "已受理"
+              : "已拒绝"}
+        </dd>
+        <dt>执行状态</dt>
+        <dd>{task.execution_label ?? "暂无"}</dd>
+      </dl>
+    </section>
+  );
+}
+
 function ToolActions({
   result,
   onFocus,
@@ -605,6 +644,9 @@ export default function Assistant(props: Props) {
               {message.text && (
                 <p className="assistant-message-text">{message.text}</p>
               )}
+              {message.result?.task_status && (
+                <TaskStatusCard task={message.result.task_status} />
+              )}
               {message.state === "pending" && (
                 <div className="assistant-thinking">
                   <i />
@@ -629,9 +671,11 @@ export default function Assistant(props: Props) {
               {message.result && (
                 <div className="assistant-message-foot">
                   <span>
-                    {props.context.telemetry_mode === "live"
-                      ? "LIVE TELEMETRY"
-                      : "DEMO CONTEXT"}
+                    {message.result.task_status
+                      ? "本地合成任务"
+                      : props.context.telemetry_mode === "live"
+                        ? "LIVE TELEMETRY"
+                        : "DEMO CONTEXT"}
                   </span>
                   <span>{message.result.turn_id.slice(0, 8)}</span>
                 </div>

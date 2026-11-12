@@ -16,6 +16,7 @@ from pydantic import ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from services.api.routes import router as dispatch_router
+from services.api.routes import runtime as dispatch_runtime
 from services.assistant.engine import Engine, ModelUnavailable, Settings
 from services.assistant.models import Turn
 from services.assistant.places import search_places
@@ -132,6 +133,10 @@ async def turn(request: Request):
     if not slots.acquire(blocking=False):
         raise HTTPException(429, "Assistant is busy; retry later")
     packets = queue.Queue()
+    try:
+        read_dispatch_task = dispatch_runtime(request).get
+    except HTTPException:
+        read_dispatch_task = None
 
     def worker():
         try:
@@ -149,7 +154,7 @@ async def turn(request: Request):
                     "is_simulated": True,
                 }
             )
-            result = engine.run(value, emit)
+            result = engine.run(value, emit, read_dispatch_task=read_dispatch_task)
             write_audit(
                 {
                     "turn_id": str(value.request_id),

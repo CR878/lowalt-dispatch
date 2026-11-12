@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
@@ -73,6 +74,7 @@ def point_at(route, progress):
 class Toolset:
     SPECS = {
         "get_flight_status": ("读取当前界面遥测、时间和来源，不作适航或备降安全判断。", NoArgs),
+        "get_task_status": ("查询联调面板选中的本地合成任务，读取规划、回执和独立执行状态。", NoArgs),
         "list_events": ("读取本次页面会话的事件记录并按类型统计。", NoArgs),
         "list_places": ("列出虚拟场景登记地点和局部ENU坐标，未知名称不能猜坐标。", NoArgs),
         "update_task_draft": ("仅更新用户明确提供的任务草稿字段；可多轮补充，缺失值保留未知。", DraftUpdate),
@@ -84,8 +86,9 @@ class Toolset:
         "get_capabilities": ("说明实际接入能力、待连接项和下发边界。", NoArgs),
     }
 
-    def __init__(self, turn: Turn):
+    def __init__(self, turn: Turn, read_dispatch_task: Callable[[str], dict] | None = None):
         self.turn = turn
+        self.read_dispatch_task = read_dispatch_task
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
 
@@ -138,6 +141,76 @@ class Toolset:
             "progress_pct": round(ctx.progress * 100, 1),
             "telemetry": ctx.telemetry.model_dump(),
             "point": point_at(baseline(), ctx.progress),
+        }
+
+    def get_task_status(self, _args):
+        selected = self.turn.context.selected_task_id
+        if selected is None:
+            return {"status": "not_selected", "reason": "请先在「本地任务联调」选择要查询的任务。"}
+        if self.read_dispatch_task is None:
+            return {"status": "unavailable", "reason": "本地任务联调服务暂不可用。"}
+
+        task_id = str(selected)
+        try:
+            task = self.read_dispatch_task(task_id)
+        except KeyError:
+            return {"status": "unknown_task", "reason": "找不到当前选中的任务，请在联调面板重新选择。"}
+
+        result = task["result"] or {}
+        command = result.get("command")
+        execution = task["execution"]
+        ack = result.get("ack")
+
+        def matches_command(record):
+            return (
+                command
+                and record
+                and (record["task_id"], record["command_id"], record["plan_version"])
+                == (
+                    task_id,
+                    command["command_id"],
+                    command["plan_version"],
+                )
+            )
+
+        ack_accepted = ack["accepted"] if matches_command(ack) else None
+        execution_state = execution["state"] if matches_command(execution) else None
+        planning_status = str(task["planning_status"])
+        planning_label = {
+            "awaiting_confirmation": "等待确认",
+            "waiting_ack": "等待执行回执，结果待对账",
+            "acknowledged": "执行端已受理",
+            "blocked": "独立校验拦截",
+            "rejected": "执行端拒绝",
+            "reconcile_required": "待恢复任务审计",
+            "error": "规划流程异常",
+        }.get(planning_status, "规划处理中")
+        execution_label = {
+            "accepted": "执行端已接收",
+            "executing": "合成执行中",
+            "completed": "合成执行完成",
+            "recovering": "待人工对账",
+            "rejected": "执行端拒绝",
+            "failed": "合成执行失败",
+        }.get(execution_state)
+        has_execution = execution_label and (
+            ack_accepted is True or execution_state in {"failed", "recovering"}
+        )
+
+        return {
+            "status": "ok",
+            "source": "本地任务联调 · 合成执行",
+            "task_id": task_id,
+            "scenario_id": task["scenario_id"],
+            "planning_status": planning_status,
+            "planning_label": planning_label,
+            "execution_state": execution_state,
+            "execution_label": execution_label,
+            "ack_accepted": ack_accepted,
+            "plan_version": command["plan_version"] if command else None,
+            "command_id": command["command_id"] if command else None,
+            "label": execution_label if has_execution else planning_label,
+            "reason": (execution.get("reason") if has_execution else task["reason"]) or None,
         }
 
     def list_events(self, _args):

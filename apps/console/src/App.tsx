@@ -1,4 +1,4 @@
-import { DispatchPanel } from "./DispatchPanel";
+import { DispatchPanel, rememberedDispatchTask } from "./DispatchPanel";
 import {
   useCallback,
   useEffect,
@@ -66,6 +66,7 @@ import {
 } from "lucide-react";
 import MapSurface, { type MapSurfaceHandle } from "./MapSurface";
 import LocationPanel from "./LocationPanel";
+import { TerminalMap } from "./TerminalMap";
 import {
   Drone,
   LiveLocalTrack,
@@ -294,6 +295,7 @@ export default function App() {
     null,
   );
   const [assistantFocus, setAssistantFocus] = useState("");
+  const [dispatchTaskId, setDispatchTaskId] = useState(rememberedDispatchTask);
   const [drawer, setDrawer] = useState<
     | "panels"
     | "tasks"
@@ -316,6 +318,9 @@ export default function App() {
   const [compare, setCompare] = useState(true);
   const [reviewRoute, setReviewRoute] = useState<ReviewRoute | null>(null);
   const [mapKind, setMapKind] = useState<"world" | "terrain">("world");
+  const [terminalMap, setTerminalMap] = useState(
+    () => new URLSearchParams(window.location.search).get("map") === "terminal",
+  );
   const [showGeographic, setShowGeographic] = useState(false);
   const [demoVisible, setDemoVisible] = useState(true);
   const [realTerrain, setRealTerrain] = useState(false);
@@ -386,6 +391,7 @@ export default function App() {
   const localTrackAvailable = liveMode && position?.frame !== "WGS84";
   const showLocalTrack =
     localTrackAvailable && !showGeographic && !locationOpen;
+  const showTerminal = terminalMap && !liveMode && !locationOpen;
   const coordinates =
     liveMode && liveStatus === "live" && position?.frame === "WGS84"
       ? [position.lon_deg, position.lat_deg]
@@ -574,8 +580,10 @@ export default function App() {
         setLocationOpen((v) => !v);
       }
       if (event.key === "?") setOnboarding((v) => !v);
-      if (event.key.toLowerCase() === "v")
+      if (event.key.toLowerCase() === "v") {
+        setTerminalMap(false);
         setMode((v) => (v === "3d" ? "2d" : "3d"));
+      }
       if (event.code === "Space") {
         if ((event.target as HTMLElement).closest("button")) return;
         event.preventDefault();
@@ -1001,11 +1009,13 @@ export default function App() {
                 <span className="live-dot" />
                 <strong>{showLocalTrack ? "局部轨迹" : "空域态势"}</strong>
                 <span className="map-breadcrumb">
-                  {showLocalTrack
-                    ? (position?.frame ?? "局部定位")
-                    : mapKind === "world"
-                      ? "CARTO DARK MATTER / WGS84"
-                      : "地形实验 / ENU · 3 × 3 km"}
+                  {showTerminal
+                    ? "LOCAL ENU / ASCII"
+                    : showLocalTrack
+                      ? (position?.frame ?? "局部定位")
+                      : mapKind === "world"
+                        ? "CARTO DARK MATTER / WGS84"
+                        : "地形实验 / ENU · 3 × 3 km"}
                 </span>
               </div>
               <div className="map-toolbar-actions">
@@ -1040,8 +1050,28 @@ export default function App() {
                 )}
                 {!liveMode && (
                   <button
-                    className="map-surface-toggle"
+                    className="map-surface-toggle terminal-map-toggle"
+                    aria-pressed={showTerminal}
+                    aria-label="终端地图"
+                    title="切换 ASCII 终端地图"
                     onClick={() => {
+                      setTerminalMap(!showTerminal);
+                      setLocationOpen(false);
+                      setShowLayers(false);
+                      setReady(false);
+                      setMapError("");
+                    }}
+                  >
+                    <SquareTerminal size={14} />
+                    <span>终端地图</span>
+                  </button>
+                )}
+                {!liveMode && (
+                  <button
+                    className="map-surface-toggle"
+                    aria-label={mapKind === "world" ? "地形实验" : "真实地图"}
+                    onClick={() => {
+                      setTerminalMap(false);
                       setMapKind((k) => (k === "world" ? "terrain" : "world"));
                       setLocationOpen(false);
                       setMapError("");
@@ -1063,16 +1093,22 @@ export default function App() {
                 )}
                 <div className="segmented" hidden={showLocalTrack}>
                   <button
-                    className={mode === "2d" ? "selected" : ""}
-                    aria-pressed={mode === "2d"}
-                    onClick={() => setMode("2d")}
+                    className={!showTerminal && mode === "2d" ? "selected" : ""}
+                    aria-pressed={!showTerminal && mode === "2d"}
+                    onClick={() => {
+                      setTerminalMap(false);
+                      setMode("2d");
+                    }}
                   >
                     2D
                   </button>
                   <button
-                    className={mode === "3d" ? "selected" : ""}
-                    aria-pressed={mode === "3d"}
-                    onClick={() => setMode("3d")}
+                    className={!showTerminal && mode === "3d" ? "selected" : ""}
+                    aria-pressed={!showTerminal && mode === "3d"}
+                    onClick={() => {
+                      setTerminalMap(false);
+                      setMode("3d");
+                    }}
                   >
                     <Box size={12} /> 3D
                   </button>
@@ -1094,6 +1130,60 @@ export default function App() {
                   <Expand size={15} />
                 </IconButton>
               </div>
+              {showLayers && !showLocalTrack && (
+                <div className="layer-menu glass">
+                  <strong>地图图层</strong>
+                  {(
+                    Object.entries({
+                      terrain: "地形与等高线",
+                      buildings: "建筑体块",
+                      routes: "航线与备降点",
+                      restrictions: "限制区",
+                      scan: "扫描波纹",
+                    }) as [keyof Layers, string][]
+                  )
+                    .filter(([key]) => !showTerminal || key !== "scan")
+                    .map(([key, name]) => (
+                      <button
+                        key={key}
+                        aria-pressed={layers[key]}
+                        onClick={() =>
+                          setLayers((v) => ({ ...v, [key]: !v[key] }))
+                        }
+                      >
+                        <span>{name}</span>
+                        <span
+                          className={`checkbox ${layers[key] ? "checked" : ""}`}
+                        >
+                          {layers[key] && <Check size={11} />}
+                        </span>
+                      </button>
+                    ))}
+                  {!showTerminal && (
+                    <>
+                      <button onClick={() => setDemoVisible((v) => !v)}>
+                        <span>演示场景叠加</span>
+                        <span
+                          className={`checkbox ${demoVisible ? "checked" : ""}`}
+                        >
+                          {demoVisible && <Check size={11} />}
+                        </span>
+                      </button>
+                      <button onClick={() => setRealTerrain((v) => !v)}>
+                        <span>全球三维地形 · 在线DEM</span>
+                        <span
+                          className={`checkbox ${realTerrain ? "checked" : ""}`}
+                        >
+                          {realTerrain && <Check size={11} />}
+                        </span>
+                      </button>
+                      <p>
+                        在线地形是公开高程，非实时测绘。演示场景仅为固定锚点叠加。
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             {showLocalTrack && (
               <LiveLocalTrack
@@ -1101,8 +1191,18 @@ export default function App() {
                 active={liveStatus === "live"}
               />
             )}
-            <div className="map-stage" hidden={showLocalTrack}>
-              {!showLocalTrack && (
+            {showTerminal && (
+              <TerminalMap
+                layers={layers}
+                terrainModel={terrainModel}
+                progress={progress}
+                playing={playing && !motionReduced}
+                preview={assistantPreview?.waypoints}
+                comparison={reviewRoute?.waypoints}
+              />
+            )}
+            <div className="map-stage" hidden={showLocalTrack || showTerminal}>
+              {!showLocalTrack && !showTerminal && (
                 <MapSurface
                   ref={map}
                   mode={mode}
@@ -1310,53 +1410,6 @@ export default function App() {
                       </strong>
                     </div>
                   </div>
-                </div>
-              )}
-              {showLayers && (
-                <div className="layer-menu glass">
-                  <strong>地图图层</strong>
-                  {(
-                    Object.entries({
-                      terrain: "地形与等高线",
-                      buildings: "建筑体块",
-                      routes: "航线与备降点",
-                      restrictions: "限制区",
-                      scan: "扫描波纹",
-                    }) as [keyof Layers, string][]
-                  ).map(([key, name]) => (
-                    <button
-                      key={key}
-                      onClick={() =>
-                        setLayers((v) => ({ ...v, [key]: !v[key] }))
-                      }
-                    >
-                      <span>{name}</span>
-                      <span
-                        className={`checkbox ${layers[key] ? "checked" : ""}`}
-                      >
-                        {layers[key] && <Check size={11} />}
-                      </span>
-                    </button>
-                  ))}
-                  <button onClick={() => setDemoVisible((v) => !v)}>
-                    <span>演示场景叠加</span>
-                    <span
-                      className={`checkbox ${demoVisible ? "checked" : ""}`}
-                    >
-                      {demoVisible && <Check size={11} />}
-                    </span>
-                  </button>
-                  <button onClick={() => setRealTerrain((v) => !v)}>
-                    <span>全球三维地形 · 在线DEM</span>
-                    <span
-                      className={`checkbox ${realTerrain ? "checked" : ""}`}
-                    >
-                      {realTerrain && <Check size={11} />}
-                    </span>
-                  </button>
-                  <p>
-                    在线地形是公开高程，非实时测绘。演示场景仅为固定锚点叠加。
-                  </p>
                 </div>
               )}
               <div className="map-navigation">
@@ -1859,6 +1912,7 @@ export default function App() {
               ? liveFrame.captured_at
               : new Date().toISOString(),
           task_id: "T-S1-01",
+          selected_task_id: dispatchTaskId || null,
           route_id: "S1-01-baseline",
           progress: liveMode ? 0 : progress,
           telemetry_mode: liveMode ? "live" : "demo",
@@ -1971,7 +2025,12 @@ export default function App() {
               </IconButton>
             </div>
             <div className="drawer-body">
-              {drawer === "dispatch" && <DispatchPanel />}
+              {drawer === "dispatch" && (
+                <DispatchPanel
+                  taskId={dispatchTaskId}
+                  setTaskId={setDispatchTaskId}
+                />
+              )}
               {drawer === "routes" && (
                 <RouteReview
                   onSelect={(route) => {

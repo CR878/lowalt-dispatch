@@ -105,6 +105,19 @@ function validResult(result: AssistantResult) {
       ))
   )
     return false;
+  const task = result.task_status;
+  if (
+    task != null &&
+    (typeof task.source !== "string" ||
+      typeof task.task_id !== "string" ||
+      typeof task.scenario_id !== "string" ||
+      typeof task.planning_label !== "string" ||
+      (task.execution_label !== null &&
+        typeof task.execution_label !== "string") ||
+      (task.plan_version !== null && typeof task.plan_version !== "string") ||
+      (task.ack_accepted !== null && typeof task.ack_accepted !== "boolean"))
+  )
+    return false;
   return true;
 }
 

@@ -17,6 +17,7 @@ export type AssistantContext = {
   is_simulated: true;
   sampled_at: string;
   task_id: "T-S1-01";
+  selected_task_id: string | null;
   route_id: "S1-01-baseline";
   progress: number;
   telemetry_mode: "demo" | "live";
@@ -68,6 +69,15 @@ export type AssistantResult = {
   draft_digest: string | null;
   route?: PreviewRoute | { status: "blocked"; reason: string } | null;
   risk?: RiskResult | null;
+  task_status?: {
+    source: string;
+    task_id: string;
+    scenario_id: string;
+    planning_label: string;
+    execution_label: string | null;
+    ack_accepted: boolean | null;
+    plan_version: string | null;
+  } | null;
   dispatch_enabled: false;
   is_simulated: true;
   created_at: string;
@@ -89,6 +99,7 @@ export type Packet =
 
 export const toolLabels: Record<string, string> = {
   get_flight_status: "读取遥测快照",
+  get_task_status: "查询当前联调任务",
   list_events: "查询页面事件",
   list_places: "查询登记地点",
   update_task_draft: "整理任务参数",
