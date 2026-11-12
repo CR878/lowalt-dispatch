@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B · LAB CONSOLE 网格控制台 / lowalt-dispatch</title>
+<style>
+:root{--bg:#070b10;--panel:#0d131a;--line:#22303c;--line2:#35485a;
+  --text:#c7d3dc;--dim:#6c7f8d;--white:#e8f1f4;--pink:#ff7a6b;--teal:#5ad1c0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"JetBrains Mono","Cascadia Mono",Consolas,monospace;overflow:hidden}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;height:100vh}
+header{display:grid;grid-template-columns:minmax(250px,1.7fr) repeat(5,minmax(0,1fr));
+  align-items:end;border-bottom:1px solid var(--line);padding:10px 18px 0;background:#080e14}
+.brand h1{margin:0;font-size:20px;font-weight:800;letter-spacing:1.5px;color:var(--white)}
+.brand p{margin:4px 0 9px;font-size:9px;color:var(--dim);letter-spacing:1.2px}
+.kpi{padding:0 10px 9px;position:relative}
+.kpi .k{font-size:9px;color:var(--dim);letter-spacing:1.2px}
+.kpi .v{font-size:14px;font-weight:800;color:var(--white);font-variant-numeric:tabular-nums}
+.kpi .v.teal{color:var(--teal)}.kpi .v.pink{color:var(--pink)}
+.kpi .seg{position:absolute;left:10px;right:0;bottom:-1px;height:2px;background:var(--line)}
+.kpi .seg i{display:block;height:100%;background:var(--teal);transition:width 1.2s ease}
+.stage{position:relative;min-height:0;overflow:hidden}
+#stage{position:absolute;inset:0;width:100%;height:100%;display:block}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px),
+             radial-gradient(ellipse at 45% 50%,transparent 55%,rgba(0,0,0,.55) 100%)}
+.ov{position:absolute;font-size:9px;letter-spacing:1px;z-index:2;pointer-events:none}
+.tag{left:12px;top:10px;border:1px solid var(--pink);color:var(--pink);padding:3px 8px;background:rgba(7,11,16,.85)}
+.mode{right:14px;top:10px;color:var(--dim)}
+.hint{left:12px;bottom:10px;color:var(--dim)}
+.panels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;
+  padding:8px 12px 12px;border-top:1px solid var(--line);background:#080e14}
+.p{border:1px solid var(--line);background:var(--panel);padding:7px 10px 6px;
+  height:clamp(112px,16vh,158px);display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.p h3{margin:0 0 5px;font-size:9px;font-weight:800;letter-spacing:1.3px;color:var(--white)}
+.p pre{flex:1;margin:0;overflow:hidden;font-size:9px;line-height:1.45;white-space:pre}
+.p .cap{margin-top:auto;font-size:8px;color:var(--dim);padding-top:3px}
+.ok{color:var(--teal)}.bad{color:var(--pink)}.warn{color:#b9c9d4}.dim{color:var(--dim)}
+.foot{border-top:1px solid var(--line);padding:6px 14px;font-size:9px;color:var(--dim);
+  display:flex;justify-content:space-between;gap:12px;background:#080e14}
+@media(max-width:1000px){html,body{overflow:auto}.app{height:auto}.stage{height:58vh}.panels{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand"><h1>LOWALT / DISPATCH</h1><p>EMERGENCY DELIVERY · ROUTE SAFETY CONSOLE</p></div>
+    <div class="kpi"><div class="k">SCENARIOS</div><div class="v">20</div><div class="seg"><i style="width:100%"></i></div></div>
+    <div class="kpi"><div class="k">ROUTES FOUND</div><div class="v teal">19 / 20</div><div class="seg"><i style="width:95%"></i></div></div>
+    <div class="kpi"><div class="k">CHECKS</div><div class="v">7</div><div class="seg"><i style="width:70%"></i></div></div>
+    <div class="kpi"><div class="k">LANDING SITES</div><div class="v">4</div><div class="seg"><i style="width:40%"></i></div></div>
+    <div class="kpi"><div class="k">FLIGHT</div><div class="v pink">NONE</div><div class="seg"><i style="width:0%"></i></div></div>
+  </header>
+
+  <div class="stage" id="wrap">
+    <canvas id="stage"></canvas>
+    <div class="ov tag">SIMULATION ONLY · NO REAL FLIGHT</div>
+    <div class="ov mode">S2-01 / astar_static / snapshot v1</div>
+    <div class="ov hint">* A* baseline &nbsp; X restriction zone &nbsp; L diversion site &nbsp; local ENU 3000x3000 m (draft)</div>
+  </div>
+
+  <section class="panels">
+    <div class="p"><h3>01 / MISSION FEED</h3><pre id="p1"></pre><div class="cap">independent runs · shared snapshot</div></div>
+    <div class="p"><h3>02 / ROUTE PLAN</h3><pre id="p2"></pre><div class="cap">waypoints only · no self-reported checks</div></div>
+    <div class="p"><h3>03 / VALIDATION REPORT</h3><pre id="p3"></pre><div class="cap">7 independent checks</div></div>
+    <div class="p"><h3>04 / DIVERSION MARGIN</h3><pre id="p4"></pre><div class="cap">placeholder profile · not physical</div></div>
+    <div class="p"><h3>05 / RISK & LINK</h3><pre id="p5"></pre><div class="cap">cloud_link / flight_control</div></div>
+    <div class="p"><h3>06 / AGENT STATE</h3><pre id="p6"></pre><div class="cap">explicit FSM · mock tools</div></div>
+    <div class="p"><h3>07 / SCENARIO INDEX</h3><pre id="p7"></pre><div class="cap">suite v0 · seeds 1,2,3</div></div>
+    <div class="p"><h3>08 / AUDIT LOG</h3><pre id="p8"></pre><div class="cap">JSONL · _MOCK suffix</div></div>
+  </section>
+
+  <div class="foot">
+    <span>硬编码候选 B · CSS Grid 三行布局 + Canvas 主视图 + 单 rAF 循环</span>
+    <span>所有数值为占位示意，不得写入参赛材料 · 真实结果见 事实文档.md / results/</span>
+  </div>
+</div>
+
+<script>
+const p1=document.getElementById('p1');
+p1.innerHTML='<span class="dim">[t+000]</span> snapshot v1 loaded\n<span class="dim">[t+008]</span> <span class="ok">plan_route</span> S2-01\n<span class="dim">[t+040]</span> <span class="warn">R01</span> ACTIVE (+40 s)\n<span class="dim">[t+098]</span> <span class="bad">verify_route FAIL</span>\n<span class="dim">[t+102]</span> command_prepared\n<span class="dim">[t+103]</span> ACK timeout';
+
+document.getElementById('p2').innerHTML=
+ '  GRID   300 x 300 @ 10 m\n  CLEAR  30 m (raster)\n  STEPS  8-neighbour A*\n  HEUR   octile\n  CUT    no diagonal corner\n  FOUND  <span class="ok">19 / 20</span>\n  S4-04  <span class="bad">NO SOLUTION</span>\n         dest inside R04';
+
+document.getElementById('p3').innerHTML=
+ '  <span class="ok">[PASS]</span> endpoint_binding\n  <span class="ok">[PASS]</span> clearance\n  <span class="bad">[FAIL]</span> restriction_zone\n  <span class="ok">[PASS]</span> payload_limit\n  <span class="warn">[ -- ]</span> energy          <span class="dim">合成</span>\n  <span class="warn">[ -- ]</span> diversion_reach.  <span class="dim">合成</span>\n  <span class="ok">[PASS]</span> time_limit\n  <span class="dim">digest binds route content</span>';
+
+document.getElementById('p4').innerHTML=
+ '  E_left - E_res - min E_need\n\n  120 <span class="dim">|</span>      ***\n   90 <span class="dim">|</span>    **   **\n   60 <span class="dim">|</span>  **       ***\n   30 <span class="dim">|</span> **           **\n    0 <span class="dim">+------------------</span>\n      <span class="dim">0    25   50   75  100 % s</span>\n  <span class="warn">数值无物理意义 · 仅演示逻辑</span>';
+
+document.getElementById('p5').innerHTML=
+ '  <span class="ok">flight_control</span>  <span class="dim">.........</span> UP\n  <span class="warn">cloud_link</span>      <span class="dim">.........</span> DEGRADED\n\n  R01  1300,1300-1700,1700\n       ACTIVE @ +40 s\n  R02  draft   <span class="dim">待 B 重画</span>\n  R03  draft   <span class="dim">待 B 重画</span>\n  R04  dest-cover / S4-04';
+
+document.getElementById('p6').innerHTML=
+ '  IDLE -> SNAPSHOT\n  SNAPSHOT -> PLANNING\n  PLANNING -> VERIFYING\n  VERIFYING -> <span class="ok">COMMAND_PREPARED</span>\n  ... -> <span class="warn">WAITING_ACK</span>\n\n  ACK timeout = 投递未知\n  <span class="dim">不自动重发</span>';
+
+document.getElementById('p7').innerHTML=
+ '  S1 <span class="ok">#####</span> 正常配送\n  S2 <span class="warn">#####</span> 动态风险\n  S3 <span class="ok">#####</span> 通信退化\n  S4 <span class="bad">#####</span> 不可行\n\n  seeds 1,2,3\n  3 planners -> <span class="bad">_MOCK.csv</span>\n  <span class="dim">MOCK 产物不入库</span>';
+
+document.getElementById('p8').innerHTML=
+ '  logs/agent/&lt;batch&gt;/\n  *_MOCK.jsonl\n\n  command_prepared\n  submit_command\n  ack_unknown\n  fallback_selected\n\n  <span class="dim">证明控制流程，非飞行结果</span>';
+
+const cv=document.getElementById('stage'), x=cv.getContext('2d');
+let W=0,H=0,D=1;
+function resize(){
+  const r=document.getElementById('wrap').getBoundingClientRect();
+  D=Math.min(devicePixelRatio||1,2); W=r.width; H=r.height;
+  cv.width=Math.ceil(W*D); cv.height=Math.ceil(H*D);
+  x.setTransform(D,0,0,D,0,0);
+}
+new ResizeObserver(()=>resize()).observe(document.getElementById('wrap'));
+resize();
+
+const build=[[.10,.12,.03,.05],[.22,.08,.04,.03],[.36,.16,.03,.06],[.52,.09,.05,.03],
+  [.68,.18,.03,.04],[.78,.10,.04,.05],[.14,.34,.03,.04],[.30,.40,.04,.03],
+  [.44,.30,.03,.05],[.60,.36,.04,.03],[.72,.44,.03,.04],[.86,.30,.04,.05],
+  [.08,.60,.04,.03],[.24,.66,.03,.05],[.40,.58,.04,.03],[.56,.68,.03,.04],
+  [.70,.62,.05,.03],[.84,.72,.03,.04],[.34,.80,.03,.03],[.62,.84,.04,.03]];
+const zones=[[.43,.43,.11,.18,'R01'],[.74,.20,.10,.10,'R02'],[.15,.20,.09,.10,'R03'],[.86,.07,.07,.09,'R04']];
+const sites=[[.10,.22],[.47,.78],[.80,.52],[.92,.14]];
+const route=[[.05,.88],[.16,.88],[.16,.74],[.28,.74],[.28,.58],[.40,.58],[.50,.40],[.64,.40],[.72,.24],[.94,.14]];
+
+function frame(t){
+  x.setTransform(D,0,0,D,0,0);
+  x.fillStyle='#070b10'; x.fillRect(0,0,W,H);
+  x.strokeStyle='rgba(120,130,145,.07)'; x.lineWidth=1;
+  for(let i=0;i<=30;i++){const px=i/30*W;x.beginPath();x.moveTo(px,0);x.lineTo(px,H);x.stroke()}
+  for(let j=0;j<=16;j++){const py=j/16*H;x.beginPath();x.moveTo(0,py);x.lineTo(W,py);x.stroke()}
+  for(const [bx,by,bw,bh] of build){
+    x.fillStyle='rgba(120,130,145,.10)'; x.fillRect(bx*W,by*H,bw*W,bh*H);
+    x.strokeStyle='rgba(150,160,175,.22)'; x.strokeRect(bx*W,by*H,bw*W,bh*H);
+  }
+  for(const [zx,zy,zw,zh,tag] of zones){
+    x.fillStyle='rgba(255,122,107,.07)'; x.fillRect(zx*W,zy*H,zw*W,zh*H);
+    x.setLineDash([4,4]); x.strokeStyle='rgba(255,122,107,.65)'; x.strokeRect(zx*W,zy*H,zw*W,zh*H);
+    x.setLineDash([]); x.fillStyle='#ff7a6b'; x.font='10px monospace';
+    x.fillText(tag,zx*W+4,zy*H+12);
+  }
+  for(let i=0;i<sites.length;i++){
+    const [sx,sy]=sites[i];
+    x.beginPath(); x.arc(sx*W,sy*H,7,0,Math.PI*2);
+    x.strokeStyle='#b9c9d4'; x.lineWidth=1.2; x.stroke();
+    x.fillStyle='#b9c9d4'; x.font='9px monospace'; x.fillText('L'+(i+1),sx*W+10,sy*H+3);
+  }
+  x.beginPath();
+  route.forEach(([px,py],i)=> i?x.lineTo(px*W,py*H):x.moveTo(px*W,py*H));
+  x.strokeStyle='rgba(90,209,192,.22)'; x.lineWidth=7; x.stroke();
+  x.setLineDash([9,7]); x.lineDashOffset=-t*0.02;
+  x.strokeStyle='#5ad1c0'; x.lineWidth=1.8; x.stroke(); x.setLineDash([]);
+  const [ax,ay]=route[0],[bx,by]=route[route.length-1];
+  x.fillStyle='#e8f1f4'; x.font='bold 11px monospace';
+  x.fillText('S',ax*W-16,ay*H+4); x.fillText('D',bx*W+8,by*H+4);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

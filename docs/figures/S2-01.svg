@@ -1,0 +1,63 @@
+<svg width="100%" viewBox="0 0 680 500" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>S2-01 航线与限制区</title>
+<desc>改线 · 起飞后 40 s 限制区生效：A* 基线航线、草稿城区建筑、限制区与备降点。局部 ENU 米制坐标。</desc>
+<rect x="40.0" y="60.0" width="400.0" height="400.0" fill="none" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="134.1" y="319.2" width="27.8" height="19.2" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="287.2" y="275.0" width="20.9" height="20.8" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="362.2" y="327.0" width="22.7" height="24.6" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="316.5" y="287.1" width="27.3" height="14.9" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="291.5" y="139.4" width="23.0" height="20.0" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="336.6" y="203.5" width="18.2" height="20.2" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="152.1" y="111.1" width="24.6" height="17.7" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="392.9" y="290.7" width="14.4" height="12.2" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="281.4" y="401.3" width="13.7" height="24.6" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="251.3" y="146.3" width="12.1" height="23.8" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="216.3" y="116.1" width="20.4" height="17.9" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="136.9" y="271.9" width="23.4" height="23.9" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="170.4" y="353.6" width="21.8" height="15.8" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="94.1" y="172.2" width="15.2" height="22.5" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="269.0" y="85.2" width="16.4" height="13.1" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="66.4" y="323.7" width="20.5" height="17.6" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="355.8" y="157.4" width="19.1" height="23.5" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="263.3" y="187.6" width="12.8" height="23.3" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="95.8" y="341.9" width="21.4" height="13.5" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="217.4" y="375.4" width="27.9" height="22.8" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<rect x="213.3" y="233.3" width="53.3" height="53.3" fill="#791F1F" stroke="#F09595" stroke-width="0.5"/>
+<text x="240" y="260" font-family="var(--font-sans)" font-size="10" fill="#F7C1C1" text-anchor="middle" dominant-baseline="central">R01 +40s</text>
+<rect x="253.3" y="313.3" width="53.3" height="53.3" fill="#3C3489" stroke="#7F77DD" stroke-width="0.5" opacity="0.4"/>
+<text x="280" y="340" font-family="var(--font-sans)" font-size="10" fill="#CECBF6" text-anchor="middle" dominant-baseline="central">R02</text>
+<rect x="160.0" y="166.7" width="53.3" height="53.3" fill="#3C3489" stroke="#7F77DD" stroke-width="0.5" opacity="0.4"/>
+<text x="187" y="193" font-family="var(--font-sans)" font-size="10" fill="#CECBF6" text-anchor="middle" dominant-baseline="central">R03</text>
+<rect x="366.0" y="119.3" width="14.7" height="14.7" fill="#3C3489" stroke="#7F77DD" stroke-width="0.5" opacity="0.4"/>
+<text x="373" y="127" font-family="var(--font-sans)" font-size="10" fill="#CECBF6" text-anchor="middle" dominant-baseline="central">R04</text>
+<circle cx="133.3" cy="366.7" r="4" fill="#085041" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="141" y="367" font-family="var(--font-sans)" font-size="10" fill="#5DCAA5" dominant-baseline="central">L1</text>
+<circle cx="293.3" cy="206.7" r="4" fill="#085041" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="301" y="207" font-family="var(--font-sans)" font-size="10" fill="#5DCAA5" dominant-baseline="central">L2</text>
+<circle cx="400.0" cy="366.7" r="4" fill="#085041" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="408" y="367" font-family="var(--font-sans)" font-size="10" fill="#5DCAA5" dominant-baseline="central">L3</text>
+<circle cx="133.3" cy="100.0" r="4" fill="#085041" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="141" y="100" font-family="var(--font-sans)" font-size="10" fill="#5DCAA5" dominant-baseline="central">L4</text>
+<polyline points="80.0,420.0 84.7,415.3 88.7,411.3 92.7,407.3 96.7,403.3 100.7,399.3 104.7,395.3 108.7,391.3 112.7,387.3 116.7,383.3 120.7,379.3 124.7,375.3 128.7,371.3 132.7,367.3 136.7,363.3 140.7,359.3 144.7,355.3 148.7,351.3 152.7,347.3 156.7,343.3 160.7,343.3 164.7,342.0 168.7,338.0 172.7,334.0 176.7,330.0 180.7,326.0 184.7,322.0 188.7,318.0 192.7,314.0 196.7,310.0 200.7,306.0 204.7,302.0 208.7,298.0 212.7,294.0 216.7,290.0 220.7,286.0 224.7,282.0 228.7,278.0 232.7,274.0 236.7,270.0 240.7,266.0 244.7,262.0 248.7,258.0 252.7,254.0 256.7,250.0 260.7,246.0 264.7,242.0 268.7,238.0 272.7,234.0 276.7,230.0 280.7,226.0 284.7,222.0 288.7,218.0 292.7,214.0 296.7,210.0 300.7,206.0 304.7,202.0 308.7,198.0 312.7,194.0 316.7,190.0 320.7,186.0 324.7,182.0 328.7,178.0 332.7,174.0 336.7,170.0 340.7,166.0 344.7,162.0 348.7,158.0 352.7,154.0 356.7,150.0 360.7,146.0 364.7,142.0 368.7,138.0 372.7,134.0 376.7,130.0 380.7,126.0 384.7,122.0 388.7,118.0 392.7,114.0 396.7,110.0 400.7,106.0 400.7,102.0 400.0,100.0" fill="none" stroke="#85B7EB" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="80.0" cy="420.0" r="5" fill="#0C447C" stroke="#B5D4F4" stroke-width="1.2"/>
+<circle cx="400.0" cy="100.0" r="5" fill="#0C447C" stroke="#B5D4F4" stroke-width="1.2"/>
+<text x="460" y="36" font-family="var(--font-sans)" font-size="14" font-weight="500" fill="#D3D1C7" dominant-baseline="central">S2-01 · S2</text>
+<text x="460" y="56" font-family="var(--font-sans)" font-size="11" fill="#888780" dominant-baseline="central">改线 · 起飞后 40 s 限制区生效</text>
+<rect x="460" y="79.0" width="9" height="9" rx="2" fill="#85B7EB" stroke="#85B7EB" stroke-width="0.5"/>
+<text x="476" y="84" font-family="var(--font-sans)" font-size="11" font-weight="500" fill="#D3D1C7" dominant-baseline="central">A* 基线航线</text>
+<text x="460" y="98" font-family="var(--font-sans)" font-size="10" fill="#888780">3428 m</text>
+<rect x="460" y="119.0" width="9" height="9" rx="2" fill="#791F1F" stroke="#F09595" stroke-width="0.5"/>
+<text x="476" y="124" font-family="var(--font-sans)" font-size="11" font-weight="500" fill="#D3D1C7" dominant-baseline="central">本场景限制区</text>
+<text x="460" y="138" font-family="var(--font-sans)" font-size="10" fill="#888780">标注为生效偏移</text>
+<rect x="460" y="159.0" width="9" height="9" rx="2" fill="#3C3489" stroke="#7F77DD" stroke-width="0.5"/>
+<text x="476" y="164" font-family="var(--font-sans)" font-size="11" font-weight="500" fill="#D3D1C7" dominant-baseline="central">未涉及的限制区</text>
+<text x="460" y="178" font-family="var(--font-sans)" font-size="10" fill="#888780">本场景事件里没有</text>
+<rect x="460" y="199.0" width="9" height="9" rx="2" fill="#2C2C2A" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="476" y="204" font-family="var(--font-sans)" font-size="11" font-weight="500" fill="#D3D1C7" dominant-baseline="central">建筑</text>
+<text x="460" y="218" font-family="var(--font-sans)" font-size="10" fill="#888780">草稿几何</text>
+<rect x="460" y="239.0" width="9" height="9" rx="2" fill="#085041" stroke="#5DCAA5" stroke-width="0.5"/>
+<text x="476" y="244" font-family="var(--font-sans)" font-size="11" font-weight="500" fill="#D3D1C7" dominant-baseline="central">备降点</text>
+<text x="460" y="258" font-family="var(--font-sans)" font-size="10" fill="#888780">基线不使用</text>
+<text x="460" y="290" font-family="var(--font-sans)" font-size="10" fill="#888780">局部 ENU 米制 · 原点待定</text>
+<text x="460" y="306" font-family="var(--font-sans)" font-size="10" fill="#888780">几何为草稿，非真实城区</text>
+</svg>

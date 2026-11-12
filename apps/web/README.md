@@ -1,39 +1,49 @@
-# apps/web —— 调度任务台（未开始）
+# apps/web —— 调度任务台
 
-**负责人：C**　**状态：⬜ 目录占位，无工程**
+**负责人：C**　**状态：🟡 有硬编码静态可视化页；React / MapLibre 正式工程未开始**
 
-## 三维 / 视觉前端在 `apps/web-3d/`
+三维与视觉前端不在本目录，在 [`apps/web-3d/`](../web-3d/)（Vite + React + TypeScript；展厅用 R3F / Three.js）。阶段 0–1：工程骨架、ENU 换算、M350 RTK 比例骨架。天地图 / Cesium ion token 与后端接线未实现。本目录的静态页保持原样。
 
-调度任务台仍是本目录，没有工程。三维与视觉前端在 [`apps/web-3d/`](../web-3d/)：Vite + React + TypeScript；展厅用 R3F / Three.js，态势视图计划用 CesiumJS。
+## 现在有什么（2026-11-10）
 
-当前进度：
+| 文件 | 说明 |
+|---|---|
+| `index.html` | 正式前端入口。单文件 + `view3d.js`，**零依赖、零后端、不接 API** |
+| `view3d.js` | Canvas 2D 手写透视投影渲染器（无 WebGL、无 three.js） |
+| `designs/` | 设计候选快照（A / B / C 与 D1 / D2 / D3），只用于对比，不参与构建 |
 
-- **阶段 0：** 工程骨架、冻结的 demo 存档、ENU↔WGS84 坐标换算、锚点决议。天地图 token 与 Cesium ion token **未接入，待验证**。
-- **阶段 1：** M350 RTK 比例骨架（69 个部件）和四段高光镜头预演脚本。尚无真实材质。
+页面是「3D 倾斜俯视 + 终端 ASCII 侧栏」双视图：
 
-与后端的接线 **未实现**。60 fps 展厅是阶段 3，还没有。
+- 右侧 3D：局部 ENU 3000 × 3000 m 草稿场景，建筑有高度、限制区有体积、航线与备降点是 3D 几何；三机位自动运镜，节拍时钟 + 低分辨率 glow 缓冲合成。
+- 左侧：`01 ROUTE / LOCAL ENU 3000 x 3000 m (DRAFT)` ASCII 战术航图、备降余量剖面、7 项独立检查清单。
+- 顶部常驻 `SIMULATION ONLY · NO REAL FLIGHT`。
+
+### 打开
+
+直接双击 `index.html` 即可；或起个静态服务：
 
 ```bash
-cd apps/web-3d
-npm ci
-npm run dev      # http://127.0.0.1:5173/
-npm run build    # tsc -b && vite build
-npm test         # vitest，ENU 换算
+cd apps/web
+python -m http.server 8000
+# 浏览器打开 http://localhost:8000/
 ```
 
-Token 只放在该目录的 `.env`（从 `.env.example` 复制）。不要提交填好的 `.env`。
+### 数据边界（重要）
 
-## 职责
+- 21 栋建筑 / 4 个限制区 / 8 段航线 / 4 个备降点全部是**硬编码草稿几何**，不是 `scenarios/v0/*.geojson` 的真实内容，也不是真实城区。
+- 场景号（S2-01、S4-04）、7 个检查项名、19/20、R01 坐标取自仓库真实定义；**所有数值为占位示意**。
+- 能量与备降两项用合成参数演示，数值无物理意义，**不得写入参赛材料**。
+- 没有真机、没有 PX4 / SITL 链路、没有华为云部署、没有任何 API 调用。
+- 现状基准以项目根《事实文档.md》为唯一依据。
 
-调度员看到的那个网页：建任务 → 看候选方案 → 看备降余量剖面 → 看计划和实际轨迹 →
-看事件时间线 → 回放 → 导出。
+> `designs/view3d.js` 是候选阶段的快照副本，与 `apps/web/view3d.js` 内容相同。后续改渲染器只改 `apps/web/view3d.js`；候选页保持当时验证过的状态，不再同步。
 
-## 技术选择
+---
+
+## 尚未开始（原计划 11/12—11/16，未执行）
 
 React + TypeScript + Vite + MapLibre GL JS。组件库用 Ant Design 或团队熟的都行，
 **不引入 CesiumJS** —— 二维够用，三维高度展示不是本月的评分点。
-
-## 初始化
 
 ```bash
 cd apps/web
@@ -42,17 +52,14 @@ npm install
 npm install maplibre-gl
 ```
 
-完成后把 `node_modules/`、`dist/` 交给根 `.gitignore`（已经写好了）。
+> 注意：上面的初始化会覆盖当前目录结构，动手前先和 C 确认是否保留 `index.html` 作为静态预览。
+> `node_modules/`、`dist/` 已在根 `.gitignore` 中排除。
 
-## 第一个任务（11/12—11/16）
+第一个任务清单：
 
 1. 地图 + 场景 GeoJSON 图层（建筑、限制区、备降点、起降点）。
 2. 任务表：列表 + 详情，字段直接对齐 `core/models.py` 的 `Task`。
-3. **备降余量剖面图** —— 这是主视觉，优先级高于任何美化。
-   横轴沿路线累计距离，纵轴 `E_left − E_reserve − E_need`，零线以下涂红，
-   标出备降点位置和限制区生效点。同一事件下并排显示旧线（进红区）和新线（全程非负）。
+3. **备降余量剖面图** —— 主视觉，优先级高于任何美化。横轴沿路线累计距离，纵轴 `E_left − E_reserve − E_need`，零线以下涂红，标出备降点位置和限制区生效点；同一事件下并排显示旧线（进红区）和新线（全程非负）。
 4. 事件时间线：谁在什么时候改了什么，`plan_version` 怎么变的。
-
-## 注意
 
 页面上要能看出哪些数据是仿真、哪些是实测（`is_simulated` 字段别浪费）。

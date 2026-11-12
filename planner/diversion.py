@@ -79,8 +79,6 @@ class DiversionField:
     site_ids: list[str]
 
     def lookup(self, grid: Grid, x: float, y: float) -> tuple[float, str | None]:
-        import numpy as np
-
         dist = self.dist_m
         nearest = self.nearest_index
         iy, ix = grid.to_ij(x, y)
@@ -705,9 +703,7 @@ def hard_constraint_report(
     payload = scenario.get("payload_kg")
     if payload is not None and float(payload) > vehicle.max_payload_kg:
         categories += 1
-        reasons.append(
-            f"载荷 {float(payload):.2f} kg 超出机型最大载荷 {vehicle.max_payload_kg:.2f} kg"
-        )
+        reasons.append(f"载荷 {float(payload):.2f} kg 超出机型最大载荷 {vehicle.max_payload_kg:.2f} kg")
     flight_time = _flight_time_s(vehicle, plan_out.length_m, climb_delta_m(scenario))
     limit = scenario.get("time_limit_s")
     if limit is not None and flight_time > float(limit):
@@ -754,7 +750,9 @@ def profile_record(scenario_id: str, plan_out: ScenarioPlan) -> dict:
         "reason": plan_out.reason,
         "length_m": round(plan_out.length_m, 3),
         "energy_used_wh": round(plan_out.energy_used_wh, 4),
-        "min_margin_wh": None if profile is None or profile.min_margin_wh is None else round(profile.min_margin_wh, 4),
+        "min_margin_wh": None
+        if profile is None or profile.min_margin_wh is None
+        else round(profile.min_margin_wh, 4),
         "negative_sample_count": 0 if profile is None else profile.negative_sample_count,
         "is_feasible": False if profile is None else profile.is_feasible,
         "reserve_wh": plan_out.reserve_wh,
@@ -796,9 +794,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  机型 {vehicle.vehicle_key}  ·  {vehicle_path}")
     print("  基线只做几何；astar_diversion 在扩展时剪掉备降不可达的状态")
     print("=" * 88)
-    header = (
-        f"{'场景':<8}{'基线m':>8}{'基线余量':>10}{'约束m':>8}{'约束余量':>10}  约束结论"
-    )
+    header = f"{'场景':<8}{'基线m':>8}{'基线余量':>10}{'约束m':>8}{'约束余量':>10}  约束结论"
     print(header)
     n_both = 0
     n_base_only = 0
@@ -810,8 +806,16 @@ def main(argv: list[str] | None = None) -> int:
         div = plan_scenario_with_diversion(sc, scene, vehicle)
         base_len = f"{base.length_m:.0f}" if base.found else "-"
         div_len = f"{div.length_m:.0f}" if div.found else "-"
-        base_m = "-" if base.profile is None or base.profile.min_margin_wh is None else f"{base.profile.min_margin_wh:.1f}"
-        div_m = "-" if div.profile is None or div.profile.min_margin_wh is None else f"{div.profile.min_margin_wh:.1f}"
+        base_m = (
+            "-"
+            if base.profile is None or base.profile.min_margin_wh is None
+            else f"{base.profile.min_margin_wh:.1f}"
+        )
+        div_m = (
+            "-"
+            if div.profile is None or div.profile.min_margin_wh is None
+            else f"{div.profile.min_margin_wh:.1f}"
+        )
         if div.found:
             n_div += 1
             conclusion = "可行"

@@ -524,10 +524,29 @@ def test_agent_error_keeps_the_route() -> None:
     assert "拒绝改写路线" in body["agent"]["detail"]
 
 
-def test_m3_package_is_not_created_by_this_service() -> None:
-    assert not (REPO_ROOT / "agent").exists()
+def test_standalone_api_does_not_implement_m3_or_use_mock_planners() -> None:
+    """独立进程不实现 M3，也不把 mock 规划器接到 HTTP。
+
+    `agent/` 来自上游，由 `runtime.py` 的本地调度链路使用。这个测试不要求删掉它。
+    """
+    assert (REPO_ROOT / "agent").is_dir()
     assert not (REPO_ROOT / "m3").exists()
-    for path in (REPO_ROOT / "services" / "api").glob("*.py"):
-        text = path.read_text(encoding="utf-8")
+    standalone = (
+        "__main__.py",
+        "agent_hook.py",
+        "assemble.py",
+        "config.py",
+        "entrypoints.py",
+        "envelopes.py",
+        "errors.py",
+        "main.py",
+        "planner_adapter.py",
+        "scene_loader.py",
+        "store.py",
+    )
+    for name in standalone:
+        text = (REPO_ROOT / "services" / "api" / name).read_text(encoding="utf-8")
         assert "eval.planners" not in text
         assert "MockPlanner" not in text
+        assert "import agent" not in text
+        assert "from agent" not in text

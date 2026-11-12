@@ -16,6 +16,8 @@ v0：字段已定义，**机型/能量/速度的数值一律待定**，由学生
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
@@ -202,10 +204,16 @@ class DiversionMarginSample(BaseModel):
     s_m: float = Field(ge=0, description="沿航线累计距离")
     t_s: float = Field(ge=0, description="预计飞行时间")
     margin_wh: float = Field(description="E_left - E_reserve - E_need_to_nearest_valid_landing，单位 Wh")
-    nearest_site_id: str | None = Field(default=None, description="该采样点能量意义上最近的可用备降点；None 表示无有效退出路径")
+    nearest_site_id: str | None = Field(
+        default=None,
+        description="该采样点能量意义上最近的可用备降点；None 表示无有效退出路径",
+    )
     energy_need_wh: float | None = Field(
         default=None,
-        description="到 nearest_site_id 的能耗（Wh）。None 且 nearest_site_id 为 None 时，表示几何上没有可达备降点；此时 margin_wh 只是负的哨兵值，不是物理缺口",
+        description=(
+            "到 nearest_site_id 的能耗（Wh）。None 且 nearest_site_id 为 None 时，"
+            "表示几何上没有可达备降点；此时 margin_wh 只是负的哨兵值，不是物理缺口"
+        ),
     )
 
 
@@ -252,12 +260,29 @@ class RoutePlan(BaseModel):
     algorithm: str = Field(description="例如 'astar_static', 'astar_diversion_aware'")
     waypoints: list[Position] = Field(min_length=2)
     energy_budget_wh: float = Field(gt=0)
-    diversion_site_id: str | None = Field(default=None, description="主备降点；None 表示规划时未找到有效退出方案")
+    diversion_site_id: str | None = Field(
+        default=None, description="主备降点；None 表示规划时未找到有效退出方案"
+    )
     valid_until: datetime | None = None
     checks: list[ConstraintCheck] = Field(
         default_factory=list,
         description="规划器自报的检查结果，仅供参考；独立校验器必须重新复算",
     )
+
+
+def route_digest(route: RoutePlan) -> str:
+    """把校验报告绑定到航线**内容**，而不只是版本号。
+
+    为什么放在 core：这是 RoutePlan 自身的属性，规划器和校验器必须用**同一份实现**
+    算同一个摘要。如果两边各写一份，摘要一旦对不上，报告就永远绑不上；
+    更糟的情况是绑上了一条被偷偷改过的航线。
+
+    顺带拒绝嵌套模型里的 NaN/Infinity（allow_nan=False）。
+    """
+    encoded = json.dumps(
+        route.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 # --------------------------------------------------------------------------- #
@@ -271,7 +296,9 @@ class VehicleState(BaseModel):
     ts: datetime
     position: Position
     groundspeed_mps: float | None = None
-    energy_remaining_wh: float | None = Field(default=None, description="飞控能给出的估计值；拿不到就留 None，不要拿 SOC 硬换算")
+    energy_remaining_wh: float | None = Field(
+        default=None, description="飞控能给出的估计值；拿不到就留 None，不要拿 SOC 硬换算"
+    )
     flight_mode: str = Field(description="飞控原始模式名，如 'AUTO.MISSION', 'AUTO.LOITER'")
     gps_fix: str | None = Field(default=None, description="定位质量，如 '3d_fix', 'rtk_fixed'；未知留 None")
     link_quality_pct: float | None = Field(default=None, ge=0, le=100, description="云边链路质量采样值")
@@ -324,4 +351,5 @@ __all__ = [
     "RoutePlan",
     "Task",
     "VehicleState",
+    "route_digest",
 ]

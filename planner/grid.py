@@ -1,9 +1,19 @@
 """把几何场景栅格化成占用图。
 
+## 为什么栅格净空要比物理净空大一截
+
 栅格化必然有精度损失，这里把它显式写出来，而不是假装没有：
+
 - 单元边长 `res_m`（默认 10 m）：小于一格的缝隙会被抹掉；
-- 安全净空 `clearance_m`（默认 20 m）：按圆形结构元把障碍加厚，
-  即"机体中心必须离障碍至少这么远"，近似为方形膨胀，角部略保守。
+- 栅格净空 `clearance_m`（默认 **30 m**）：按圆形结构元把障碍加厚。
+
+30 m 不是物理要求，是给 20 m 物理净空留的**离散化裕量**。原因有两条，都实测过：
+
+1. 栅格判的是单元中心，而机体真实位置在连续空间里，最多差半格（5 m）；
+2. 八邻域走位会切角，两个可用单元中心之间的直线段可能贴着障碍拐角过去。
+
+所以规划用的净空必须大于要求值，否则校验器按连续几何一量就会判违规。
+`tests/test_validator.py::test_planner_clearance_matches_validator` 守着这条对齐。
 """
 
 from __future__ import annotations
@@ -15,7 +25,8 @@ import numpy as np
 from core.geometry import Polygon, dilate_circular, polygon_mask
 
 DEFAULT_RES_M = 10.0
-DEFAULT_CLEARANCE_M = 20.0
+# 物理净空 20 m + 离散化裕量 10 m；理由见模块 docstring
+DEFAULT_CLEARANCE_M = 30.0
 
 
 @dataclass
