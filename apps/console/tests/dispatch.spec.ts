@@ -3,9 +3,6 @@ import { expect, test } from "./fixtures";
 test("reviewed local task reaches actual M3/M2/M4 and survives panel reopening", async ({
   page,
 }) => {
-  // 本机实测 10.2 s；CI 用 SwiftShader 软件渲染 3D 地图，走到第 47 行时已耗时 46.5 s，
-  // 默认 45 s 测试上限在后半段耗尽。只放宽这一条用例（slow = 3x timeout），不改全局阈值。
-  test.slow();
   await page.goto("/airspace");
   await page.getByRole("button", { name: "本地任务联调", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "本地任务联调", exact: true });

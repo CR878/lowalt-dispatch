@@ -8,8 +8,11 @@ export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
   workers: 1,
-  timeout: 45_000,
-  expect: { timeout: 15_000 },
+  // CI 用 SwiftShader 软件渲染 3D 地图：最慢用例本机 10.2 s、CI 1.9 m，
+  // 默认 45 s 会在流程中途耗尽（报 Test timeout 而非断言失败）。
+  // 只放宽 CI 上限，本机保持原阈值，真实卡顿在本机仍会暴露。
+  timeout: process.env.CI ? 180_000 : 45_000,
+  expect: { timeout: process.env.CI ? 30_000 : 15_000 },
   reporter: "list",
   use: {
     ...devices["Desktop Chrome"],
