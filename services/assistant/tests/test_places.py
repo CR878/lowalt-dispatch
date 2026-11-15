@@ -1,10 +1,9 @@
 import httpx
-from fastapi.testclient import TestClient
 
-from services.assistant import app, places
+from services.assistant import places
 
 
-def test_search_limits_cache_and_wgs84_without_live_network(monkeypatch):
+def test_search_limits_cache_and_wgs84_without_live_network(client, monkeypatch):
     calls = []
 
     def handle(request):
@@ -18,7 +17,6 @@ def test_search_limits_cache_and_wgs84_without_live_network(monkeypatch):
     )
     monkeypatch.setattr(places, "_cache", {})
     monkeypatch.setattr(places, "_next_request", 0)
-    client = TestClient(app.app)
     response = client.get("/api/assistant/places/search", params={"q": "上海测试"})
     assert response.status_code == 200
     value = response.json()
@@ -31,7 +29,7 @@ def test_search_limits_cache_and_wgs84_without_live_network(monkeypatch):
     assert client.get("/api/assistant/places/search", params={"q": "a"}).status_code == 422
 
 
-def test_search_failure_and_invalid_coordinates_never_become_places(monkeypatch):
+def test_search_failure_and_invalid_coordinates_never_become_places(client, monkeypatch):
     original = httpx.Client
 
     def handle(request):
@@ -51,5 +49,5 @@ def test_search_failure_and_invalid_coordinates_never_become_places(monkeypatch)
         places.httpx, "Client", lambda **kwargs: original(transport=httpx.MockTransport(fail))
     )
     monkeypatch.setattr(places, "_next_request", 0)
-    response = TestClient(app.app).get("/api/assistant/places/search", params={"q": "服务失败"})
+    response = client.get("/api/assistant/places/search", params={"q": "服务失败"})
     assert response.status_code == 503

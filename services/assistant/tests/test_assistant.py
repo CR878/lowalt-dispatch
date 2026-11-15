@@ -6,7 +6,6 @@ from hashlib import sha256
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from services.api.runtime import LocalDispatch
@@ -339,10 +338,9 @@ def test_request_rejects_fake_live_mode_nonfinite_and_unknown_fields():
         Turn.model_validate(value)
 
 
-def test_api_streams_tools_and_keeps_audit_in_demo_namespace(tmp_path, monkeypatch):
+def test_api_streams_tools_and_keeps_audit_in_demo_namespace(client, tmp_path, monkeypatch):
     audit = []
     monkeypatch.setattr(api, "write_audit", audit.append)
-    client = TestClient(api.app)
     health = client.get("/api/assistant/health").json()
     assert health["dispatch_enabled"] is False
     assert "api_key" not in health
