@@ -14,6 +14,18 @@ from core.geometry import polyline_length
 from planner.astar import plan
 from planner.grid import build_grid
 from planner.scene import load_scene
+from services.assistant import evidence
+from services.assistant.intake import (
+    ForecastQuery,
+    IntakeCreate,
+    PlaceEvidence,
+    PlaceQuery,
+    TaskIntake,
+    WeatherEvidence,
+)
+from services.assistant.intake import (
+    store as intake_store,
+)
 from services.assistant.knowledge import search
 from services.assistant.models import DocumentQuery, Draft, DraftUpdate, NoArgs, Turn
 from services.assistant.telemetry import STALE_SECONDS
@@ -89,6 +101,20 @@ class Toolset:
             NoArgs,
         ),
         "get_capabilities": ("说明实际接入能力、待连接项和下发边界。", NoArgs),
+        "resolve_real_place": (
+            "把地点名解析为坐标；解析不出就标 unresolved，绝不猜坐标。",
+            PlaceQuery,
+        ),
+        "get_weather_forecast": (
+            "按经纬度和时间取 Open-Meteo 逐时预报（温度/湿度/风速/阵风/降水/能见度）；"
+            "不可达时返回 unavailable，不填任何数字。",
+            ForecastQuery,
+        ),
+        "get_airspace_zones": ("列出仓库草稿限制区；明确标注仿真草稿、非实测空域。", NoArgs),
+        "create_task_intake": (
+            "把用户原话、起终点、时间与已收集的证据落成一张任务工单；只记录，不下发、不执行。",
+            IntakeCreate,
+        ),
     }
 
     def __init__(self, turn: Turn, read_dispatch_task: Callable[[str], dict] | None = None):
@@ -96,6 +122,8 @@ class Toolset:
         self.read_dispatch_task = read_dispatch_task
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
+        self.place_results: list[dict] = []
+        self.terminal = False
 
     @classmethod
     def schemas(cls):
@@ -380,4 +408,203 @@ class Toolset:
             ],
             "dispatch_enabled": False,
             "is_simulated": True,
+        }
+
+    def resolve_real_place(self, args: PlaceQuery):
+        result = evidence.resolve_place(args.name, local_places=PLACES, aliases=ALIASES)
+        self.place_results.append(result)
+        return result
+
+    def get_weather_forecast(self, args: ForecastQuery):
+        return evidence.fetch_weather_forecast(args.latitude, args.longitude, args.scheduled_for)
+
+    def get_airspace_zones(self, _args):
+        return evidence.list_airspace_zones()
+
+    def create_task_intake(self, args: IntakeCreate):
+        stated = evidence.extract_confirmations(args.text)
+        if stated:
+            args = args.model_copy(
+                update={
+                    key: value for key, value in stated.items() if getattr(args, key) in (None, False, "")
+                }
+            )
+        if not args.scheduled_for:
+            parsed, parsed_note = evidence.parse_schedule(args.text)
+            args = args.model_copy(
+                update={
+                    "scheduled_for": parsed,
+                    "schedule_note": (
+                        parsed_note + "（规则解析，待用户确认）" if parsed else "未识别到时间，需用户补充"
+                    ),
+                }
+            )
+        places = {item["name"]: item for item in self.place_results}
+        origin = places.get(args.origin) or evidence.resolve_place(
+            args.origin, local_places=PLACES, aliases=ALIASES
+        )
+        destination = places.get(args.destination) or evidence.resolve_place(
+            args.destination, local_places=PLACES, aliases=ALIASES
+        )
+        for field, point in (("origin", args.origin_point), ("destination", args.destination_point)):
+            if not point:
+                continue
+            current = origin if field == "origin" else destination
+            updated = {
+                **current,
+                "point": point,
+                "crs": "EPSG:4326",
+                "source": "用户在地图上确认",
+                "status": "ok",
+                "is_simulated": False,
+            }
+            if field == "origin":
+                origin = updated
+            else:
+                destination = updated
+
+        map_pins, questions = [], []
+        for field, item, label in (("origin", origin, "起点"), ("destination", destination, "终点")):
+            pin = {
+                "field": field,
+                "name": item["name"],
+                "point": item.get("point"),
+                "crs": item.get("crs"),
+                "source": item.get("source"),
+                "confirmed": args.places_confirmed,
+                "note": (
+                    "已在地图上定位，请确认是不是这个位置"
+                    if item.get("point")
+                    else "暂时无法自动定位，请在地图上手动选点（不猜坐标）"
+                ),
+            }
+            map_pins.append(pin)
+            if not args.places_confirmed or not item.get("point"):
+                questions.append(
+                    {
+                        "field": field,
+                        "question": f"{label}是「{item['name']}」吗？请确认名称并在地图上确认位置。",
+                        "map_pin": pin,
+                    }
+                )
+
+        if not args.schedule_confirmed:
+            questions.insert(
+                0,
+                {
+                    "field": "scheduled_for",
+                    "question": (
+                        f"时间我暂按 {args.scheduled_for} 理解（{args.schedule_note}）。"
+                        "请确认具体日期与起飞时刻。"
+                    ),
+                    "current": args.scheduled_for,
+                },
+            )
+        if args.payload_kg is None:
+            questions.append(
+                {"field": "payload_kg", "question": "这次运送的载荷重量是多少公斤？（0–100 kg）"}
+            )
+        if args.priority is None:
+            questions.append({"field": "priority", "question": "优先级按 P1（应急/紧急）还是 P2（常规）？"})
+
+        point = origin.get("point") if origin.get("crs") == "EPSG:4326" else None
+        weather_feasibility = (
+            {
+                "status": "available_if_date_in_window",
+                "latitude": point[1],
+                "longitude": point[0],
+                "note": (
+                    "已拿到地图定位，可按指定时刻取 Open-Meteo 逐时预报（最多未来 16 天，"
+                    f"含风速/温度/湿度/阵风/降水/能见度）；{args.scheduled_for} 需在窗口内。"
+                ),
+            }
+            if point
+            else {
+                "status": "needs_map_pin",
+                "note": "天气预报需要 WGS84 地图定位后才能取；请先在地图上确认起点位置。",
+            }
+        )
+
+        if questions:
+            opening = (
+                "可以，完全可以做到（该时段在 16 天预报窗口内时可取天气）。"
+                if point
+                else "可以，完全可以做到（前提是先拿到地图定位；天气预报最多覆盖未来 16 天）。"
+            )
+            lines = [opening, "在生成任务和推荐路线之前，请把下面几项确认一下："]
+            lines += [f"{index}. {item['question']}" for index, item in enumerate(questions, 1)]
+            lines.append(
+                "地图定位："
+                + "；".join(
+                    f"{pin['field']}={pin['name']} "
+                    + (
+                        f"[{pin['point'][0]}, {pin['point'][1]}] {pin['crs']}"
+                        if pin["point"]
+                        else "未定位，请在地图上点选"
+                    )
+                    for pin in map_pins
+                )
+            )
+            lines.append("确认后我再建任务工单、取该时段预报并给出几何路线预览；现在不建单、不猜任何数值。")
+            self.terminal = True
+            return {
+                "status": "needs_clarification",
+                "source": "信息未齐，先追问确认",
+                "questions": questions,
+                "map_pins": map_pins,
+                "weather_feasibility": weather_feasibility,
+                "summary": "\n".join(lines),
+                "is_simulated": True,
+                "dispatch_enabled": False,
+            }
+
+        def as_evidence(value):
+            return PlaceEvidence.model_validate(
+                {key: value.get(key) for key in ("name", "point", "crs", "source", "is_simulated")}
+            )
+
+        weather = self.results.get("get_weather_forecast")
+        if weather is None:
+            point = origin.get("point")
+            if origin.get("crs") == "EPSG:4326" and point:
+                weather = evidence.fetch_weather_forecast(point[1], point[0], args.scheduled_for)
+            else:
+                weather = evidence.unavailable_weather(
+                    "起终点未解析为 WGS84 坐标，未取预报", args.scheduled_for
+                )
+        airspace = self.results.get("get_airspace_zones") or evidence.list_airspace_zones()
+        preview = self.results.get("plan_task_preview")
+        route_preview = preview if preview and preview.get("status") == "geometry_only" else None
+
+        warnings = [
+            "天气预报不是实测值；风速未进入能耗或绕路计算。",
+            "限制区来自仿真草稿，不是实测空域，不能用于安全判定。",
+            "真实经纬度尚未地理配准进规划器，推荐路线只能是几何预览。",
+            "工单不是 core.models.Task，不进入 M3 状态机，不产生飞控指令。",
+        ]
+        if weather.get("status") != "ok":
+            warnings.append("气象数据未取到：" + str(weather.get("reason") or "未提供"))
+        if route_preview is None:
+            warnings.append("未生成几何路线预览：真实地点不在虚拟场景登记表中。")
+        for item in (origin, destination):
+            if item.get("status") == "unresolved":
+                warnings.append(f"地点「{item['name']}」未解析出坐标，未猜坐标。")
+
+        record = TaskIntake.build(
+            args,
+            origin=as_evidence(origin),
+            destination=as_evidence(destination),
+            weather=WeatherEvidence.model_validate(weather),
+            airspace=airspace,
+            route_preview=route_preview,
+            warnings=warnings,
+        )
+        self.terminal = True
+        return {
+            "status": "created",
+            "source": "自然语言任务工单（服务端 JSON，非执行任务）",
+            "intake_id": record.intake_id,
+            "intake": intake_store.create(record),
+            "is_simulated": True,
+            "dispatch_enabled": False,
         }

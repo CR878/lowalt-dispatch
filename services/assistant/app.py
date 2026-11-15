@@ -18,6 +18,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from services.api.routes import router as dispatch_router
 from services.api.routes import runtime as dispatch_runtime
 from services.assistant.engine import Engine, ModelUnavailable, Settings
+from services.assistant.intake import store as intake_store
 from services.assistant.models import Turn
 from services.assistant.places import search_places
 from services.assistant.telemetry import stream_telemetry
@@ -175,6 +176,20 @@ def health():
 @app.get("/api/assistant/places/search")
 def places(q: str):
     return search_places(q)
+
+
+@app.get("/api/assistant/intakes")
+def list_intakes():
+    """Read-only list of natural-language task intakes. Never an executable task."""
+    return {"items": intake_store.list(), "is_simulated": True, "dispatch_enabled": False}
+
+
+@app.get("/api/assistant/intakes/{intake_id}")
+def get_intake(intake_id: str):
+    try:
+        return intake_store.get(intake_id)
+    except KeyError:
+        raise HTTPException(404, "找不到该任务工单") from None
 
 
 @app.get("/api/telemetry/stream")
