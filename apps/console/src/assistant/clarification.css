@@ -1,0 +1,137 @@
+.intake-clarify {
+  margin: 10px 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 4%, transparent);
+  font-size: 12px;
+}
+.intake-clarify header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.intake-clarify header span {
+  margin-left: auto;
+  opacity: 0.7;
+  font-size: 11px;
+}
+.intake-clarify-lead {
+  margin: 8px 0;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.intake-clarify-questions {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.intake-clarify-questions li {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  line-height: 1.5;
+}
+.intake-clarify-questions li > span {
+  flex: 0 0 18px;
+  height: 18px;
+  border-radius: 50%;
+  text-align: center;
+  font-size: 11px;
+  line-height: 18px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.intake-clarify-map {
+  border: 1px dashed color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+.intake-clarify-map-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.intake-clarify-map-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+}
+.intake-clarify-map-head button:nth-of-type(2) {
+  margin-left: auto;
+}
+.intake-pin {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 6px 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+.intake-pin > span {
+  opacity: 0.65;
+}
+.intake-pin code,
+.intake-pin small {
+  grid-column: 1 / -1;
+  font-size: 11px;
+}
+.intake-pin small {
+  opacity: 0.6;
+}
+.intake-clarify-hint,
+.intake-clarify-weather,
+.intake-clarify-foot {
+  margin: 6px 0;
+  opacity: 0.75;
+  line-height: 1.5;
+  font-size: 11px;
+}
+.intake-clarify-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.intake-clarify-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.intake-clarify-form input,
+.intake-clarify-form select {
+  padding: 5px 7px;
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.intake-clarify-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: #2f6df6;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.intake-clarify-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.intake-clarify-foot {
+  display: block;
+}

@@ -40,6 +40,7 @@ import {
   type Position,
   type Proposal,
 } from "./api";
+import { IntakeList } from "./IntakeList";
 
 type Form = {
   mode: "scenario" | "custom";
@@ -334,6 +335,7 @@ export function MissionList() {
           </Empty>
         )}
       </section>
+      <IntakeList />
       {!!summary?.planning_tasks.length && (
         <section className="p-card p-spaced">
           <div className="p-card-head">

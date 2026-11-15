@@ -68,6 +68,36 @@ export type RiskResult = {
   source: string;
   stale?: boolean;
 };
+export type ClarificationQuestion = {
+  field: string;
+  question: string;
+  current?: string | null;
+  map_pin?: MapPin | null;
+};
+export type MapPin = {
+  field: string;
+  name: string;
+  point: [number, number] | null;
+  crs: string;
+  source: string;
+  confirmed: boolean;
+  note: string;
+};
+export type Clarification = {
+  status: "needs_clarification";
+  source: string;
+  questions: ClarificationQuestion[];
+  map_pins: MapPin[];
+  weather_feasibility: {
+    status: "available_if_date_in_window" | "needs_map_pin";
+    latitude?: number;
+    longitude?: number;
+    note: string;
+  };
+  summary: string;
+  is_simulated: true;
+  dispatch_enabled: false;
+};
 export type AssistantResult = {
   turn_id: string;
   provider: "local" | "maas";
@@ -90,6 +120,7 @@ export type AssistantResult = {
   dispatch_enabled: false;
   is_simulated: true;
   created_at: string;
+  clarification?: Clarification | null;
 };
 export type Health = {
   provider: "local" | "maas";
@@ -116,4 +147,8 @@ export const toolLabels: Record<string, string> = {
   plan_task_preview: "计算几何路线",
   inspect_terrain_risk: "检查变化影响",
   get_capabilities: "检查接入能力",
+  resolve_real_place: "解析地点坐标",
+  get_weather_forecast: "读取时段天气预报",
+  get_airspace_zones: "列出草稿限制区",
+  create_task_intake: "确认/生成任务工单",
 };

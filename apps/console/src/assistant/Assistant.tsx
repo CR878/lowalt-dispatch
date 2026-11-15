@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { getHealth, requestTurn, validDraft } from "./api";
+import { ClarificationCard } from "./ClarificationCard";
 import { toolLabels } from "./types";
 import type {
   AssistantContext,
@@ -669,6 +670,13 @@ export default function Assistant(props: Props) {
               ))}
               {message.result?.task_status && (
                 <TaskStatusCard task={message.result.task_status} />
+              )}
+              {message.result?.clarification && (
+                <ClarificationCard
+                  data={message.result.clarification}
+                  busy={busy}
+                  onConfirm={(value) => void send(value)}
+                />
               )}
               {message.state === "pending" && (
                 <div className="assistant-thinking">
