@@ -106,7 +106,8 @@ class LocalDispatch:
             else None,
             "warning": WARNING,
             "scenarios": [
-                {"id": key, "name": value.get("name", key)} for key, value in self.scenarios.items()
+                {"id": key, "name": value.get("title", value.get("name", key))}
+                for key, value in self.scenarios.items()
             ],
         }
 
@@ -284,6 +285,28 @@ class LocalDispatch:
                 "observation": observation,
                 "events": events,
             }
+
+    def list_tasks(self):
+        with self.lock:
+            result = []
+            for path in sorted(
+                self.root.glob("proposals/*.json"), key=lambda p: p.stat().st_mtime, reverse=True
+            )[:100]:
+                value = self.get(path.stem)
+                result.append(
+                    {
+                        key: value[key]
+                        for key in (
+                            "task_id",
+                            "scenario_id",
+                            "planning_status",
+                            "execution",
+                            "reason",
+                            "is_simulated",
+                        )
+                    }
+                )
+            return result
 
     def abandon(self, task_id: str):
         with self.lock:

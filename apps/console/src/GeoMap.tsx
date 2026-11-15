@@ -19,6 +19,7 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { GRID, GRID_STEP, pointAlong, TerrainModel } from "./terrain";
 import { RADAR_TILE_ZOOM, WIND_REGION, type WindField } from "./weather";
 import { createWindLayer, WIND_MAX_ZOOM } from "./WindLayer";
+import { useTheme } from "./portal/Theme";
 import {
   enuToLngLat,
   type GeoMission,
@@ -36,6 +37,8 @@ import type {
 } from "./types";
 
 export const CARTO_STYLE =
+  "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+export const CARTO_NIGHT_STYLE =
   "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 /** Esri World Imagery：免 key 公开卫星影像，注意 URL 是 {z}/{y}/{x} 顺序。 */
 const SATELLITE_TILES = [
@@ -48,17 +51,17 @@ const DEM_TILES = [
 ];
 const TERRAIN_EXAGGERATION = 1.35;
 maplibregl.setWorkerUrl(mapWorkerUrl);
-const offline: StyleSpecification = {
+const offline = (dark: boolean): StyleSpecification => ({
   version: 8,
   sources: {},
   layers: [
     {
       id: "background",
       type: "background",
-      paint: { "background-color": "#08090b" },
+      paint: { "background-color": dark ? "#101c2d" : "#eef3f7" },
     },
   ],
-};
+});
 type FeatureProps = Record<string, string | number>;
 const feature = (
   geometry: Geometry,
@@ -115,11 +118,15 @@ export type GeoMapProps = {
 
 export default forwardRef<GeoMapHandle, GeoMapProps>(
   function GeoMap(props, ref) {
+    const { theme } = useTheme();
+    const appearance = useRef(theme);
+    appearance.current = theme;
+    const loadedTheme = useRef(theme);
     const root = useRef<HTMLDivElement>(null);
     const runtime = useRef<{
       map: LibreMap;
       update: () => void;
-      reload: () => void;
+      reload: (force?: boolean) => void;
       scene: SceneData | null;
     } | null>(null);
     const dynamic = useRef(props);
@@ -187,6 +194,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         online = false,
         loadingStyle = false;
       let styleAbort: AbortController | null = null;
+      let styleGeneration = 0;
       let tileTimeout: number | undefined;
       let terrainFailed = false;
       let satelliteFailed = false;
@@ -210,7 +218,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       try {
         map = new maplibregl.Map({
           container: root.current!,
-          style: offline,
+          style: offline(appearance.current === "dark"),
           center: enuToLngLat([1500, 1500]),
           zoom: 14.1,
           pitch: dynamic.current.mode === "3d" ? 55 : 0,
@@ -741,8 +749,9 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         draw?.();
         sendReady();
       }
-      async function reload() {
-        if (disposed || loadingStyle) return;
+      async function reload(force = false) {
+        if (disposed || (loadingStyle && !force)) return;
+        const generation = ++styleGeneration;
         loadingStyle = true;
         online = false;
         clearTimeout(tileTimeout);
@@ -752,7 +761,10 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         const timeout = window.setTimeout(() => abort.abort(), 12000);
         state("正在连接真实底图");
         try {
-          const response = await fetch(CARTO_STYLE, { signal: abort.signal });
+          const response = await fetch(
+            appearance.current === "dark" ? CARTO_NIGHT_STYLE : CARTO_STYLE,
+            { signal: abort.signal },
+          );
           if (!response.ok) throw new Error();
           const style = (await response.json()) as StyleSpecification;
           if (
@@ -761,20 +773,25 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             !Array.isArray(style.layers)
           )
             throw new Error();
-          if (disposed) return;
+          if (disposed || generation !== styleGeneration) return;
           mapReady = false;
           // A retry must rebuild even an identical style, so cached failures and
           // our overlays receive a fresh style.load lifecycle.
-          map.setStyle(style, { diff: false }); // Same CARTO style as CodeArts.
+          map.setStyle(style, { diff: false });
           state("底图加载中");
           tileTimeout = window.setTimeout(() => {
             if (!online) state("底图资源响应较慢 · 坐标可用");
           }, 18000);
         } catch {
-          if (!disposed) state("底图离线 · 坐标可用");
+          if (!disposed && generation === styleGeneration) {
+            map.setStyle(offline(appearance.current === "dark"), {
+              diff: false,
+            });
+            state("底图离线 · 坐标可用");
+          }
         } finally {
           clearTimeout(timeout);
-          loadingStyle = false;
+          if (generation === styleGeneration) loadingStyle = false;
         }
       }
       const droneEl = document.createElement("div");
@@ -820,7 +837,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           state(
             p.basemap === "satellite"
               ? satelliteFailed
-                ? "卫星底图暂不可用 · 暗色底图可用"
+                ? "卫星底图暂不可用 · 主题底图可用"
                 : "卫星实景 · Esri World Imagery"
               : online
                 ? "真实底图 · CARTO"
@@ -958,7 +975,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       map.on("sourcedata", (event) => {
         const sourceId = event.sourceId;
         if (sourceId === "satellite") {
-          // 卫星瓦片成功即恢复状态；失败只更新状态条，不影响暗色底图。
+          // 卫星瓦片成功即恢复状态；失败只更新状态条，不影响主题底图。
           if (event.tile && event.isSourceLoaded && satelliteFailed) {
             satelliteFailed = false;
             if (dynamic.current.basemap === "satellite")
@@ -990,11 +1007,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         if (disposed) return;
         const sourceId = (event as { sourceId?: string }).sourceId;
         if (sourceId === "satellite") {
-          // 卫星影像失败：只更新状态条并保留 CARTO 暗色底图，绝不阻塞地图。
+          // 卫星影像失败：只更新状态条并保留 CARTO 主题底图，绝不阻塞地图。
           if (!satelliteFailed) {
             satelliteFailed = true;
             if (dynamic.current.basemap === "satellite")
-              state("卫星底图暂不可用 · 暗色底图可用");
+              state("卫星底图暂不可用 · 主题底图可用");
           }
           return;
         }
@@ -1063,6 +1080,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         runtime.current = null;
       };
     }, []);
+    useEffect(() => {
+      if (loadedTheme.current === theme) return;
+      loadedTheme.current = theme;
+      void runtime.current?.reload(true);
+    }, [theme]);
     useEffect(() => {
       const map = runtime.current?.map;
       if (map)

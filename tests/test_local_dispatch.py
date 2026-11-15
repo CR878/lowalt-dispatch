@@ -139,10 +139,20 @@ def test_restart_marks_unfinished_task_for_reconciliation_without_replay(tmp_pat
 
 def test_local_api_requires_review_and_preserves_real_telemetry_boundary(tmp_path, monkeypatch):
     monkeypatch.setenv("AERIS_DISPATCH_DIR", str(tmp_path))
+    monkeypatch.setenv("AERIS_IDENTITY_DIR", str(tmp_path / "identity"))
+    monkeypatch.setenv("SQLITE_PATH", str(tmp_path / "planning.sqlite"))
     monkeypatch.setenv("AERIS_DISPATCH_TRANSPORT", "direct")
     from services.assistant.app import app
 
     with TestClient(app) as client:
+        client.headers["X-Aeris-Request"] = "1"
+        assert (
+            client.post(
+                "/api/auth/setup",
+                json={"email": "pilot@example.com", "name": "Pilot", "password": "PilotTest2026"},
+            ).status_code
+            == 200
+        )
         assert client.get("/api/dispatch/health").json()["controls_px4"] is False
         assert client.get("/api/assistant/health").json()["dispatch_enabled"] is False
         assert (

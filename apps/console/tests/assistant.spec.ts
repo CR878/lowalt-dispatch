@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { readFile } from "node:fs/promises";
 
 async function openAssistant(page: Page) {
@@ -7,7 +7,7 @@ async function openAssistant(page: Page) {
   await page.route("https://basemaps.cartocdn.com/**", (route) =>
     route.abort(),
   );
-  await page.goto("/");
+  await page.goto("/airspace");
   await expect(page.getByText("构建数字空域…")).toBeHidden();
   await page.getByRole("button", { name: "打开调度助手", exact: true }).click();
   await expect(page.locator(".assistant-panel")).toBeVisible();

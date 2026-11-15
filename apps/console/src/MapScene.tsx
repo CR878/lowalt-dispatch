@@ -7,6 +7,7 @@ import {
 } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { useTheme, type Theme } from "./portal/Theme";
 import { GRID, GRID_STEP, TerrainModel, pointAlong } from "./terrain";
 import type {
   Layers,
@@ -41,12 +42,16 @@ const material = (color: string, opacity = 1) =>
   new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity });
 
 export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
+  const { theme } = useTheme();
+  const appearance = useRef(theme);
+  appearance.current = theme;
   const root = useRef<HTMLDivElement>(null);
   const runtime = useRef<{
     controls: OrbitControls;
     camera: THREE.PerspectiveCamera | THREE.OrthographicCamera;
     terrain: TerrainModel;
     updateTerrain: () => void;
+    setTheme: (theme: Theme) => void;
     groups: Record<keyof Layers, THREE.Group>;
     reset: () => void;
     focus: (point: Point) => void;
@@ -85,6 +90,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
 
   useEffect(() => {
     const host = root.current!;
+    let darkMode = appearance.current === "dark";
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({
@@ -99,7 +105,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
       return;
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.7));
-    renderer.setClearColor("#0b1117");
+    renderer.setClearColor(darkMode ? "#101c2d" : "#edf3f8");
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     host.appendChild(renderer.domElement);
     renderer.domElement.setAttribute(
@@ -108,7 +114,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
     );
     renderer.domElement.setAttribute("role", "img");
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2("#0b1117", 0.000125);
+    scene.fog = new THREE.FogExp2(darkMode ? "#101c2d" : "#edf3f8", 0.000125);
     const perspective = new THREE.PerspectiveCamera(39, 1, 5, 16000);
     const orthographic = new THREE.OrthographicCamera(
       -1700,
@@ -145,8 +151,9 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
       controls.update();
     };
     reset();
-    scene.add(new THREE.AmbientLight("#b1c2d6", 1.7));
-    const light = new THREE.DirectionalLight("#dce6f8", 2.5);
+    const ambient = new THREE.AmbientLight("#b1c2d6", darkMode ? 1.2 : 1.7);
+    scene.add(ambient);
+    const light = new THREE.DirectionalLight("#dce6f8", darkMode ? 1.8 : 2.5);
     light.position.set(-1200, 3000, 1000);
     scene.add(light);
     const terrain = dynamic.current.terrainModel ?? new TerrainModel();
@@ -200,8 +207,8 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
       }
     }
     function updateTerrain() {
-      const dark = new THREE.Color("#111e24"),
-        high = new THREE.Color("#26373e");
+      const dark = new THREE.Color(darkMode ? "#203c40" : "#c0d6d0"),
+        high = new THREE.Color(darkMode ? "#496354" : "#e0eade");
       for (let y = 0; y <= GRID; y++)
         for (let x = 0; x <= GRID; x++) {
           const i = y * (GRID + 1) + x,
@@ -295,6 +302,15 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
       camera,
       terrain,
       updateTerrain,
+      setTheme: (next) => {
+        darkMode = next === "dark";
+        const sky = darkMode ? "#101c2d" : "#edf3f8";
+        renderer.setClearColor(sky);
+        (scene.fog as THREE.FogExp2).color.set(sky);
+        ambient.intensity = darkMode ? 1.2 : 1.7;
+        light.intensity = darkMode ? 1.8 : 2.5;
+        updateTerrain();
+      },
       groups,
       reset,
       focus: (point) => {
@@ -835,6 +851,9 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
       renderer.domElement.remove();
     };
   }, []);
+  useEffect(() => {
+    runtime.current?.setTheme(theme);
+  }, [theme]);
 
   return (
     <div className="map-render" ref={root}>

@@ -40,6 +40,11 @@ def health(request: Request):
     return runtime(request).health()
 
 
+@router.get("/tasks")
+def list_tasks(request: Request):
+    return runtime(request).list_tasks()
+
+
 @router.post("/proposals")
 def propose(body: ProposalInput, request: Request):
     try:

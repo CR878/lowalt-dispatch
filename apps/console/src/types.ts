@@ -1,5 +1,5 @@
 export type ViewMode = "2d" | "3d";
-/** 双底图：CARTO Dark Matter 暗色底图 / Esri World Imagery 卫星实景。 */
+/** 双底图：CARTO Positron 日间底图 / Esri World Imagery 卫星实景。 */
 export type Basemap = "dark" | "satellite";
 export type PanelId =
   | "mission"

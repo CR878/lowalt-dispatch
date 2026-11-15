@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -24,7 +24,7 @@ test("M4 telemetry updates, becomes stale and recovers without demo values", asy
       }) + "\n",
     );
 
-  await page.goto("/?telemetry=live");
+  await page.goto("/airspace?telemetry=live");
   const playback = page.locator(".playback");
   const battery = page.getByTestId("telemetry-battery");
   await expect(playback).toContainText("等待遥测");

@@ -1,6 +1,10 @@
 # AERIS · 低空任务指挥台
 
-可独立运行的 React / TypeScript / MapLibre / Three.js 前端原型。保留 AERIS 深色菜单和仪表布局，接入工作区码道版本使用的 CARTO Dark Matter 真实地图。视觉语言参考 [HALOFLUX lab · preset A](https://ryder191.github.io/haloflux/lab.html?preset=a)，没有复制该参考站代码或素材。
+React / TypeScript / MapLibre / Three.js 企业版，支持日间、夜间与跟随系统。默认先进入日间产品首页，再通过登录、工作台与侧边栏导航访问任务、空域、设备和记录。地图按主题使用 CARTO Positron / Dark Matter 底图，保留卫星、地形、天气、仪表和调度助手；首页已预留后续3D模型动画区域。
+
+首页、登录页与工作区右上角的月亮/太阳按钮可即时切换外观；“账户与安全 → 界面外观”支持跟随系统。主题保存在当前浏览器并同步到同源标签页，切换不会重置任务输入、地图视角或地形数据。建议使用 Chrome / Edge 123+ 或支持 CSS `light-dark()` 的现代浏览器。
+
+完整启动、首次管理员初始化、邮箱验证/邀请交付、角色权限和模块数据链路见 [日间企业版使用说明](../../docs/前端日间企业版.md)。使用 `npm run dev:all` 同时启动前端与本地后端，不需要购买云资源。
 
 此版本单独放在 `apps/console/`，避免覆盖同目录树内正在制作的 `apps/web/` 静态前端。两个应用独立启动，不要求同时运行。Node.js 依赖已经在当前电脑安装好。
 
@@ -44,15 +48,15 @@ node scripts/capture.mjs           # 本机 Chrome 截图，开发服务需在51
 
 本版本新增双底图、DEM 晕渲和公开天气叠加，全部使用**免密钥公开服务**，不需要在前端配置任何第三方 key。
 
-| 能力 | 数据源 | 说明 |
-| --- | --- | --- |
-| 暗色底图 | CARTO Dark Matter | 默认底图，沿用原样式与署名 |
-| 卫星实景 | Esri World Imagery | `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`，注意瓦片顺序是 `{z}/{y}/{x}`；署名 `Esri, Maxar, Earthstar Geographics` |
-| 三维地形 | AWS Open Data Terrarium（Mapzen 编码） | `raster-dem` + `setTerrain`，垂直夸张固定 1.35；公开高程，**非实时测绘** |
-| 地形晕渲 | 同上 | `hillshade` 图层，仅在开启“全球三维地形 · 在线DEM”时显示，可在图层菜单单独关闭 |
-| 当前气象 | Open-Meteo | 查询点的风、阵风、能见度、云量、降水、温度与数据时间 |
-| 区域风场 | Open-Meteo / CMA GRAPES | 长三角离地 10 米模型风，区域视图以颜色显示风速、线条显示去向 |
-| 雷达回波 | RainViewer | 最新公开历史帧与查询点覆盖状态，瓦片源最高 z7 |
+| 能力     | 数据源                                 | 说明                                                                                                                                                                     |
+| -------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 暗色底图 | CARTO Dark Matter                      | 默认底图，沿用原样式与署名                                                                                                                                               |
+| 卫星实景 | Esri World Imagery                     | `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`，注意瓦片顺序是 `{z}/{y}/{x}`；署名 `Esri, Maxar, Earthstar Geographics` |
+| 三维地形 | AWS Open Data Terrarium（Mapzen 编码） | `raster-dem` + `setTerrain`，垂直夸张固定 1.35；公开高程，**非实时测绘**                                                                                                 |
+| 地形晕渲 | 同上                                   | `hillshade` 图层，仅在开启“全球三维地形 · 在线DEM”时显示，可在图层菜单单独关闭                                                                                           |
+| 当前气象 | Open-Meteo                             | 查询点的风、阵风、能见度、云量、降水、温度与数据时间                                                                                                                     |
+| 区域风场 | Open-Meteo / CMA GRAPES                | 长三角离地 10 米模型风，区域视图以颜色显示风速、线条显示去向                                                                                                             |
+| 雷达回波 | RainViewer                             | 最新公开历史帧与查询点覆盖状态，瓦片源最高 z7                                                                                                                            |
 
 使用方式：
 
@@ -176,9 +180,9 @@ WebSocket消息外层增加类型：
 
 ## 后续接入顺序
 
-调度助手使用A键收放；模型配置与M3接入边界见上方助手说明。当前新增本地工具服务没有替代M3的正式确认、下发与ACK流程。
+调度助手使用A键收放；模型配置与M3接入边界见上方助手说明。场景任务流程已接通本地M3、规划、独立校验与M4合成回执，真实飞控接入仍需独立验证。
 
 1. 对接遥测适配层：PX4/MAVSDK经过后端转为界面单位、时间戳及来源，增加过期/缺失提示，再替换 `useFlight.ts` 演示源。
-2. 对接M3任务/事件、M2候选航线与真实备降余量剖面；保留任务版本、确认状态和审计标识，不把草稿保存当下发成功。
+2. 完成真实机型与坐标标定后接入真实执行任务及备降余量剖面；已接通的本地任务仍保留合成标识，不把草稿保存当下发成功。
 3. 为真实地形提供坐标、高程基准及基准帧，接入DEM增量；需要现实变化感知时再接传感器或测绘更新流程。
-4. 选定部署入口后配置反向代理、HTTPS、WebSocket及身份认证。当前不需要购买云资源即可本地演示。
+4. 本地身份服务已经启用；选定对外部署入口后再配置反向代理、HTTPS、企业邮件/IdP和地形WebSocket认证。当前不需要购买云资源即可本地演示。

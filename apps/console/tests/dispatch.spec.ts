@@ -1,9 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("reviewed local task reaches actual M3/M2/M4 and survives panel reopening", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/airspace");
   await page.getByRole("button", { name: "本地任务联调", exact: true }).click();
   const panel = page.getByRole("dialog", { name: "本地任务联调", exact: true });
   await expect(

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { baseHeight, GRID_STEP, TerrainModel } from "../src/terrain";
 import type { TerrainPatch } from "../src/types";
 
@@ -61,7 +61,7 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://basemaps.cartocdn.com/**", (route) =>
     route.abort(),
   );
-  await page.goto("/");
+  await page.goto("/airspace");
   await expect(page.getByText("构建数字空域…")).toBeHidden();
 });
 

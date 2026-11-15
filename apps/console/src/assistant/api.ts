@@ -133,7 +133,7 @@ export async function requestTurn(
 ) {
   const response = await fetch("/api/assistant/turn", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Aeris-Request": "1" },
     body: JSON.stringify({ request_id: crypto.randomUUID(), ...args }),
     signal,
   });

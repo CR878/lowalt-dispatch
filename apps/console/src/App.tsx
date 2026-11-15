@@ -1,4 +1,5 @@
 import { DispatchPanel, rememberedDispatchTask } from "./DispatchPanel";
+import { useTheme } from "./portal/Theme";
 import {
   useCallback,
   useEffect,
@@ -550,7 +551,16 @@ function WeatherHud({
   );
 }
 
-export default function App() {
+export default function App({
+  embedded = false,
+  readOnly = false,
+  initialLive = false,
+}: {
+  embedded?: boolean;
+  readOnly?: boolean;
+  initialLive?: boolean;
+}) {
+  const { theme } = useTheme();
   const preferences = useRef(loadPreferences()).current;
   const [panels, setPanels] = useState<Record<PanelId, boolean>>(
     preferences.panels,
@@ -586,6 +596,10 @@ export default function App() {
   const [showLayers, setShowLayers] = useState(false);
   const [compare, setCompare] = useState(true);
   const [reviewRoute, setReviewRoute] = useState<ReviewRoute | null>(null);
+  const [taskRoute, setTaskRoute] = useState<{
+    route_id: string;
+    waypoints: [number, number][];
+  } | null>(null);
   const [mapKind, setMapKind] = useState<"world" | "terrain">("world");
   const [terminalMap, setTerminalMap] = useState(
     () => new URLSearchParams(window.location.search).get("map") === "terminal",
@@ -646,6 +660,7 @@ export default function App() {
   const revision = useRef(0);
   const [liveMode, setLiveMode] = useState(
     () =>
+      initialLive ||
       new URLSearchParams(window.location.search).get("telemetry") === "live",
   );
   const {
@@ -846,6 +861,46 @@ export default function App() {
   };
 
   const notify = useCallback((message: string) => setToast(message), []);
+  useEffect(() => {
+    if (!embedded || initialLive) return;
+    const query = new URLSearchParams(window.location.search);
+    const taskId = query.get("task");
+    const planId = query.get("planTask");
+    if (!taskId && !planId) return;
+    const controller = new AbortController();
+    const path = planId
+      ? `/api/planning/tasks/${encodeURIComponent(planId)}/routes`
+      : `/api/dispatch/tasks/${encodeURIComponent(taskId!)}`;
+    fetch(path, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error("任务航线读取失败，请返回任务详情核对");
+        const data = await response.json();
+        const route = planId ? data.at(-1) : data.result?.route;
+        if (!route?.waypoints?.length)
+          throw new Error("该任务尚无可展示的航线，请在任务详情查看处理原因");
+        if (controller.signal.aborted) return;
+        setTaskRoute({
+          route_id: route.plan_version || "task-route",
+          waypoints: route.waypoints.map((p: { x_m: number; y_m: number }) => [
+            p.x_m,
+            p.y_m,
+          ]),
+        });
+        if (taskId) {
+          setDispatchTaskId(taskId);
+          localStorage.setItem("aeris-local-task", taskId);
+        }
+        setLayers((l) => ({ ...l, routes: true }));
+        setDemoVisible(true);
+        setPlaying(false);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          notify(error instanceof Error ? error.message : "无法加载任务航线");
+      });
+    return () => controller.abort();
+  }, [embedded, initialLive, notify]);
   const addEvent = useCallback(
     (title: string, detail: string, type: EventItem["type"] = "info") =>
       setEvents((e) =>
@@ -1003,7 +1058,8 @@ export default function App() {
       )
         return;
       if (event.key.toLowerCase() === "f") setFocus((v) => !v);
-      if (event.key.toLowerCase() === "a") setAssistantOpen((v) => !v);
+      if (event.key.toLowerCase() === "a" && !readOnly)
+        setAssistantOpen((v) => !v);
       if (event.key.toLowerCase() === "l") {
         setMapKind("world");
         setLocationOpen((v) => !v);
@@ -1033,7 +1089,7 @@ export default function App() {
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [togglePanel, drawer]);
+  }, [togglePanel, drawer, readOnly]);
 
   const exportSnapshot = () => {
     const body = {
@@ -1161,7 +1217,7 @@ export default function App() {
 
   return (
     <div
-      className={`app ${focus ? "focus-mode" : ""} ${playing ? "" : "paused"} ${assistantOpen ? "assistant-open" : ""} ${motionReduced ? "motion-reduced" : ""} ${locationOpen ? "locating" : ""}`}
+      className={`app ${embedded ? "console-embedded" : ""} ${readOnly ? "console-readonly" : ""} ${focus ? "focus-mode" : ""} ${playing ? "" : "paused"} ${assistantOpen ? "assistant-open" : ""} ${motionReduced ? "motion-reduced" : ""} ${locationOpen ? "locating" : ""}`}
     >
       <header className="topbar">
         <a className="brand" href="#" aria-label="AERIS 低空智能调度台">
@@ -1281,6 +1337,11 @@ export default function App() {
       </aside>
 
       <main className="main">
+        {readOnly && (
+          <div className="read-only-banner">
+            当前为观察员视图，可以查看态势与遥测；创建、规划和执行权限由管理员分配。
+          </div>
+        )}
         <div className="page-heading">
           <div>
             <div className="eyebrow">
@@ -1303,11 +1364,17 @@ export default function App() {
             >
               <ArrowDownToLine size={14} /> 导出快照
             </button>
-            <button className="button primary" onClick={() => setDrawer("new")}>
-              <Plus size={16} /> 新建任务
-            </button>
+            {!readOnly && (
+              <button
+                className="button primary new-task-button"
+                onClick={() => setDrawer("new")}
+              >
+                <Plus size={16} /> 新建任务
+              </button>
+            )}
             <button
               className="button subtle"
+              hidden={readOnly}
               onClick={() => setDrawer("dispatch")}
             >
               <Link2 size={15} /> 本地任务联调
@@ -1445,7 +1512,9 @@ export default function App() {
                       : mapKind === "world"
                         ? basemap === "satellite"
                           ? "ESRI WORLD IMAGERY / WGS84"
-                          : "CARTO DARK MATTER / WGS84"
+                          : theme === "dark"
+                            ? "CARTO DARK MATTER / WGS84"
+                            : "CARTO POSITRON / WGS84"
                         : "地形实验 / ENU · 3 × 3 km"}
                 </span>
               </div>
@@ -1488,7 +1557,7 @@ export default function App() {
                     }`}
                     aria-pressed={basemap === "satellite"}
                     aria-label="切换卫星实景底图"
-                    title="暗色底图 / 卫星实景（Esri World Imagery，免 key）"
+                    title="主题底图 / 卫星实景（Esri World Imagery，免 key）"
                     onClick={() =>
                       setBasemap((value) =>
                         value === "satellite" ? "dark" : "satellite",
@@ -1501,7 +1570,11 @@ export default function App() {
                       <Map size={13} />
                     )}
                     <span>
-                      {basemap === "satellite" ? "卫星实景" : "暗色底图"}
+                      {basemap === "satellite"
+                        ? "卫星实景"
+                        : theme === "dark"
+                          ? "夜间底图"
+                          : "日间底图"}
                     </span>
                   </button>
                 )}
@@ -1671,7 +1744,7 @@ export default function App() {
                 terrainModel={terrainModel}
                 progress={progress}
                 playing={playing && !motionReduced}
-                preview={assistantPreview?.waypoints}
+                preview={(assistantPreview || taskRoute)?.waypoints}
                 comparison={reviewRoute?.waypoints}
               />
             )}
@@ -1694,7 +1767,7 @@ export default function App() {
                       capturedAt: new Date().toISOString(),
                     });
                   }}
-                  preview={assistantPreview}
+                  preview={assistantPreview || taskRoute}
                   comparison={reviewRoute}
                   kind={liveMode ? "world" : mapKind}
                   demoVisible={!liveMode && demoVisible}
@@ -1729,6 +1802,7 @@ export default function App() {
                       );
                   }}
                   onTask={() => setDrawer("new")}
+                  readOnly={readOnly}
                   onError={notify}
                 />
               )}
@@ -1770,6 +1844,18 @@ export default function App() {
                     </button>
                   </div>
                 )}
+              {!liveMode && !assistantPreview && taskRoute && (
+                <div className="assistant-preview-label">
+                  <Route size={12} /> 任务航线 · {taskRoute.route_id} ·
+                  ENU显示投影 / 仿真
+                  <button
+                    aria-label="关闭任务航线"
+                    onClick={() => setTaskRoute(null)}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
               {!liveMode && assistantPreview && (
                 <div className="assistant-preview-label">
                   <Sparkles size={12} /> 助手几何预览 · 不替换当前任务{" "}
@@ -1983,7 +2069,9 @@ export default function App() {
                     onClick={() => setBasemap("dark")}
                     aria-pressed={basemap === "dark"}
                   >
-                    <span>暗色底图 · CARTO</span>
+                    <span>
+                      {theme === "dark" ? "夜间底图" : "日间底图"} · CARTO
+                    </span>
                     <span
                       className={`checkbox ${basemap === "dark" ? "checked" : ""}`}
                     >
@@ -2523,47 +2611,51 @@ export default function App() {
         </footer>
       </main>
 
-      <Assistant
-        open={assistantOpen}
-        onToggle={() => setAssistantOpen((v) => !v)}
-        context={{
-          is_simulated: true,
-          sampled_at:
-            liveMode && liveFrame
-              ? liveFrame.captured_at
-              : new Date().toISOString(),
-          task_id: "T-S1-01",
-          selected_task_id: dispatchTaskId || null,
-          route_id: "S1-01-baseline",
-          progress: liveMode ? 0 : progress,
-          telemetry_mode: liveMode ? "live" : "demo",
-          telemetry: liveMode ? null : t,
-          live_telemetry: liveMode ? liveFrame : null,
-          terrain: liveMode ? null : terrain,
-          events,
-        }}
-        onDraft={saveAssistantDraft}
-        onFocus={(point, label) => {
-          map.current?.focus(point);
-          setCoordinate(enuToLngLat(point));
-          setAssistantFocus(label);
-        }}
-        onRoute={(route) => {
-          setAssistantPreview(route);
-          if (route) {
-            setLayers((l) => ({ ...l, routes: true }));
-            map.current?.reset();
-            setAssistantFocus("");
-          }
-        }}
-        onPanel={(panel) => {
-          setPanels((p) => ({ ...p, [panel]: true }));
-          setFocus(false);
-          if (panel === "events") setDrawer("events");
-        }}
-        onInjectTerrain={simulateTerrain}
-        onEvent={(title, detail) => addEvent(title, detail)}
-      />
+      {!readOnly && (
+        <Assistant
+          open={!readOnly && assistantOpen}
+          onToggle={() => {
+            if (!readOnly) setAssistantOpen((v) => !v);
+          }}
+          context={{
+            is_simulated: true,
+            sampled_at:
+              liveMode && liveFrame
+                ? liveFrame.captured_at
+                : new Date().toISOString(),
+            task_id: "T-S1-01",
+            selected_task_id: dispatchTaskId || null,
+            route_id: "S1-01-baseline",
+            progress: liveMode ? 0 : progress,
+            telemetry_mode: liveMode ? "live" : "demo",
+            telemetry: liveMode ? null : t,
+            live_telemetry: liveMode ? liveFrame : null,
+            terrain: liveMode ? null : terrain,
+            events,
+          }}
+          onDraft={saveAssistantDraft}
+          onFocus={(point, label) => {
+            map.current?.focus(point);
+            setCoordinate(enuToLngLat(point));
+            setAssistantFocus(label);
+          }}
+          onRoute={(route) => {
+            setAssistantPreview(route);
+            if (route) {
+              setLayers((l) => ({ ...l, routes: true }));
+              map.current?.reset();
+              setAssistantFocus("");
+            }
+          }}
+          onPanel={(panel) => {
+            setPanels((p) => ({ ...p, [panel]: true }));
+            setFocus(false);
+            if (panel === "events") setDrawer("events");
+          }}
+          onInjectTerrain={simulateTerrain}
+          onEvent={(title, detail) => addEvent(title, detail)}
+        />
+      )}
 
       {focus && (
         <button className="focus-exit button" onClick={() => setFocus(false)}>
@@ -2646,7 +2738,7 @@ export default function App() {
               </IconButton>
             </div>
             <div className="drawer-body">
-              {drawer === "dispatch" && (
+              {drawer === "dispatch" && !readOnly && (
                 <DispatchPanel
                   taskId={dispatchTaskId}
                   setTaskId={setDispatchTaskId}
@@ -2763,13 +2855,14 @@ export default function App() {
                   )}
                   <button
                     className="button primary full-width"
+                    hidden={readOnly}
                     onClick={() => setDrawer("new")}
                   >
                     <Plus size={15} /> 新建任务草稿
                   </button>
                 </>
               )}
-              {drawer === "new" && (
+              {drawer === "new" && !readOnly && (
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();

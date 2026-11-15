@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { readFile } from "node:fs/promises";
 import { parseCoordinates, enuToLngLat, lngLatToEnu } from "../src/geo";
 
@@ -18,7 +18,7 @@ async function search(page: Page, query: string) {
 }
 test.beforeEach(async ({ page }) => {
   await page.route("https://basemaps.cartocdn.com/**", (r) => r.abort());
-  await page.goto("/");
+  await page.goto("/airspace");
   await expect(page.getByText("构建数字空域…")).toBeHidden();
 });
 test("real coordinate endpoints survive reload and are saved and exported with provenance", async ({

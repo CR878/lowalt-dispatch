@@ -74,7 +74,9 @@ async function api<T>(
     method: body === undefined ? "GET" : "POST",
     signal,
     headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
+      body === undefined
+        ? undefined
+        : { "Content-Type": "application/json", "X-Aeris-Request": "1" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {

@@ -25,6 +25,7 @@ type Props = {
   onSelect: (place: GeoPlace) => void;
   onAssign: (key: keyof GeoMission, place: GeoPlace | null) => void;
   onTask: () => void;
+  readOnly?: boolean;
   onError: (text: string) => void;
 };
 export default function LocationPanel({
@@ -35,6 +36,7 @@ export default function LocationPanel({
   onSelect,
   onAssign,
   onTask,
+  readOnly = false,
   onError,
 }: Props) {
   const [query, setQuery] = useState(""),
@@ -280,6 +282,7 @@ export default function LocationPanel({
           )}
           <button
             className="button primary full-width"
+            hidden={readOnly}
             disabled={!mission.origin || !mission.destination}
             onClick={() => {
               if (

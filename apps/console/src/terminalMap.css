@@ -1,7 +1,7 @@
 .map-surface-toggle.terminal-map-toggle[aria-pressed="true"] {
-  color: #d9caff;
-  border-color: #7d679c;
-  background: #2d253d;
+  color: light-dark(#376e95, #a7c6dd);
+  border-color: #e2dde9;
+  background: #f4f3f7;
 }
 
 .map-panel .terminal-map {
@@ -36,7 +36,7 @@
 .terminal-north,
 .terminal-east {
   grid-area: 1 / 2;
-  color: #9faaba;
+  color: light-dark(#556377, #b5c0ce);
 }
 
 .terminal-east {
@@ -83,7 +83,7 @@
   gap: 8px;
   border-top: 1px solid var(--line);
   padding: 9px 0;
-  color: #9faaba;
+  color: light-dark(#556377, #b5c0ce);
   font: 10px var(--mono);
 }
 
@@ -106,7 +106,7 @@
 }
 
 .terminal-position code {
-  color: #e0e4ed;
+  color: light-dark(#4b5c81, #b1bbd3);
 }
 
 .terminal-position code:last-child {
@@ -132,11 +132,11 @@
 
 .terminal-map [data-ink="building"],
 .terminal-map [data-ink="comparison"] {
-  color: #9faaba;
+  color: light-dark(#556377, #b5c0ce);
 }
 
 .terminal-map [data-ink="zone"] {
-  color: #e4a1c5;
+  color: light-dark(#95376a, #dda7c4);
 }
 
 .terminal-map [data-ink="route"],
@@ -169,7 +169,7 @@
   }
 
   .terminal-grid [data-trail] {
-    color: #e0e4ed;
+    color: light-dark(#4b5c81, #b1bbd3);
     text-shadow: 0 0 7px var(--green);
   }
 

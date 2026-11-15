@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import type { ReviewRoute } from "./RouteReview";
 
 export function Sparkline({
-  color = "#bca9ff",
+  color = "var(--chart-line, #7196ba)",
   phase = 0,
   height = 34,
 }: {
@@ -142,8 +142,16 @@ export function MarginChart({
           <rect x="42" y="127" width="658" height="35" />
         </clipPath>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#a891ef" stopOpacity=".22" />
-          <stop offset="1" stopColor="#a891ef" stopOpacity="0" />
+          <stop
+            offset="0"
+            stopColor="var(--chart-line, #7196ba)"
+            stopOpacity=".22"
+          />
+          <stop
+            offset="1"
+            stopColor="var(--chart-line, #7196ba)"
+            stopOpacity="0"
+          />
         </linearGradient>
       </defs>
       {[43, 85, 127].map((y, i) => (
@@ -153,7 +161,11 @@ export function MarginChart({
             x2="700"
             y1={y}
             y2={y}
-            stroke={i === 2 ? "#665849" : "#242a32"}
+            stroke={
+              i === 2
+                ? "var(--chart-zero, #d5c2a6)"
+                : "var(--chart-grid, #dce5ec)"
+            }
             strokeDasharray={i === 2 ? "4 5" : "2 5"}
           />
           <text x="24" y={y + 4} textAnchor="end" className="chart-tick">
@@ -195,7 +207,12 @@ export function MarginChart({
           opacity=".65"
         />
       )}
-      <path d={current} fill="none" stroke="#baa6f7" strokeWidth="2" />
+      <path
+        d={current}
+        fill="none"
+        stroke="var(--chart-line, #5a8fbb)"
+        strokeWidth="2"
+      />
       <path
         d={`${current} L700 127 L42 127 Z`}
         fill="#ed91ad40"
@@ -220,12 +237,12 @@ export function MarginChart({
         cx={42 + (cursor / 120) * 658}
         cy={cursorY}
         r="3.5"
-        fill="#e8e0ff"
+        fill="var(--chart-cursor, #477b9f)"
       />
       <text
         x={Math.min(540, 52 + (cursor / 120) * 658)}
         y="23"
-        fill="#d5c7fa"
+        fill="var(--chart-cursor, #477b9f)"
         fontSize="9"
       >
         {hover === null
@@ -267,7 +284,13 @@ export function Attitude({ pitch, roll }: { pitch: number; roll: number }) {
           <circle cx="70" cy="70" r="49" />
         </clipPath>
       </defs>
-      <circle cx="70" cy="70" r="59" fill="none" stroke="#303741" />
+      <circle
+        cx="70"
+        cy="70"
+        r="59"
+        fill="none"
+        stroke="var(--chart-grid, #c5d2dd)"
+      />
       {Array.from({ length: 25 }, (_, i) => (
         <line
           key={i}
@@ -275,15 +298,27 @@ export function Attitude({ pitch, roll }: { pitch: number; roll: number }) {
           x2="70"
           y1="10"
           y2={i % 3 ? 14 : 18}
-          stroke={i === 12 ? "#c6b5f8" : "#707d8e"}
+          stroke={i === 12 ? "#6396bd" : "var(--attitude-tick, #707d8e)"}
           strokeWidth="1"
           transform={`rotate(${i * 10 - 120} 70 70)`}
         />
       ))}
       <g clipPath={`url(#${id})`}>
         <g transform={`rotate(${-roll} 70 70) translate(0 ${pitch * 1.2})`}>
-          <rect x="0" y="-10" width="140" height="80" fill="#23303e" />
-          <rect x="0" y="70" width="140" height="90" fill="#2d2a2c" />
+          <rect
+            x="0"
+            y="-10"
+            width="140"
+            height="80"
+            fill="var(--attitude-sky, #dfeaf3)"
+          />
+          <rect
+            x="0"
+            y="70"
+            width="140"
+            height="90"
+            fill="var(--attitude-ground, #e9e3d9)"
+          />
           <line x1="0" x2="140" y1="70" y2="70" stroke="#8d98a4" />
           {[-30, -15, 15, 30].map((v) => (
             <g key={v}>
@@ -292,10 +327,15 @@ export function Attitude({ pitch, roll }: { pitch: number; roll: number }) {
                 x2={Math.abs(v) === 30 ? 92 : 86}
                 y1={70 + v}
                 y2={70 + v}
-                stroke="#7c8999"
+                stroke="var(--attitude-tick, #7c8999)"
                 opacity=".6"
               />
-              <text x="99" y={73 + v} fill="#8994a2" fontSize="6">
+              <text
+                x="99"
+                y={73 + v}
+                fill="var(--attitude-tick, #8994a2)"
+                fontSize="6"
+              >
                 {Math.abs(v)}
               </text>
             </g>
@@ -305,12 +345,18 @@ export function Attitude({ pitch, roll }: { pitch: number; roll: number }) {
       <path
         d="M33 70 H57 L62 75 H78 L83 70 H107"
         fill="none"
-        stroke="#d4c1ff"
+        stroke="var(--chart-cursor, #3c7098)"
         strokeWidth="2"
       />
-      <circle cx="70" cy="70" r="2" fill="#d4c1ff" />
-      <path d="M66 24 L70 17 L74 24Z" fill="#c5afff" />
-      <text x="70" y="132" textAnchor="middle" fill="#838f9e" fontSize="8">
+      <circle cx="70" cy="70" r="2" fill="var(--chart-cursor, #3c7098)" />
+      <path d="M66 24 L70 17 L74 24Z" fill="var(--chart-cursor, #3c7098)" />
+      <text
+        x="70"
+        y="132"
+        textAnchor="middle"
+        fill="var(--attitude-tick, #838f9e)"
+        fontSize="8"
+      >
         姿态 / ATTITUDE
       </text>
     </svg>

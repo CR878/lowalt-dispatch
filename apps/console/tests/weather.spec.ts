@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("toolbar opens the regional wind field and weather follows existing mission points", async ({
   page,
@@ -50,7 +50,7 @@ test("toolbar opens the regional wind field and weather follows existing mission
     if (path.startsWith("/v2/radar/")) tiles.add(path);
     return r.fulfill({ contentType: "image/png", body: transparent });
   });
-  await page.goto("/");
+  await page.goto("/airspace");
   const weather = page.getByRole("region", { name: "任务区公开气象" });
   const layers = page.getByRole("button", { name: "地图图层" });
   const wind = page.getByRole("button", { name: "风场", exact: true });
