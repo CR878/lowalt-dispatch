@@ -127,8 +127,10 @@ def scenario_from_snapshot(
 ) -> tuple[dict[str, Any], list[str]]:
     """把快照收成 `plan_scenario` 能读的事件列表。
 
-    静态基线只认识 `at_s == 0` 的 zone_id。尚未生效的限制区不能提前当成障碍，
-    基线也不会做时间轴绕行，所以直接不送进去，并写明原因。
+    保守策略：场景里声明的限制区一律当成立即生效、全程存在，送进搜索网格当障碍。
+    飞行中才生效（effective_from > now）的区域不再被忽略——宁可绕路也不规划穿越未来
+    禁飞区的航线。精确的时变处理（按到达时刻绕行）属于 `astar_dynamic`，目前仍是 mock。
+    已过期（effective_until < now）的区域确实不再生效，仍排除。
     """
     notes: list[str] = []
     events: list[dict[str, Any]] = []
@@ -139,12 +141,6 @@ def scenario_from_snapshot(
         if event.effective_until is not None and now > event.effective_until:
             notes.append(f"限制区事件 {event.event_id} 已过 effective_until，未送入规划器。")
             continue
-        if event.effective_from > now:
-            notes.append(
-                f"限制区事件 {event.event_id} 尚未到 effective_from。"
-                "静态基线不会表达未来才生效的区域，所以这次既没有把它当障碍，也没有按时间轴绕行。"
-            )
-            continue
         zone_id = zone_id_of(event)
         if zone_id is None:
             notes.append(
@@ -153,6 +149,11 @@ def scenario_from_snapshot(
                 "当前入口只能按场景文件里的区号避让，不能按任意多边形临时封控。"
             )
             continue
+        if event.effective_from > now:
+            notes.append(
+                f"限制区事件 {event.event_id} 尚未到 effective_from，"
+                "但按保守策略当全程生效，已作为障碍送入规划器。"
+            )
         events.append({"kind": "restriction_zone", "at_s": 0, "zone_id": zone_id})
 
     scenario = {

@@ -133,7 +133,11 @@ def test_no_landing_site_is_a_negative_sentinel_not_zero_margin() -> None:
 
 def test_pruning_rejects_route_that_baseline_still_returns() -> None:
     """能量只够单程、不够再飞回唯一备降点时，约束搜索必须无解，基线仍给出几何路线。"""
-    scene = Scene(obstacles=[], zones={}, sites={"L": LandingSite("L", 100.0, 100.0, radius_m=30.0, compatible_vehicle_types=("toy",))})
+    scene = Scene(
+        obstacles=[],
+        zones={},
+        sites={"L": LandingSite("L", 100.0, 100.0, radius_m=30.0, compatible_vehicle_types=("toy",))},
+    )
     scenario = {
         "id": "toy-far",
         "origin": {"x_m": 100.0, "y_m": 100.0, "alt_m": 0.0},
@@ -185,7 +189,9 @@ def test_short_hop_profile_stays_non_negative_and_matches_formula() -> None:
     assert start.margin_wh == pytest.approx(100.0 - (start.energy_need_wh or 0.0), abs=0.5)
     end = diversion.profile.samples[-1]
     assert end.energy_need_wh is not None
-    assert end.margin_wh == pytest.approx(100.0 - vehicle.energy_per_meter_wh * end.s_m - end.energy_need_wh, abs=1.0)
+    assert end.margin_wh == pytest.approx(
+        100.0 - vehicle.energy_per_meter_wh * end.s_m - end.energy_need_wh, abs=1.0
+    )
 
 
 def test_profile_samples_cover_the_polyline() -> None:
@@ -431,3 +437,41 @@ def test_site_closure_during_flight_enters_search_and_profile() -> None:
     assert constrained.profile.is_feasible
     # 基线与约束两条剖面用同一套时变口径，对照才公平
     assert abs(base.profile.min_margin_wh - constrained.profile.min_margin_wh) < 1e-6
+
+
+def test_at_s_positive_zone_is_blocked_conservatively() -> None:
+    # 保守策略：飞行中才生效（at_s>0）的限制区也当全程障碍，搜索不得交出穿越它的航线。
+    # S2-01 的 R01 在 at_s=40 才生效；旧口径忽略它、路线穿过去，新口径必须绕开。
+    scene = load_scene()
+    suite = load_suite()
+    sc = next(s for s in suite["scenarios"] if s["id"] == "S2-01")
+
+    from planner.astar import plan
+    from planner.diversion import blockers_at_t0, cached_grid
+    from planner.scene import endpoint_xy
+
+    # R01 必须出现在搜索的 blocker 集合里（不再被 at_s>0 过滤掉）
+    zone_ids = {
+        z.zone_id
+        for z in scene.zones.values()
+        if any(
+            ev.get("kind") == "restriction_zone"
+            and ev.get("zone_id") == z.zone_id
+            and float(ev.get("at_s", 0) or 0) > 0
+            for ev in sc.get("events", [])
+        )
+    }
+    blocked = blockers_at_t0(sc, scene)
+    blocked_ids = {zid for zid in zone_ids if any(scene.zones[zid].polygon is poly for poly in blocked)}
+    assert "R01" in zone_ids, "S2-01 应有 at_s>0 的 R01"
+    assert "R01" in blocked_ids, "at_s>0 的 R01 必须进入搜索 blocker"
+
+    grid = cached_grid(blockers_at_t0(sc, scene))
+    path = plan(grid, endpoint_xy(sc, "origin"), endpoint_xy(sc, "destination"))
+    assert path.found, path.reason
+
+    zone = scene.zones["R01"]
+    inside = sum(
+        1 for _, (x, y) in sample_polyline(path.waypoints, 5.0) if point_in_polygon(x, y, zone.polygon)
+    )
+    assert inside == 0, f"S2-01 路线不应穿过 at_s>0 的 R01，实际落入 {inside} 个采样点"

@@ -101,15 +101,18 @@ def load_suite(path: Path | None = None) -> dict[str, Any]:
 
 
 def zones_known_at_t0(scenario: dict[str, Any], scene: Scene) -> list[Zone]:
-    """起飞时刻就已经知道、且已经生效的限制区。
+    """场景里声明的全部限制区，当作规划全程生效（保守策略）。
 
-    这是**基线该有的信息量**：at_s > 0 的事件在起飞时还不存在，基线不该提前知道。
-    这个函数本身就是一次判定（"基线知道什么"），所以只给基线用；
-    校验器必须自己按时间轴逐点判断，不许调用这个。
+    本项目把"飞行中才生效（at_s > 0）的限制区"的精确时变处理留给 `astar_dynamic`
+    （目前仍是 mock）。在它落地前，采用保守策略：把所有声明过的限制区都当成立即生效、
+    全程存在，避免规划出穿越未来禁飞区的航线。
+
+    这比"基线只该知道 at_s == 0"更保守。校验器的 `_check_restriction` 仍会按生效时刻
+    逐点比对，作为更精细的时间轴安全网；本函数只决定搜索网格里哪些格子被堵死。
     """
     out: list[Zone] = []
     for ev in scenario.get("events", []) or []:
-        if ev.get("kind") != "restriction_zone" or ev.get("at_s", 0) != 0:
+        if ev.get("kind") != "restriction_zone":
             continue
         zone = scene.zones.get(ev["zone_id"])
         if zone is not None:

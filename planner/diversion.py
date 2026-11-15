@@ -51,10 +51,11 @@ _FIELD_CACHE: dict[tuple, DiversionField] = {}
 _SCENE: Scene | None = None
 
 APPROXIMATION_NOTE = (
-    "备降路径近似：与主航线相同的占用栅格（障碍 + at_s=0 的限制区，圆形净空膨胀），"
+    "备降路径近似：与主航线相同的占用栅格（障碍 + 全部声明过的限制区，圆形净空膨胀），"
     "八邻域最短路，进入备降半径即到达；能耗为一次爬升加无风巡航，不计转弯。"
     "搜索比折线采样多扣一格对角线。目的地不算备降点；飞行中关闭的备降点按到达时刻生效，"
-    "at_s>0 的限制区仍不进入本版。示例机型参数不是真实平台数据。"
+    "at_s>0 的限制区采用保守策略、当全程生效（精确的时变处理留给 astar_dynamic）。"
+    "示例机型参数不是真实平台数据。"
 )
 
 
@@ -136,12 +137,16 @@ def shared_scene() -> Scene:
 
 
 def zones_active_at_planning_time(scenario: dict, scene: Scene):
-    """只拿 at_s == 0 的限制区。飞行中才出现的区域，本版规划器当还不知道。"""
+    """场景里声明的全部限制区，当作规划全程生效（保守策略）。
+
+    过去这里只取 at_s == 0 的限制区，等于默认"飞行中才出现的区域规划器不知道"。
+    现改为保守策略：把所有声明过的限制区都当成立即生效、全程存在，避免搜索交出
+    穿越未来禁飞区的航线。精确的时变处理（按到达时刻切换 blocker）属于 `astar_dynamic`，
+    目前仍是 mock。
+    """
     out = []
     for ev in scenario.get("events") or []:
         if ev.get("kind") != "restriction_zone":
-            continue
-        if float(ev.get("at_s", 0) or 0) != 0.0:
             continue
         zone = scene.zones.get(ev.get("zone_id"))
         if zone is not None:

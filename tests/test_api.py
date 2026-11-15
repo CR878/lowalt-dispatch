@@ -49,7 +49,9 @@ def _position(x: float, y: float, alt: float = 0.0) -> dict:
     return {"frame": "enu_m", "x_m": x, "y_m": y, "alt_m": alt, "alt_ref": "rel_takeoff"}
 
 
-def _task(task_id: str = "T-20261109-001", origin: dict | None = None, destination: dict | None = None) -> dict:
+def _task(
+    task_id: str = "T-20261109-001", origin: dict | None = None, destination: dict | None = None
+) -> dict:
     return {
         "task_id": task_id,
         "origin": origin or _position(150, 150, 0),
@@ -363,8 +365,12 @@ def test_active_restriction_zone_changes_feasibility(client: TestClient) -> None
     assert [item["route_id"] for item in routes.json()] == ["v1", "v2"]
 
 
-def test_future_restriction_is_not_treated_as_active(client: TestClient) -> None:
-    _create(client, _task(task_id="T-future", origin=_position(500, 500), destination=_position(2500, 2500, 30)))
+def test_future_restriction_is_treated_as_active_conservatively(client: TestClient) -> None:
+    # 保守策略：飞行中才生效（effective_from 在未来）的限制区也当全程障碍送入规划器，
+    # 不再被忽略。此处终点 (2500,2500) 落在 R04 内部，R04 一旦生效就无可行路线。
+    _create(
+        client, _task(task_id="T-future", origin=_position(500, 500), destination=_position(2500, 2500, 30))
+    )
     created = client.post(
         "/tasks/T-future/snapshots",
         json={
@@ -386,8 +392,9 @@ def test_future_restriction_is_not_treated_as_active(client: TestClient) -> None
     response = _plan(client, "T-future")
     assert response.status_code == 200, response.text
     route = response.json()["route"]
-    assert route["found"] is True
-    assert any("尚未" in item for item in route["limitations"])
+    assert route["found"] is False
+    assert route["reason"] is not None and route["reason"]
+    assert any("保守" in item for item in route["limitations"])
 
 
 def test_stale_snapshot_is_rejected_without_storing_a_route(client: TestClient) -> None:

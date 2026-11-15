@@ -87,14 +87,37 @@ def test_planner_clearance_matches_validator(scene, suite) -> None:
 # --------------------------------------------------------------------------- #
 # 该拒的必须拒
 # --------------------------------------------------------------------------- #
-def test_baseline_blind_spot_is_caught(scene, suite) -> None:
-    """S2-01 的 R01 在 +40 s 才生效，基线不知道；校验器按时间轴必须抓到。"""
-    task, snapshot, route = _build(suite["S2-01"], scene)
+def test_validator_blocks_intrusion_and_planner_avoids_zone(scene, suite) -> None:
+    """保守策略下：规划器绕开 at_s>0 的 R01；但若真有航线在 R01 生效后才穿过它，
+
+    校验器按时间轴必须抓到。前者是现在的新行为，后者是校验器一直该有的能力。
+    """
+    sc = suite["S2-01"]
+    task, snapshot, route = _build(sc, scene)
+    assert route is not None
     report = validate_route(route, task, snapshot, scene, profile=TOY, now=T0)
     rz = _check(report, "restriction_zone")
-    assert not rz.passed
-    assert "R01" in rz.detail
-    assert "生效" in rz.detail
+    assert rz.passed, rz.detail  # 规划器已绕开 R01，应通过
+
+    # 造一条在 R01 生效（at_s=40s，cruise 15 m/s => 需弧长 > 600 m）后才穿过其几何中心的航线
+    rz_poly = scene.zones["R01"].polygon
+    cx = sum(p[0] for p in rz_poly) / len(rz_poly)
+    cy = sum(p[1] for p in rz_poly) / len(rz_poly)
+    approach = task.origin.model_copy(update={"x_m": cx - 700.0, "y_m": cy})
+    inside = task.origin.model_copy(update={"x_m": cx, "y_m": cy})
+    bad = RoutePlan(
+        route_id="bad-r01-v1",
+        plan_version="v1",
+        snapshot_id=snapshot.snapshot_id,
+        algorithm="manual",
+        waypoints=[approach, inside, task.destination],
+        energy_budget_wh=100.0,
+    )
+    bad_report = validate_route(bad, task, snapshot, scene, profile=TOY, now=T0)
+    bad_rz = _check(bad_report, "restriction_zone")
+    assert not bad_rz.passed
+    assert "R01" in bad_rz.detail
+    assert "生效" in bad_rz.detail
 
 
 def test_route_through_building_is_rejected(scene, suite) -> None:
@@ -197,9 +220,7 @@ def test_report_bound_to_digest_rejects_tampered_route(scene, suite) -> None:
     assert report_failures(report, task, route, snapshot, T0, not_before=T0) == []
 
     tampered = route.model_copy(deep=True)
-    tampered.waypoints[2] = tampered.waypoints[2].model_copy(
-        update={"x_m": tampered.waypoints[2].x_m + 50.0}
-    )
+    tampered.waypoints[2] = tampered.waypoints[2].model_copy(update={"x_m": tampered.waypoints[2].x_m + 50.0})
     issues = report_failures(report, task, tampered, snapshot, T0, not_before=T0)
     assert any("does not match" in i.detail for i in issues)
 
@@ -214,7 +235,11 @@ def test_cross_snapshot_validation_is_refused(scene, suite) -> None:
 def test_waypoint_reference_mismatch_raises(scene, suite) -> None:
     task, snapshot, route = _build(suite["S1-01"], scene)
     broken = route.model_copy(deep=True)
-    broken.waypoints = [task.origin.model_copy(update={"frame": "wgs84", "x_m": None, "y_m": None, "lat_deg": 28.0, "lon_deg": 115.0})] + list(route.waypoints[1:])
+    broken.waypoints = [
+        task.origin.model_copy(
+            update={"frame": "wgs84", "x_m": None, "y_m": None, "lat_deg": 28.0, "lon_deg": 115.0}
+        )
+    ] + list(route.waypoints[1:])
     with pytest.raises(ValueError, match="ENU"):
         validate_route(broken, task, snapshot, scene, profile=TOY, now=T0)
 

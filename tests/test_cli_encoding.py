@@ -50,8 +50,7 @@ def test_cli_survives_non_utf8_stdout(argv: tuple[str, ...]) -> None:
     )
 
     assert proc.returncode == 0, (
-        f"{argv[0]} 在 cp1252 下崩溃：\n"
-        + proc.stderr.decode("utf-8", "replace")[-3000:]
+        f"{argv[0]} 在 cp1252 下崩溃：\n" + proc.stderr.decode("utf-8", "replace")[-3000:]
     )
 
     text = proc.stdout.decode("utf-8")  # 解码失败本身就是结论

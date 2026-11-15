@@ -280,14 +280,15 @@ def _valid_sites(snapshot: RiskSnapshot, task: Task, t: datetime) -> list:
 
 
 def _escape_blockers(snapshot: RiskSnapshot, scene: Scene) -> list:
-    """备降路径要绕开的几何：建筑 + 快照时刻已生效的限制区。
+    """备降路径要绕开的几何：建筑 + 全部限制区（与规划器 `blockers_at_t0` 同口径）。
 
-    与规划器 `blockers_at_t0` 同口径。飞行中才生效的限制区不进距离场——
-    那是动态重规划的事，而且主航线的时间轴违规已由 `_check_restriction` 独立判。
+    规划器已采用保守策略，把所有声明过的限制区当成立即生效、全程存在，所以这里
+    也纳入全部 restriction_zone 事件（不再按 `effective_from` 过滤）。主航线的时间轴
+    违规由 `_check_restriction` 独立判，备降可达性的距离场只决定哪些格子被堵死。
     """
     out: list = list(scene.obstacles)
     for ev in snapshot.events:
-        if ev.kind != "restriction_zone" or ev.effective_from > snapshot.captured_at:
+        if ev.kind != "restriction_zone":
             continue
         poly = _event_polygon(ev, scene)
         if poly:

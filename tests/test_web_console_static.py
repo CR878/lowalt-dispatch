@@ -229,11 +229,7 @@ def _read_text(path: Path) -> str:
 
 def _is_number(value: Any) -> bool:
     """真正的数值（排除 bool，排除 NaN/Infinity）。"""
-    return (
-        isinstance(value, (int, float))
-        and not isinstance(value, bool)
-        and math.isfinite(float(value))
-    )
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value))
 
 
 def _num(value: Any, digits: int = 6) -> str:
@@ -400,8 +396,7 @@ def _model_field_names(model: Any, model_name: str) -> tuple[set[str], str]:
     if isinstance(fields, dict) and fields:
         return set(fields), "core.models.py/pydantic model_fields"
     return set(_FALLBACK_FIELDS[model_name]), (
-        "显式常量回退（pydantic 或 core.models 不可用，见 C5 注释；"
-        "常量与 core/models.py 当前字段逐字一致）"
+        "显式常量回退（pydantic 或 core.models 不可用，见 C5 注释；常量与 core/models.py 当前字段逐字一致）"
     )
 
 
@@ -437,13 +432,8 @@ def _orientation(ax: float, ay: float, bx: float, by: float, cx: float, cy: floa
     return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
 
 
-def _on_segment(
-    ax: float, ay: float, bx: float, by: float, cx: float, cy: float
-) -> bool:
-    return (
-        min(ax, bx) - EPS <= cx <= max(ax, bx) + EPS
-        and min(ay, by) - EPS <= cy <= max(ay, by) + EPS
-    )
+def _on_segment(ax: float, ay: float, bx: float, by: float, cx: float, cy: float) -> bool:
+    return min(ax, bx) - EPS <= cx <= max(ax, bx) + EPS and min(ay, by) - EPS <= cy <= max(ay, by) + EPS
 
 
 def segments_intersect(
@@ -460,9 +450,8 @@ def segments_intersect(
     d3 = _orientation(ax, ay, bx, by, cx, cy)
     d4 = _orientation(ax, ay, bx, by, dx, dy)
 
-    if (
-        ((d1 > EPS and d2 < -EPS) or (d1 < -EPS and d2 > EPS))
-        and ((d3 > EPS and d4 < -EPS) or (d3 < -EPS and d4 > EPS))
+    if ((d1 > EPS and d2 < -EPS) or (d1 < -EPS and d2 > EPS)) and (
+        (d3 > EPS and d4 < -EPS) or (d3 < -EPS and d4 > EPS)
     ):
         return True
     if abs(d1) <= EPS and _on_segment(cx, cy, dx, dy, ax, ay):
@@ -476,9 +465,7 @@ def segments_intersect(
     return False
 
 
-def polyline_hits_polygon(
-    points: Sequence[Sequence[float]], polygon: Sequence[Sequence[float]]
-) -> bool:
+def polyline_hits_polygon(points: Sequence[Sequence[float]], polygon: Sequence[Sequence[float]]) -> bool:
     """折线是否与多边形相交：顶点落在多边形内，或任一段与任一边相交。"""
     ring = _ring(polygon)
     if len(ring) < 3:
@@ -552,16 +539,12 @@ def scene() -> dict[str, Any]:
     真正失败由 test_c1_scene_data_block_extractable 单点报告，避免重复刷屏。
     """
     if not SCENE_JS.exists() or SCENE_JS.stat().st_size == 0:
-        pytest.skip(
-            "SKIP [待联调] apps/web/assets/scene.js 尚未交付（owner=T1）；"
-            "数据类断言待产物到位后复跑"
-        )
+        pytest.skip("SKIP [待联调] apps/web/assets/scene.js 尚未交付（owner=T1）；数据类断言待产物到位后复跑")
     try:
         return extract_scene_data(SCENE_JS)
     except SceneDataError as exc:
         pytest.skip(
-            "SKIP [阻塞] scene.js 数据块不可解析，诊断见 test_c1_scene_data_block_extractable："
-            f"{exc}"
+            f"SKIP [阻塞] scene.js 数据块不可解析，诊断见 test_c1_scene_data_block_extractable：{exc}"
         )
 
 
@@ -720,15 +703,13 @@ def test_no_build_traces(html: str) -> None:
         (re.compile(r"\.tsx?\b"), "引用了 TypeScript 源文件（.ts/.tsx）"),
         (re.compile(r"(?:^|[\s;{}(=])import\s+[\w{*\"']", re.M), "出现 ES module `import`"),
         (re.compile(r"\brequire\s*\("), "出现 `require(`（CommonJS/构建痕迹）"),
-        (re.compile(r"""type\s*=\s*["']module["']"""), "出现 type=\"module\"（file:// 下会被浏览器拒绝）"),
+        (re.compile(r"""type\s*=\s*["']module["']"""), '出现 type="module"（file:// 下会被浏览器拒绝）'),
     )
     violations: list[str] = []
     for pattern, reason in patterns:
         for match in pattern.finditer(local_html):
             line_no = local_html.count("\n", 0, match.start()) + 1
-            violations.append(
-                f"index.html:{line_no} {reason}，命中片段：{match.group(0)[:60]!r}"
-            )
+            violations.append(f"index.html:{line_no} {reason}，命中片段：{match.group(0)[:60]!r}")
     _report(
         "C-STATIC-TEST@1[无构建痕迹]",
         "index.html（剔除绝对 URL 后）不得含构建痕迹",
@@ -751,9 +732,7 @@ def _package_url_versions(html_text: str, package: str) -> list[str | None]:
       （版本段后紧跟 HTML 引号，因此终止符集合包含引号/空白/`>`）。
     """
     pattern = re.compile(
-        r"(?:^|/)"
-        + re.escape(package)
-        + r"(?P<version>@[^/\s\"'<>?#]*)?(?=/|$|\?|#|[\"'\s>])"
+        r"(?:^|/)" + re.escape(package) + r"(?P<version>@[^/\s\"'<>?#]*)?(?=/|$|\?|#|[\"'\s>])"
     )
     return [match.group("version") for match in pattern.finditer(html_text)]
 
@@ -790,9 +769,7 @@ def test_crs_constants(scene: dict[str, Any]) -> None:
     if crs.get("frame") != "enu_m":
         violations.append(f"crs.frame={crs.get('frame')!r}，期望 'enu_m'")
     if crs.get("approximation") != "equirectangular_demo":
-        violations.append(
-            f"crs.approximation={crs.get('approximation')!r}，期望 'equirectangular_demo'"
-        )
+        violations.append(f"crs.approximation={crs.get('approximation')!r}，期望 'equirectangular_demo'")
     if crs.get("is_demo_approximation") is not True:
         violations.append(
             f"crs.is_demo_approximation={crs.get('is_demo_approximation')!r}，期望 True（机读标识）"
@@ -819,9 +796,7 @@ def test_crs_constants(scene: dict[str, Any]) -> None:
     else:
         for keyword in ("ENU", "WGS84", "演示"):
             if keyword not in disclaimer:
-                violations.append(
-                    f"crs.disclaimer 缺少关键词 `{keyword}`（应声明为 ENU→WGS84 演示近似）"
-                )
+                violations.append(f"crs.disclaimer 缺少关键词 `{keyword}`（应声明为 ENU→WGS84 演示近似）")
 
     coverage = _coverage(scene)
     if coverage is None:
@@ -853,9 +828,7 @@ def test_crs_roundtrip_and_center(scene: dict[str, Any]) -> None:
             x_back, y_back = _lnglat_to_enu(crs, lng, lat)
             error = math.hypot(x_back - x_m, y_back - y_m)
             if error >= ROUNDTRIP_TOL_M:
-                violations.append(
-                    f"ENU({_num(x_m, 1)}, {_num(y_m, 1)}) 往返误差 {error:.3e} m ≥ 1e-6 m"
-                )
+                violations.append(f"ENU({_num(x_m, 1)}, {_num(y_m, 1)}) 往返误差 {error:.3e} m ≥ 1e-6 m")
 
     coverage = _coverage(scene)
     if coverage is not None:
@@ -890,9 +863,13 @@ def test_crs_derived_lnglat_order(scene: dict[str, Any]) -> None:
             return
         x_m, y_m = _lnglat_to_enu(crs, float(lng), float(lat))
         if not (low <= x_m <= high):
-            violations.append(f"{path} 反算 x_m={_num(x_m, 1)} 超出 [{low:g}, {high:g}] m（经纬度顺序疑似写反）")
+            violations.append(
+                f"{path} 反算 x_m={_num(x_m, 1)} 超出 [{low:g}, {high:g}] m（经纬度顺序疑似写反）"
+            )
         if not (low <= y_m <= high):
-            violations.append(f"{path} 反算 y_m={_num(y_m, 1)} 超出 [{low:g}, {high:g}] m（经纬度顺序疑似写反）")
+            violations.append(
+                f"{path} 反算 y_m={_num(y_m, 1)} 超出 [{low:g}, {high:g}] m（经纬度顺序疑似写反）"
+            )
 
     for index, site in enumerate(scene.get("sites") or []):
         if isinstance(site, dict):
@@ -914,9 +891,7 @@ def test_crs_derived_lnglat_order(scene: dict[str, Any]) -> None:
         check_point(f"obstacles[i={index}].centroid_lnglat", *centroid[:2])
         for point_index, point in enumerate(obstacle.get("polygon_lnglat") or []):
             if isinstance(point, (list, tuple)) and len(point) >= 2:
-                check_point(
-                    f"obstacles[i={index}].polygon_lnglat[{point_index}]", point[0], point[1]
-                )
+                check_point(f"obstacles[i={index}].polygon_lnglat[{point_index}]", point[0], point[1])
 
     _report("C-CRS@1", "派生经纬度顺序与覆盖范围", violations)
 
@@ -956,9 +931,7 @@ def test_geojson_counts_and_crs_note(scene: dict[str, Any]) -> None:
                 f"geojson.{key}.features 数量={actual_count}，期望 {expected_count}（基线 {filename}）"
             )
         if collection.get("crs_note") != baseline.get("crs_note"):
-            violations.append(
-                f"geojson.{key}.crs_note 与 scenarios/v0/{filename} 不一致（必须原样保留）"
-            )
+            violations.append(f"geojson.{key}.crs_note 与 scenarios/v0/{filename} 不一致（必须原样保留）")
     _report("C-SCENE-GEO@1", "内联 FeatureCollection 数量与坐标说明", violations)
 
 
@@ -1024,9 +997,13 @@ def test_sites_derived(scene: dict[str, Any]) -> None:
         if site.get("kind") != "landing_site":
             violations.append(f"{path}({site.get('site_id')}).kind={site.get('kind')!r}，期望 'landing_site'")
         if site.get("is_simulated") is not True:
-            violations.append(f"{path}({site.get('site_id')}).is_simulated={site.get('is_simulated')!r}，期望 True")
+            violations.append(
+                f"{path}({site.get('site_id')}).is_simulated={site.get('is_simulated')!r}，期望 True"
+            )
         if "alt_min_m" in site:
-            violations.append(f"{path}({site.get('site_id')}) 不应含 alt_min_m（radius_m 只属于 sites，高度带只属于 zones）")
+            violations.append(
+                f"{path}({site.get('site_id')}) 不应含 alt_min_m（radius_m 只属于 sites，高度带只属于 zones）"
+            )
 
         position = site.get("position")
         if not isinstance(position, dict):
@@ -1065,13 +1042,17 @@ def test_zones_derived(scene: dict[str, Any]) -> None:
             violations.append(f"{path} 不是对象（实际：{type(zone).__name__}）")
             continue
         if zone.get("kind") != "restriction_zone":
-            violations.append(f"{path}({zone.get('zone_id')}).kind={zone.get('kind')!r}，期望 'restriction_zone'")
+            violations.append(
+                f"{path}({zone.get('zone_id')}).kind={zone.get('kind')!r}，期望 'restriction_zone'"
+            )
         for key, expected in (("alt_min_m", 0.0), ("alt_max_m", 120.0)):
             actual = zone.get(key)
             if not _is_number(actual) or abs(float(actual) - expected) > EPS:
                 violations.append(f"{path}({zone.get('zone_id')}).{key}={actual!r}，期望 {expected:g}")
         if zone.get("is_simulated") is not True:
-            violations.append(f"{path}({zone.get('zone_id')}).is_simulated={zone.get('is_simulated')!r}，期望 True")
+            violations.append(
+                f"{path}({zone.get('zone_id')}).is_simulated={zone.get('is_simulated')!r}，期望 True"
+            )
         polygon = _zone_polygon(zone)
         if polygon is None:
             violations.append(f"{path}({zone.get('zone_id')}).polygon_enu 缺失或顶点数 < 3 / 含非数值")
@@ -1088,9 +1069,7 @@ def test_obstacles_derived(scene: dict[str, Any]) -> None:
 
     violations: list[str] = []
     expected_ids = [f"B{index:02d}" for index in range(1, 21)]
-    obstacle_ids = [
-        obstacle.get("obstacle_id") for obstacle in obstacles if isinstance(obstacle, dict)
-    ]
+    obstacle_ids = [obstacle.get("obstacle_id") for obstacle in obstacles if isinstance(obstacle, dict)]
     if obstacle_ids != expected_ids:
         violations.append(f"obstacles[*].obstacle_id={obstacle_ids!r}，期望 B01…B20（按文件顺序）")
 
@@ -1104,9 +1083,7 @@ def test_obstacles_derived(scene: dict[str, Any]) -> None:
         if not _is_number(height):
             violations.append(f"{path}({obstacle_id}).height_m={height!r}，期望数值")
         elif not (36.0 - EPS <= float(height) <= 101.0 + EPS):
-            violations.append(
-                f"{path}({obstacle_id}).height_m={_num(height, 2)}，期望落在 [36.0, 101.0]"
-            )
+            violations.append(f"{path}({obstacle_id}).height_m={_num(height, 2)}，期望落在 [36.0, 101.0]")
         if obstacle.get("height_source") != "demo_derived":
             violations.append(
                 f"{path}({obstacle_id}).height_source={obstacle.get('height_source')!r}，"
@@ -1117,7 +1094,9 @@ def test_obstacles_derived(scene: dict[str, Any]) -> None:
         if obstacle.get("kind") != "building":
             violations.append(f"{path}({obstacle_id}).kind={obstacle.get('kind')!r}，期望 'building'")
         if obstacle.get("is_simulated") is not True:
-            violations.append(f"{path}({obstacle_id}).is_simulated={obstacle.get('is_simulated')!r}，期望 True")
+            violations.append(
+                f"{path}({obstacle_id}).is_simulated={obstacle.get('is_simulated')!r}，期望 True"
+            )
         area = obstacle.get("footprint_area_m2")
         if not _is_number(area) or float(area) <= 0:
             violations.append(f"{path}({obstacle_id}).footprint_area_m2={area!r}，期望 > 0 的数值")
@@ -1177,13 +1156,9 @@ def test_polygons_closed_and_consistent(scene: dict[str, Any]) -> None:
                 and _is_number(lnglat_point[0])
                 and _is_number(lnglat_point[1])
             ):
-                violations.append(
-                    f"{label}.polygon_lnglat[{point_index}]={lnglat_point!r} 不是 [lng, lat]"
-                )
+                violations.append(f"{label}.polygon_lnglat[{point_index}]={lnglat_point!r} 不是 [lng, lat]")
                 continue
-            expected_lng, expected_lat = _enu_to_lnglat(
-                crs, float(enu_point[0]), float(enu_point[1])
-            )
+            expected_lng, expected_lat = _enu_to_lnglat(crs, float(enu_point[0]), float(enu_point[1]))
             if (
                 abs(float(lnglat_point[0]) - expected_lng) > 1e-9
                 or abs(float(lnglat_point[1]) - expected_lat) > 1e-9
@@ -1250,9 +1225,7 @@ def _check_task_fields(scene_data: dict[str, Any]) -> list[str]:
                 violations.append(f"{label}.{path_key}.alt_ref={position.get('alt_ref')!r}，期望 'agl'")
             for axis in ("x_m", "y_m", "alt_m"):
                 if not _is_number(position.get(axis)):
-                    violations.append(
-                        f"{label}.{path_key}.{axis}={position.get(axis)!r}，期望有限数值"
-                    )
+                    violations.append(f"{label}.{path_key}.{axis}={position.get(axis)!r}，期望有限数值")
 
         provenance = task.get("provenance")
         if not isinstance(provenance, dict):
@@ -1266,7 +1239,9 @@ def _check_task_fields(scene_data: dict[str, Any]) -> list[str]:
                     f"{label}.provenance.is_simulated={provenance.get('is_simulated')!r}，期望 True"
                 )
         if task.get("is_simulated") is not True:
-            violations.append(f"{label}.is_simulated={task.get('is_simulated')!r}，期望 True（UI 徽标直接读它）")
+            violations.append(
+                f"{label}.is_simulated={task.get('is_simulated')!r}，期望 True（UI 徽标直接读它）"
+            )
         status = task.get("status")
         if status not in {"queued", "in_flight", "infeasible", "delivered", "diverted"}:
             violations.append(
@@ -1359,9 +1334,7 @@ def test_tasks_match_eval_scenarios(scene: dict[str, Any]) -> None:
                 if not _is_number(expected_value):
                     violations.append(f"v0.yaml:{scenario_id}.{endpoint}.{axis} 缺失，无法核对")
                     continue
-                if not _is_number(actual_value) or abs(
-                    float(actual_value) - float(expected_value)
-                ) > 1e-6:
+                if not _is_number(actual_value) or abs(float(actual_value) - float(expected_value)) > 1e-6:
                     violations.append(
                         f"tasks[{task_id}].{endpoint}.{axis}={_num(actual_value)}，"
                         f"期望 {_num(expected_value)}（eval/scenarios/v0.yaml:{scenario_id}）"
@@ -1406,9 +1379,7 @@ def test_routes_matrix(scene: dict[str, Any]) -> None:
         for field, expected_value in expected.items():
             actual_value = route.get(field)
             if actual_value != expected_value:
-                violations.append(
-                    f"routes[{route_id}].{field}={actual_value!r}，期望 {expected_value!r}"
-                )
+                violations.append(f"routes[{route_id}].{field}={actual_value!r}，期望 {expected_value!r}")
     _report("C-SCENE-DATA@1.2", "必需候选路线与固定元数据", violations)
 
 
@@ -1424,9 +1395,7 @@ def test_routes_fields_complete(scene: dict[str, Any]) -> None:
         label = f"routes[{route_id or f'i={index}'}]"
         missing = sorted(field for field in required_fields if field not in route)
         if missing:
-            violations.append(
-                f"{label} 缺少 RoutePlan 字段 {missing}（基准：{source}）"
-            )
+            violations.append(f"{label} 缺少 RoutePlan 字段 {missing}（基准：{source}）")
         unknown = sorted(
             key
             for key in route
@@ -1442,7 +1411,9 @@ def test_routes_fields_complete(scene: dict[str, Any]) -> None:
 
         waypoints = route.get("waypoints")
         if not isinstance(waypoints, list) or len(waypoints) < 2:
-            violations.append(f"{label}.waypoints 长度={len(waypoints) if isinstance(waypoints, list) else waypoints!r}，期望 ≥2")
+            violations.append(
+                f"{label}.waypoints 长度={len(waypoints) if isinstance(waypoints, list) else waypoints!r}，期望 ≥2"
+            )
         else:
             for waypoint_index, waypoint in enumerate(waypoints):
                 point_path = f"{label}.waypoints[{waypoint_index}]"
@@ -1457,7 +1428,9 @@ def test_routes_fields_complete(scene: dict[str, Any]) -> None:
                 if not _is_number(alt):
                     violations.append(f"{point_path}.alt_m={alt!r}，期望有限数值")
                 elif not (30.0 - EPS <= float(alt) <= 45.0 + EPS):
-                    violations.append(f"{point_path}.alt_m={_num(alt, 1)}，期望落在 30–45 m（C-SCENE-DATA@1.2）")
+                    violations.append(
+                        f"{point_path}.alt_m={_num(alt, 1)}，期望落在 30–45 m（C-SCENE-DATA@1.2）"
+                    )
                 for axis in ("x_m", "y_m"):
                     if not _is_number(waypoint.get(axis)):
                         violations.append(f"{point_path}.{axis}={waypoint.get(axis)!r}，期望有限数值")
@@ -1474,9 +1447,7 @@ def test_routes_fields_complete(scene: dict[str, Any]) -> None:
                     if key not in check:
                         violations.append(f"{label}.checks[{check_index}] 缺少字段 `{key}`")
                 if "passed" in check and not isinstance(check["passed"], bool):
-                    violations.append(
-                        f"{label}.checks[{check_index}].passed={check['passed']!r}，期望布尔值"
-                    )
+                    violations.append(f"{label}.checks[{check_index}].passed={check['passed']!r}，期望布尔值")
 
         if route.get("is_simulated") is not True:
             violations.append(f"{label}.is_simulated={route.get('is_simulated')!r}，期望 True")
@@ -1490,9 +1461,7 @@ def test_routes_endpoints_match_tasks(scene: dict[str, Any]) -> None:
     for route_id, route in _routes(scene).items():
         task = tasks.get(route.get("task_id"))
         if task is None:
-            violations.append(
-                f"routes[{route_id}].task_id={route.get('task_id')!r} 找不到对应任务"
-            )
+            violations.append(f"routes[{route_id}].task_id={route.get('task_id')!r} 找不到对应任务")
             continue
         points = _route_points(route)
         if len(points) < 2:
@@ -1517,9 +1486,7 @@ def test_routes_endpoints_match_tasks(scene: dict[str, Any]) -> None:
     _report("C-SCENE-DATA@1.2", "路线起终点与任务端点一致", violations)
 
 
-def _check_route_zone(
-    scene_data: dict[str, Any], route_id: str, zone_id: str, expect_hit: bool
-) -> list[str]:
+def _check_route_zone(scene_data: dict[str, Any], route_id: str, zone_id: str, expect_hit: bool) -> list[str]:
     """对单条路线与单个限制区做相交判定，返回违例描述。"""
     route = _routes(scene_data).get(route_id)
     zone = _zones(scene_data).get(zone_id)
@@ -1603,9 +1570,7 @@ def _check_profile_fields(scene_data: dict[str, Any]) -> list[str]:
         if missing:
             violations.append(f"{label} 缺少 DiversionMarginProfile 字段 {missing}（基准：{source}）")
         unknown = sorted(
-            key
-            for key in profile
-            if key not in profile_fields and key not in ALLOWED_EXTRA_PROFILE_FIELDS
+            key for key in profile if key not in profile_fields and key not in ALLOWED_EXTRA_PROFILE_FIELDS
         )
         if unknown:
             violations.append(
@@ -1628,9 +1593,7 @@ def _check_profile_fields(scene_data: dict[str, Any]) -> list[str]:
                     f"{sample_missing}（基准：{sample_source}）"
                 )
             sample_unknown = sorted(
-                key
-                for key in sample
-                if key not in sample_fields and key not in ALLOWED_EXTRA_SAMPLE_FIELDS
+                key for key in sample if key not in sample_fields and key not in ALLOWED_EXTRA_SAMPLE_FIELDS
             )
             if sample_unknown:
                 violations.append(
@@ -1670,23 +1633,15 @@ def _check_i1(scene_data: dict[str, Any]) -> list[str]:
     if profile is None:
         return ["I1 缺少剖面 RT-S2-01-A，无法判定（C-SCENE-DATA@1.3）"]
     samples = _samples(profile)
-    margins = [
-        float(sample["margin_wh"]) for sample in samples if _is_number(sample.get("margin_wh"))
-    ]
+    margins = [float(sample["margin_wh"]) for sample in samples if _is_number(sample.get("margin_wh"))]
     violations: list[str] = []
     if len(margins) != len(samples):
-        violations.append(
-            f"I1 RT-S2-01-A 有 {len(samples) - len(margins)} 个采样点的 margin_wh 不是有限数值"
-        )
+        violations.append(f"I1 RT-S2-01-A 有 {len(samples) - len(margins)} 个采样点的 margin_wh 不是有限数值")
     negative = [value for value in margins if value < 0]
     if len(negative) < 5:
-        violations.append(
-            f"I1 RT-S2-01-A 负值采样点数量={len(negative)}，期望 ≥ 5（体现旧线不可行）"
-        )
+        violations.append(f"I1 RT-S2-01-A 负值采样点数量={len(negative)}，期望 ≥ 5（体现旧线不可行）")
     if margins and min(margins) > -1.5:
-        violations.append(
-            f"I1 RT-S2-01-A min(margin_wh)={_num(min(margins), 3)}，期望 ≤ −1.500"
-        )
+        violations.append(f"I1 RT-S2-01-A min(margin_wh)={_num(min(margins), 3)}，期望 ≤ −1.500")
     return violations
 
 
@@ -1704,9 +1659,7 @@ def _check_i2(scene_data: dict[str, Any]) -> list[str]:
                 f"I2 RT-S2-01-B samples[{sample_index}](s_m={_num(s_m, 1)}) margin_wh={margin!r} 不是有限数值"
             )
         elif float(margin) < 1.0 - EPS:
-            violations.append(
-                f"I2 RT-S2-01-B s_m={_num(s_m, 1)} margin_wh={_num(margin, 3)}，期望 ≥ +1.000"
-            )
+            violations.append(f"I2 RT-S2-01-B s_m={_num(s_m, 1)} margin_wh={_num(margin, 3)}，期望 ≥ +1.000")
     return violations
 
 
@@ -1722,9 +1675,7 @@ def _check_i3(scene_data: dict[str, Any]) -> list[str]:
 
         first_s_m = samples[0].get("s_m")
         if not _is_number(first_s_m) or abs(float(first_s_m)) > EPS:
-            violations.append(
-                f"I3 margin_profiles[{route_id}] 首点 s_m={_num(first_s_m, 3)}，期望 0"
-            )
+            violations.append(f"I3 margin_profiles[{route_id}] 首点 s_m={_num(first_s_m, 3)}，期望 0")
 
         previous_s_m: float | None = None
         previous_t_s: float | None = None
@@ -2059,9 +2010,7 @@ def _check_event_effective_from(scene_data: dict[str, Any]) -> list[str]:
 def _check_plan_version_change(scene_data: dict[str, Any]) -> list[str]:
     """必须存在 T-S2-01 的 v1 → v2 版本变更条目。"""
     violations: list[str] = []
-    changes = [
-        event for event in _events(scene_data) if event.get("kind") == PLAN_VERSION_CHANGE_KIND
-    ]
+    changes = [event for event in _events(scene_data) if event.get("kind") == PLAN_VERSION_CHANGE_KIND]
     if not changes:
         return ["events 中缺少 kind='plan_version_change' 的版本变更条目（C-SCENE-DATA@1.4）"]
     target = [
@@ -2112,9 +2061,29 @@ def test_events_plan_version_change(scene: dict[str, Any]) -> None:
 # 纳入扫描只会制造误报，且与 C8（单文件 <10 s）冲突。
 SCAN_EXCLUDED_DIRS = {"node_modules", "dist", ".vite", "__pycache__", ".git"}
 SCAN_EXCLUDED_SUFFIXES = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".svgz", ".bmp",
-    ".woff", ".woff2", ".ttf", ".otf", ".eot",
-    ".mp4", ".webm", ".mp3", ".wav", ".zip", ".gz", ".glb", ".gltf", ".wasm", ".bin",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".ico",
+    ".svgz",
+    ".bmp",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".mp4",
+    ".webm",
+    ".mp3",
+    ".wav",
+    ".zip",
+    ".gz",
+    ".glb",
+    ".gltf",
+    ".wasm",
+    ".bin",
 }
 
 
@@ -2172,8 +2141,7 @@ def scan_forbidden_phrases(files: Sequence[tuple[Path, str]]) -> list[str]:
                 line_no = text.count("\n", 0, index) + 1
                 line = lines[line_no - 1].strip() if line_no - 1 < len(lines) else ""
                 hits.append(
-                    f"{_rel(path)}:{line_no} 命中禁用串「{phrase}」（{reason}）；"
-                    f"所在行：{line[:120]!r}"
+                    f"{_rel(path)}:{line_no} 命中禁用串「{phrase}」（{reason}）；所在行：{line[:120]!r}"
                 )
     return hits
 
@@ -2208,9 +2176,7 @@ def test_footer_copyright(html: str) -> None:
     if "原创实现" not in html:
         violations.append("index.html 未出现 `原创实现`（页面原创声明，未复制其源码）")
     if "PolyForm Noncommercial" not in html:
-        violations.append(
-            "index.html 未出现 `PolyForm Noncommercial`（来源许可证与非商业用途声明）"
-        )
+        violations.append("index.html 未出现 `PolyForm Noncommercial`（来源许可证与非商业用途声明）")
     _report("C-COPY@1", "页脚版权声明", violations)
 
 
@@ -2223,9 +2189,9 @@ def test_page_anchors(html: str) -> None:
     for anchor in REQUIRED_ANCHOR_IDS:
         occurrences = len(re.findall(rf"""id\s*=\s*["']{re.escape(anchor)}["']""", html))
         if occurrences == 0:
-            violations.append(f"index.html 缺少锚点 `id=\"{anchor}\"`")
+            violations.append(f'index.html 缺少锚点 `id="{anchor}"`')
         elif occurrences > 1:
-            violations.append(f"index.html 锚点 `id=\"{anchor}\"` 出现 {occurrences} 次，期望唯一")
+            violations.append(f'index.html 锚点 `id="{anchor}"` 出现 {occurrences} 次，期望唯一')
     _report("C-PAGE-ANCHORS@1", "必需 DOM 锚点", violations)
 
 
@@ -2237,13 +2203,11 @@ def test_page_script_and_diagnostics(html: str) -> None:
     )
     script_match = script_pattern.search(html)
     if script_match is None:
-        violations.append(
-            "index.html 未以 `<script src=\"assets/scene.js\">` 引入唯一数据资源脚本"
-        )
+        violations.append('index.html 未以 `<script src="assets/scene.js">` 引入唯一数据资源脚本')
     else:
         if re.search(r"""type\s*=\s*["']module["']""", script_match.group(0), re.IGNORECASE):
             violations.append(
-                "`assets/scene.js` 被以 type=\"module\" 引入（file:// 下会被 CORS 拒绝，必须是经典脚本）"
+                '`assets/scene.js` 被以 type="module" 引入（file:// 下会被 CORS 拒绝，必须是经典脚本）'
             )
     if "window.LOWALT_CONSOLE" not in html:
         violations.append("index.html 未定义诊断接口 `window.LOWALT_CONSOLE`（C-PAGE-ANCHORS@1）")
