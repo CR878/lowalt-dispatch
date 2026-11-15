@@ -112,9 +112,9 @@ def main(argv: list[str] | None = None) -> int:
             mark = "PASS" if c.passed else ("无法" if c.detail.startswith(UNAVAILABLE) else "FAIL")
             print(f"  {c.name:<24}{mark:<6}{c.detail}")
 
-    print("\n说明：规划器已把全部声明过的限制区（含 at_s>0 的）当永久障碍保守地绕开，")
-    print("      所以 restriction_zone 项现在基本都通过；校验器的价值在于按自己的采样独立复算")
-    print("      净空 / 载荷 / 能量 / 备降可达 / 时限这五类硬约束，不依赖规划器结论。")
+    print("\n说明：规划器对 at_s>0 的限制区已按到达时刻精确判断（航线可在激活前穿过），")
+    print("      不把它们当永久障碍；校验器同样按生效时刻逐点复算 restriction_zone，")
+    print("      并独立复算净空 / 载荷 / 能量 / 备降可达 / 时限这五类硬约束，不依赖规划器结论。")
     return 0
 
 

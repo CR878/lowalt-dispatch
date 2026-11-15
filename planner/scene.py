@@ -101,23 +101,46 @@ def load_suite(path: Path | None = None) -> dict[str, Any]:
 
 
 def zones_known_at_t0(scenario: dict[str, Any], scene: Scene) -> list[Zone]:
-    """场景里声明的全部限制区，当作规划全程生效（保守策略）。
+    """起飞时刻就已经知道、且已经生效（at_s == 0）的限制区。
 
-    本项目把"飞行中才生效（at_s > 0）的限制区"的精确时变处理留给 `astar_dynamic`
-    （目前仍是 mock）。在它落地前，采用保守策略：把所有声明过的限制区都当成立即生效、
-    全程存在，避免规划出穿越未来禁飞区的航线。
-
-    这比"基线只该知道 at_s == 0"更保守。校验器的 `_check_restriction` 仍会按生效时刻
-    逐点比对，作为更精细的时间轴安全网；本函数只决定搜索网格里哪些格子被堵死。
+    这是**基线该有的信息量**：at_s > 0 的事件在起飞时还不存在。飞行中才生效的
+    限制区由 `nfz_schedule` 提供、在搜索期（`planner.diversion._accept_state`）按到达时刻
+    单独判断，让航线能"在禁飞区激活前穿过去"，而不是被永久绕开。`zones_known_at_t0`
+    只决定搜索网格里哪些格子被几何堵死（at_s == 0 的限制区 + 建筑）；时变部分交给
+    搜索期的精确判断。
     """
     out: list[Zone] = []
     for ev in scenario.get("events", []) or []:
-        if ev.get("kind") != "restriction_zone":
+        if ev.get("kind") != "restriction_zone" or float(ev.get("at_s", 0) or 0) != 0:
             continue
         zone = scene.zones.get(ev["zone_id"])
         if zone is not None:
             out.append(zone)
     return out
+
+
+def nfz_schedule(scenario: dict[str, Any], scene: Scene) -> tuple[tuple[Polygon, float, float | None], ...]:
+    """飞行中才生效（at_s > 0）的限制区，按生效秒数排序。
+
+    返回 `(polygon, at_s, duration_s)`；`duration_s` 为 None 表示激活后永久生效。
+    场景里的 `events` 是现成数据，不需要任何编造的风场或机型参数。`zones_known_at_t0`
+    已处理 at_s == 0 的几何；这里只处理 at_s > 0 的时变部分。
+    """
+    out: list[tuple[Polygon, float, float | None]] = []
+    for ev in scenario.get("events", []) or []:
+        if ev.get("kind") != "restriction_zone":
+            continue
+        at_s = float(ev.get("at_s", 0) or 0)
+        if at_s <= 0:
+            continue
+        zone = scene.zones.get(ev["zone_id"])
+        if zone is None:
+            continue
+        dur = ev.get("duration_s")
+        duration = None if dur is None else float(dur)
+        out.append((zone.polygon, at_s, duration))
+    out.sort(key=lambda w: w[1])
+    return tuple(out)
 
 
 def endpoint_xy(scenario: dict[str, Any], which: str) -> tuple[float, float]:

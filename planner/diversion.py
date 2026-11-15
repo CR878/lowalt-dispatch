@@ -35,11 +35,11 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from core.geometry import polyline_length, sample_polyline
+from core.geometry import Polygon, point_in_polygon, polyline_length, sample_polyline
 from core.models import DiversionMarginProfile, DiversionMarginSample
 from planner.astar import plan
 from planner.grid import DEFAULT_CLEARANCE_M, DEFAULT_RES_M, Grid, build_grid, snap_to_free
-from planner.scene import LandingSite, Scene, endpoint_xy
+from planner.scene import LandingSite, Scene, endpoint_xy, nfz_schedule
 from sim.energy import VehicleProfile, climb_energy_wh, cruise_energy_wh, cruise_time_s
 
 # 无几何可达备降点时写入剖面的 margin。只表示“没有退出路径”，不是能量缺口。
@@ -51,10 +51,10 @@ _FIELD_CACHE: dict[tuple, DiversionField] = {}
 _SCENE: Scene | None = None
 
 APPROXIMATION_NOTE = (
-    "备降路径近似：与主航线相同的占用栅格（障碍 + 全部声明过的限制区，圆形净空膨胀），"
+    "备降路径近似：与主航线相同的占用栅格（障碍 + at_s==0 的限制区，圆形净空膨胀），"
     "八邻域最短路，进入备降半径即到达；能耗为一次爬升加无风巡航，不计转弯。"
     "搜索比折线采样多扣一格对角线。目的地不算备降点；飞行中关闭的备降点按到达时刻生效，"
-    "at_s>0 的限制区采用保守策略、当全程生效（精确的时变处理留给 astar_dynamic）。"
+    "at_s>0 的限制区按到达时刻精确判断（航线可在禁飞区激活前穿过，不再被永久绕开）。"
     "示例机型参数不是真实平台数据。"
 )
 
@@ -137,16 +137,15 @@ def shared_scene() -> Scene:
 
 
 def zones_active_at_planning_time(scenario: dict, scene: Scene):
-    """场景里声明的全部限制区，当作规划全程生效（保守策略）。
+    """只拿 at_s == 0 的限制区，构成搜索的静态占用栅格（几何基线）。
 
-    过去这里只取 at_s == 0 的限制区，等于默认"飞行中才出现的区域规划器不知道"。
-    现改为保守策略：把所有声明过的限制区都当成立即生效、全程存在，避免搜索交出
-    穿越未来禁飞区的航线。精确的时变处理（按到达时刻切换 blocker）属于 `astar_dynamic`，
-    目前仍是 mock。
+    飞行中才生效（at_s > 0）的限制区不进栅格，而是由 `_accept_state` 按到达时刻
+    单独判断（`nfz_blocks_at`）——航线可以在禁飞区激活前穿过去，不必被永久绕开。
+    精确的时变处理不再留给 `astar_dynamic`：它已经接进 `astar_diversion` 的搜索期。
     """
     out = []
     for ev in scenario.get("events") or []:
-        if ev.get("kind") != "restriction_zone":
+        if ev.get("kind") != "restriction_zone" or float(ev.get("at_s", 0) or 0) != 0.0:
             continue
         zone = scene.zones.get(ev.get("zone_id"))
         if zone is not None:
@@ -495,8 +494,11 @@ def _explain_prune(path_reason: str | None, prune_counts: dict[str, int]) -> tup
             "diversion": "起点不满足备降可达：剩余能量扣除保留量后，到不了任何当前有效备降点",
             "no_exit": "起点没有几何可达的当前有效备降点（障碍或限制区挡住了所有备降点）",
             "time": "起点已超出任务时限",
+            "nfz_time": "起点落在某个已激活的飞行中限制区内",
         }.get(cat, path_reason)
-        kind = {"time": "time", "no_exit": "no_site", "diversion": "diversion"}.get(cat, "diversion")
+        kind = {"time": "time", "no_exit": "no_site", "diversion": "diversion", "nfz_time": "nfz"}.get(
+            cat, "diversion"
+        )
         return text, kind
 
     parts: list[str] = []
@@ -510,15 +512,37 @@ def _explain_prune(path_reason: str | None, prune_counts: dict[str, int]) -> tup
     if prune_counts.get("no_site"):
         parts.append(f"{prune_counts['no_site']} 个状态在到达时已无当前有效备降点（飞行中关闭）")
         kind = "no_site"
+    if prune_counts.get("nfz_time"):
+        parts.append(f"{prune_counts['nfz_time']} 个状态在到达时刻落在已激活的飞行中限制区内而被剪枝")
+        kind = "nfz" if not any(prune_counts.get(k) for k in ("diversion", "no_exit", "no_site")) else kind
     if prune_counts.get("time"):
         parts.append(f"{prune_counts['time']} 个状态超出任务时限")
-        if not any(prune_counts.get(k) for k in ("diversion", "no_exit", "no_site")):
+        if not any(prune_counts.get(k) for k in ("diversion", "no_exit", "no_site", "nfz_time")):
             kind = "time"
     if parts:
         return "无可行路线：" + "；".join(parts) + "。未返回放宽约束后的路线。", kind
     if path_reason and ("终点" in path_reason or "起点周围" in path_reason or "上限" in path_reason):
         return path_reason, "geometry"
     return path_reason or "无可行路线", "geometry"
+
+
+def nfz_active_at(
+    windows: tuple[tuple[Polygon, float, float | None], ...],
+    x: float,
+    y: float,
+    t_s: float,
+) -> bool:
+    """点 (x, y) 在 t_s 时刻是否落在某个已激活的飞行中限制区内。
+
+    `windows` 来自 `scene.nfz_schedule`：`(polygon, at_s, duration_s)`。
+    “已激活” = `at_s <= t_s` 且（`duration` 为 None 或 `t_s <= at_s + duration`）。
+    这是精确时变判断：航线可以在禁飞区激活前穿过它，不必被永久绕开。
+    """
+    for poly, at_s, duration in windows:
+        if at_s <= t_s and (duration is None or t_s <= at_s + duration):
+            if point_in_polygon(x, y, poly):
+                return True
+    return False
 
 
 def _accept_state(
@@ -532,6 +556,7 @@ def _accept_state(
     climb_time_s: float,
     time_limit_s: float | None,
     field_at: Callable[[float], DiversionField | None] | None = None,
+    nfz_windows: tuple[tuple[Polygon, float, float | None], ...] = (),
 ):
     slack_m = grid.res_m * math.sqrt(2.0)
     speed = vehicle.cruise_speed_mps
@@ -541,6 +566,12 @@ def _accept_state(
         t_s = climb_time_s + g_chk / speed
         if time_limit_s is not None and t_s > time_limit_s:
             return "time"
+        # 精确时变禁飞区：到达这一格的时刻若落在某 at_s>0 限制区的激活窗口内，剪枝。
+        # 这样航线可以在禁飞区激活前穿过去，不必被永久绕开（保守策略曾把 at_s>0 当全程生效）。
+        if nfz_windows:
+            cx, cy = grid.center(node[0], node[1])
+            if nfz_active_at(nfz_windows, cx, cy, t_s):
+                return "nfz_time"
         active_field = field_at(t_s) if field_at is not None else field_
         if active_field is None:
             return "no_site"
@@ -628,6 +659,7 @@ def plan_scenario_with_diversion(
     climb_time = (climb_delta / vehicle.climb_rate_mps) if climb_delta > 0 else 0.0
     limit = scenario.get("time_limit_s")
     time_limit = None if limit is None else float(limit)
+    nfz_windows = nfz_schedule(scenario, scene)
 
     path = plan(
         grid,
@@ -644,6 +676,7 @@ def plan_scenario_with_diversion(
             climb_time_s=climb_time,
             time_limit_s=time_limit,
             field_at=field_at,
+            nfz_windows=nfz_windows,
         ),
     )
     if not path.found:

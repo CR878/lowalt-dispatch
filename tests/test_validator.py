@@ -88,16 +88,19 @@ def test_planner_clearance_matches_validator(scene, suite) -> None:
 # 该拒的必须拒
 # --------------------------------------------------------------------------- #
 def test_validator_blocks_intrusion_and_planner_avoids_zone(scene, suite) -> None:
-    """保守策略下：规划器绕开 at_s>0 的 R01；但若真有航线在 R01 生效后才穿过它，
+    """精确时变下：校验器按时间轴复算，能抓到航线进入已激活的 at_s>0 限制区。
 
-    校验器按时间轴必须抓到。前者是现在的新行为，后者是校验器一直该有的能力。
+    规划器（astar_diversion）对 S2-01 已据 nfz_time 判无解；校验器对同一条几何航线
+    独立复算，也应抓到它在 R01 激活后（+97s）侵入 R01。后者是校验器一直该有的能力。
     """
     sc = suite["S2-01"]
     task, snapshot, route = _build(sc, scene)
     assert route is not None
     report = validate_route(route, task, snapshot, scene, profile=TOY, now=T0)
     rz = _check(report, "restriction_zone")
-    assert rz.passed, rz.detail  # 规划器已绕开 R01，应通过
+    assert not rz.passed, rz.detail  # 几何航线在 R01 激活后侵入，校验器必须抓到
+    assert "R01" in rz.detail
+    assert "生效" in rz.detail
 
     # 造一条在 R01 生效（at_s=40s，cruise 15 m/s => 需弧长 > 600 m）后才穿过其几何中心的航线
     rz_poly = scene.zones["R01"].polygon

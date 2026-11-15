@@ -16,6 +16,7 @@ from planner.diversion import (
     UNREACHABLE_MARGIN_WH,
     active_landing_sites,
     build_diversion_field,
+    nfz_active_at,
     plan_baseline_annotated,
     plan_scenario_with_diversion,
     profile_along_route,
@@ -439,39 +440,43 @@ def test_site_closure_during_flight_enters_search_and_profile() -> None:
     assert abs(base.profile.min_margin_wh - constrained.profile.min_margin_wh) < 1e-6
 
 
-def test_at_s_positive_zone_is_blocked_conservatively() -> None:
-    # 保守策略：飞行中才生效（at_s>0）的限制区也当全程障碍，搜索不得交出穿越它的航线。
-    # S2-01 的 R01 在 at_s=40 才生效；旧口径忽略它、路线穿过去，新口径必须绕开。
+def test_blockers_at_t0_excludes_at_s_positive_nfz() -> None:
+    # 几何基线网格只含 at_s==0 的限制区；飞行中才生效（at_s>0）的由搜索期精确判断，
+    # 不再被当全程障碍永久绕开。
     scene = load_scene()
     suite = load_suite()
     sc = next(s for s in suite["scenarios"] if s["id"] == "S2-01")
+    from planner.diversion import blockers_at_t0
 
-    from planner.astar import plan
-    from planner.diversion import blockers_at_t0, cached_grid
-    from planner.scene import endpoint_xy
-
-    # R01 必须出现在搜索的 blocker 集合里（不再被 at_s>0 过滤掉）
-    zone_ids = {
-        z.zone_id
-        for z in scene.zones.values()
-        if any(
-            ev.get("kind") == "restriction_zone"
-            and ev.get("zone_id") == z.zone_id
-            and float(ev.get("at_s", 0) or 0) > 0
-            for ev in sc.get("events", [])
-        )
-    }
     blocked = blockers_at_t0(sc, scene)
-    blocked_ids = {zid for zid in zone_ids if any(scene.zones[zid].polygon is poly for poly in blocked)}
-    assert "R01" in zone_ids, "S2-01 应有 at_s>0 的 R01"
-    assert "R01" in blocked_ids, "at_s>0 的 R01 必须进入搜索 blocker"
+    r01_poly = scene.zones["R01"].polygon
+    assert r01_poly not in blocked, "at_s>0 的 R01 不应进入几何基线网格（精确时变交给搜索期）"
 
-    grid = cached_grid(blockers_at_t0(sc, scene))
-    path = plan(grid, endpoint_xy(sc, "origin"), endpoint_xy(sc, "destination"))
-    assert path.found, path.reason
 
-    zone = scene.zones["R01"]
-    inside = sum(
-        1 for _, (x, y) in sample_polyline(path.waypoints, 5.0) if point_in_polygon(x, y, zone.polygon)
-    )
-    assert inside == 0, f"S2-01 路线不应穿过 at_s>0 的 R01，实际落入 {inside} 个采样点"
+def test_nfz_active_at_predicate() -> None:
+    # 精确时变：禁飞区在 at_s 之后才激活；航线在激活前穿过它不算挡路。
+    poly = rect_polygon(0.0, 0.0, 100.0, 100.0)  # 100x100 方块
+    # 永久激活（duration=None）
+    windows = ((poly, 50.0, None),)
+    assert nfz_active_at(windows, 50.0, 50.0, 30.0) is False  # 激活前落在区内 -> 不挡
+    assert nfz_active_at(windows, 50.0, 50.0, 60.0) is True  # 激活后落在区内 -> 挡
+    assert nfz_active_at(windows, 500.0, 500.0, 60.0) is False  # 激活后落在区外 -> 不挡
+    # 带 duration 的窗口 [50, 80]
+    windows2 = ((poly, 50.0, 30.0),)
+    assert nfz_active_at(windows2, 50.0, 50.0, 80.0) is True  # 边界 t==at_s+duration 含
+    assert nfz_active_at(windows2, 50.0, 50.0, 81.0) is False  # 窗口外不挡
+    # 多个窗口：第一个已激活就挡
+    windows3 = ((poly, 50.0, None), (poly, 100.0, None))
+    assert nfz_active_at(windows3, 50.0, 50.0, 60.0) is True
+
+
+def test_s2_01_diversion_infeasible_due_to_active_nfz() -> None:
+    # S2-01 的 R01 在 at_s=40s 激活；几何路线在 ~118s 才穿过它，此时已激活。
+    # 精确搜索必须据此判无解，而不是像旧版那样把 at_s>0 当全程障碍（保守绕路导致能量不可行）。
+    scene = load_scene()
+    suite = load_suite()
+    sc = next(s for s in suite["scenarios"] if s["id"] == "S2-01")
+    vehicle = load_vehicle(EXAMPLE)
+    res = plan_scenario_with_diversion(sc, scene, vehicle)
+    assert res.found is False
+    assert "已激活的飞行中限制区" in (res.reason or ""), res.reason
