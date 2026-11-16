@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { Activity, BatteryCharging, Compass, MapPin } from "lucide-react";
-import type { LiveTelemetry } from "./types";
+import type { LiveTelemetry, Point } from "./types";
 import "./liveTelemetry.css";
 
 type Reading = number | string | null | undefined;
@@ -51,9 +51,13 @@ function trace(points: (SamplePoint | null)[]) {
 export function LiveLocalTrack({
   history,
   active,
+  reference,
+  target,
 }: {
   history: LiveTelemetry[];
   active: boolean;
+  reference?: Point[];
+  target?: Point | null;
 }) {
   const grid = useId();
   const current = history.at(-1);
@@ -79,8 +83,14 @@ export function LiveLocalTrack({
   const available = points.filter(
     (point): point is SamplePoint => point !== null,
   );
-  const east = available.map((point) => point.x);
-  const north = available.map((point) => point.y);
+  const east = [
+    ...available.map((point) => point.x),
+    ...(reference ?? []).map((p) => p[0]),
+  ];
+  const north = [
+    ...available.map((point) => point.y),
+    ...(reference ?? []).map((p) => p[1]),
+  ];
   const minE = Math.min(...east),
     maxE = Math.max(...east);
   const minN = Math.min(...north),
@@ -135,6 +145,30 @@ export function LiveLocalTrack({
           stroke="var(--track-grid)"
         />
         <path className="live-track-line" d={trace(plotted)} />
+        {reference && reference.length > 1 && (
+          <polyline
+            aria-label="ENU参考航线"
+            points={reference
+              .map(
+                (p) =>
+                  `${width / 2 + (p[0] - (minE + maxE) / 2) * scale},${height / 2 - (p[1] - (minN + maxN) / 2) * scale}`,
+              )
+              .join(" ")}
+            fill="none"
+            stroke="var(--nav-local-route, #5ba5e9)"
+            strokeWidth="2"
+            strokeDasharray="6 4"
+          />
+        )}
+        {target && (
+          <circle
+            aria-label="下一目标航点"
+            cx={width / 2 + (target[0] - (minE + maxE) / 2) * scale}
+            cy={height / 2 - (target[1] - (minN + maxN) / 2) * scale}
+            r="6"
+            fill="var(--nav-local-route, #5ba5e9)"
+          />
+        )}
         <g
           className="live-aircraft-marker"
           data-testid="live-aircraft-marker"

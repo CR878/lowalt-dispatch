@@ -1,6 +1,14 @@
 import { DispatchPanel, rememberedDispatchTask } from "./DispatchPanel";
 import { useTheme } from "./portal/Theme";
 import {
+  NavigationHUD,
+  NavigationWorkspace,
+  useNavigation,
+  xyRoute,
+} from "./navigation/Navigation";
+import { parseRoutes, type NavRoute } from "./navigation/engine";
+import { AirspaceLegend } from "./navigation/AirspacePanel";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -599,6 +607,7 @@ export default function App({
   const [taskRoute, setTaskRoute] = useState<{
     route_id: string;
     waypoints: [number, number][];
+    navigation?: NavRoute;
   } | null>(null);
   const [mapKind, setMapKind] = useState<"world" | "terrain">("world");
   const [terminalMap, setTerminalMap] = useState(
@@ -886,6 +895,41 @@ export default function App({
             p.x_m,
             p.y_m,
           ]),
+          navigation: (() => {
+            try {
+              const waypoints = route.waypoints as {
+                x_m: number;
+                y_m: number;
+                alt_m?: number;
+                alt_ref?: string;
+              }[];
+              const altitudeRef = waypoints[0].alt_ref;
+              const sameRef = Boolean(
+                altitudeRef &&
+                  waypoints.every((p) => p.alt_ref === altitudeRef),
+              );
+              return {
+                ...parseRoutes({
+                  id: route.plan_version || "task-route",
+                  title: "任务返回航线",
+                  frame: "ENU",
+                  altitude_ref: sameRef ? altitudeRef : null,
+                  source: "本地任务API · 合成场景",
+                  is_simulated: true,
+                  task_id: taskId || planId,
+                  plan_version: route.plan_version ?? null,
+                  waypoints: waypoints.map((p) => ({
+                    x: p.x_m,
+                    y: p.y_m,
+                    altitude: sameRef ? p.alt_m : null,
+                  })),
+                })[0],
+                display_anchor: "demo" as const,
+              };
+            } catch {
+              return undefined;
+            }
+          })(),
         });
         if (taskId) {
           setDispatchTaskId(taskId);
@@ -915,6 +959,107 @@ export default function App({
     (key: PanelId) => setPanels((p) => ({ ...p, [key]: !p[key] })),
     [],
   );
+  const navigationRoutes = useMemo(
+    () => [
+      ...(taskRoute
+        ? [
+            taskRoute.navigation ??
+              xyRoute(
+                taskRoute.route_id,
+                "任务航线几何预览",
+                taskRoute.waypoints,
+                "任务API · 高度/任务标识待核对",
+              ),
+          ]
+        : []),
+      ...(assistantPreview
+        ? [
+            xyRoute(
+              assistantPreview.route_id,
+              "助手几何预览",
+              assistantPreview.waypoints,
+              assistantPreview.source,
+            ),
+          ]
+        : []),
+    ],
+    [taskRoute, assistantPreview],
+  );
+  const nav = useNavigation({
+    liveMode,
+    liveFrame,
+    liveStatus,
+    history: liveHistory,
+    progress,
+    external: navigationRoutes,
+    terrain,
+    notify,
+    onEvent: addEvent,
+    readOnly,
+    onActivate: () => {
+      setTerminalMap(false);
+      setMapKind("world");
+      setLocationOpen(false);
+      setWeatherOpen(false);
+      setShowLayers(false);
+      setDemoVisible(false);
+      setLayers((v) => ({ ...v, routes: true }));
+    },
+  });
+  useEffect(() => {
+    if (
+      !nav.enabled ||
+      !nav.follow ||
+      !nav.overlay.aircraft ||
+      showLocalTrack ||
+      showTerminal ||
+      mapKind !== "world" ||
+      locationOpen
+    )
+      return;
+    const zoom = nav.nearAction
+      ? 16.6
+      : nav.guidance && nav.guidance.remaining < 300
+        ? 16
+        : nav.guidance && nav.guidance.along < 100
+          ? 16
+          : 14.9;
+    map.current?.navigate(
+      nav.overlay.aircraft,
+      zoom,
+      mode === "3d" ? (nav.overlay.heading ?? 0) : 0,
+      mode === "3d" ? 55 : 0,
+    );
+  }, [
+    nav.enabled,
+    nav.follow,
+    nav.overlay.aircraft,
+    nav.nearAction,
+    nav.guidance?.nextIndex,
+    mode,
+    showLocalTrack,
+    showTerminal,
+    mapKind,
+    locationOpen,
+  ]);
+  useEffect(() => {
+    nav.setFollow(false);
+  }, [locationOpen, weatherLayer, mapKind, showTerminal]);
+  useEffect(() => {
+    if (nav.enabled && (mapKind === "terrain" || showTerminal)) {
+      nav.setEnabled(false);
+      nav.setFollow(false);
+      notify("已暂停导航参考；地形实验和终端视图保留原场景，飞控任务未受影响");
+    }
+  }, [nav.enabled, mapKind, showTerminal]);
+  const navigationOverview = () => {
+    nav.setFollow(false);
+    const points = [...nav.overlay.active, ...nav.overlay.comparison];
+    if (points.length && !showLocalTrack) {
+      map.current?.overview(points);
+      notify("已显示参考航线全览");
+    } else notify("局部ENU航线未做地理标定，请在局部轨迹与导航数据中查看");
+  };
   const selectPlace = useCallback((place: GeoPlace) => {
     setSelectedPlace(place);
     setCoordinate(place.point);
@@ -1217,7 +1362,7 @@ export default function App({
 
   return (
     <div
-      className={`app ${embedded ? "console-embedded" : ""} ${readOnly ? "console-readonly" : ""} ${focus ? "focus-mode" : ""} ${playing ? "" : "paused"} ${assistantOpen ? "assistant-open" : ""} ${motionReduced ? "motion-reduced" : ""} ${locationOpen ? "locating" : ""}`}
+      className={`app ${nav.enabled && nav.open ? "navigation-active" : ""} ${embedded ? "console-embedded" : ""} ${readOnly ? "console-readonly" : ""} ${focus ? "focus-mode" : ""} ${playing ? "" : "paused"} ${assistantOpen ? "assistant-open" : ""} ${motionReduced ? "motion-reduced" : ""} ${locationOpen ? "locating" : ""}`}
     >
       <header className="topbar">
         <a className="brand" href="#" aria-label="AERIS 低空智能调度台">
@@ -1520,6 +1665,15 @@ export default function App({
               </div>
               <div className="map-toolbar-actions">
                 <button
+                  className={`map-surface-toggle ${nav.open ? "selected" : ""}`}
+                  aria-label="飞行导航"
+                  aria-expanded={nav.open}
+                  onClick={() => nav.setOpen((v) => !v)}
+                >
+                  <Navigation size={14} />
+                  <span>导航</span>
+                </button>
+                <button
                   className={`map-wind-button map-locate-button${weatherLayer === "wind" && weatherMapVisible ? " selected" : ""}`}
                   aria-label="风场"
                   aria-pressed={weatherLayer === "wind" && weatherMapVisible}
@@ -1736,6 +1890,19 @@ export default function App({
               <LiveLocalTrack
                 history={liveHistory}
                 active={liveStatus === "live"}
+                reference={
+                  nav.enabled && !nav.problem && nav.route?.frame === "ENU"
+                    ? nav.route.waypoints.map((p) => [p.x, p.y])
+                    : undefined
+                }
+                target={
+                  nav.guidance && nav.route?.frame === "ENU"
+                    ? [
+                        nav.route.waypoints[nav.guidance.nextIndex].x,
+                        nav.route.waypoints[nav.guidance.nextIndex].y,
+                      ]
+                    : null
+                }
               />
             )}
             {showTerminal && (
@@ -1779,6 +1946,17 @@ export default function App({
                   mission={geoMission}
                   selected={selectedPlace}
                   weather={mapWeather}
+                  navigation={
+                    nav.open || nav.enabled || nav.regions.length
+                      ? nav.overlay
+                      : null
+                  }
+                  onAirspaceSelect={(id) => {
+                    nav.setSelectedRegion(id);
+                    nav.setOpen(true);
+                    nav.setTab("airspace");
+                  }}
+                  onManualMove={() => nav.setFollow(false)}
                   onWindView={setWindView}
                   onWindMove={(moving) => {
                     windMoving.current = moving;
@@ -1828,6 +2006,10 @@ export default function App({
                 </div>
               )}
               <div className="map-vignette" />
+              <NavigationHUD nav={nav} />
+              {!showLocalTrack && !showTerminal && mapKind === "world" && (
+                <AirspaceLegend nav={nav} />
+              )}
               {!liveMode &&
                 reviewRoute &&
                 mapKind === "world" &&
@@ -2485,6 +2667,21 @@ export default function App({
           )}
         </div>
 
+        <NavigationWorkspace
+          nav={nav}
+          onOverview={navigationOverview}
+          onAreaOverview={(points) => {
+            if (showLocalTrack || showTerminal || mapKind !== "world") {
+              notify("请切换到真实地理地图后定位区域；局部坐标不套用真实空域");
+              return;
+            }
+            map.current?.overview(points);
+            notify("已显示该区域范围；请核对来源和时效");
+          }}
+          onAssistant={() => setAssistantOpen(true)}
+          onPlayback={setPlaying}
+          playing={playing}
+        />
         {liveMode && !focus && (
           <LiveTelemetryDetails history={liveHistory} status={liveStatusText} />
         )}
