@@ -718,6 +718,23 @@
   color: light-dark(#376e95, #a7c6dd);
   padding: 3px;
 }
+.assistant-bottom-actions > .assistant-web-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid light-dark(#b9cbdb, #33506a);
+  border-radius: 999px;
+  color: light-dark(#4a6b84, #9fbdd3);
+  font-size: 7px;
+  line-height: 1.6;
+  background: transparent;
+}
+.assistant-bottom-actions > .assistant-web-toggle.active {
+  border-color: light-dark(#2f6df6, #6ea0ff);
+  color: light-dark(#2f6df6, #6ea0ff);
+  background: color-mix(in srgb, #2f6df6 14%, transparent);
+}
 .assistant-offline {
   font-size: 8px;
   color: light-dark(#886944, #d6c4ad);

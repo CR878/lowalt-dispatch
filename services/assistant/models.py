@@ -125,6 +125,8 @@ class Turn(Contract):
     history: list[History] = Field(default_factory=list, max_length=16)
     draft: Draft | None = None
     context: Context
+    # Only effective when the assistant runs in maas mode; local rules have no network tool.
+    web_search: bool = False
 
     @field_validator("text")
     @classmethod

@@ -127,6 +127,7 @@ export async function requestTurn(
     history: { role: "user" | "assistant"; content: string }[];
     draft: AssistantDraft | null;
     context: AssistantContext;
+    web_search?: boolean;
   },
   signal: AbortSignal,
   onPacket: (packet: Packet) => void,

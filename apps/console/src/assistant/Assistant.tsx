@@ -9,6 +9,7 @@ import {
   ChevronRight,
   CircleHelp,
   FileCheck2,
+  Globe,
   ListChecks,
   LoaderCircle,
   MapPin,
@@ -213,6 +214,9 @@ export default function Assistant(props: Props) {
   const [draft, setDraft] = useState<AssistantDraft | null>(loadDraft);
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
+  const [webSearch, setWebSearch] = useState(
+    () => localStorage.getItem("aeris-web-search") === "1",
+  );
   const [configOpen, setConfigOpen] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [preview, setPreview] = useState<PreviewRoute | null>(null);
@@ -319,7 +323,13 @@ export default function Assistant(props: Props) {
     const timeout = setTimeout(() => controller.abort("timeout"), 95000);
     try {
       const result = await requestTurn(
-        { text: question, history, draft, context: current.current.context },
+        {
+          text: question,
+          history,
+          draft,
+          context: current.current.context,
+          web_search: webSearch,
+        },
         controller.signal,
         (packet) => {
           if (packet.type === "tool_start")
@@ -1016,6 +1026,25 @@ export default function Assistant(props: Props) {
             </div>
           </form>
           <div className="assistant-bottom-actions">
+            <button
+              type="button"
+              className={`assistant-web-toggle${webSearch ? " active" : ""}`}
+              aria-label={webSearch ? "关闭联网搜索" : "开启联网搜索"}
+              aria-pressed={webSearch}
+              title={
+                health?.provider === "maas"
+                  ? "联网搜索：法规时效性问题会查最新网页并附来源"
+                  : "本地规则模式不支持联网；请以 maas 模式启动助手"
+              }
+              onClick={() => {
+                const next = !webSearch;
+                setWebSearch(next);
+                localStorage.setItem("aeris-web-search", next ? "1" : "0");
+              }}
+            >
+              <Globe size={12} />
+              联网
+            </button>
             <span>演示数据 · 下发未接入</span>
             <button
               onClick={exportConversation}
