@@ -46,7 +46,11 @@ export function useLiveTelemetry(enabled: boolean) {
         setHistory((previous) => {
           const last = previous.at(-1);
           const recent =
-            last?.source === sample.source
+            last?.source === sample.source &&
+            last.task_id === sample.task_id &&
+            last.plan_version === sample.plan_version &&
+            last.is_simulated === sample.is_simulated &&
+            last.position?.frame === sample.position?.frame
               ? previous.filter(
                   (item) =>
                     Date.parse(item.captured_at) >= captured - HISTORY_MS,

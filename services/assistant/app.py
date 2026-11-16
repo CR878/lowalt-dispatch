@@ -20,6 +20,7 @@ from services.api.routes import runtime as dispatch_runtime
 from services.assistant.engine import Engine, ModelUnavailable, Settings
 from services.assistant.intake import store as intake_store
 from services.assistant.models import Turn
+from services.assistant.navigation import CandidateInput, candidate_routes
 from services.assistant.places import search_places
 from services.assistant.telemetry import stream_telemetry
 from services.identity.routes import COOKIE
@@ -77,6 +78,21 @@ app.mount("/api/planning", PlanningGateway())
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
 settings = Settings.from_env()
 engine = Engine(settings)
+navigation_slot = threading.BoundedSemaphore(1)
+
+
+@app.post("/api/assistant/navigation/candidates")
+def navigation_candidates(body: CandidateInput):
+    if not navigation_slot.acquire(blocking=False):
+        raise HTTPException(429, "航线计算忙碌，请稍后重试")
+    try:
+        result = candidate_routes(body)
+        write_audit({"type": "navigation_candidates", "input": body.model_dump(), "dispatch_enabled": False})
+        return result
+    finally:
+        navigation_slot.release()
+
+
 audit_lock = threading.Lock()
 slots = threading.BoundedSemaphore(3)
 

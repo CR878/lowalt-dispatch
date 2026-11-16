@@ -822,6 +822,14 @@ function HelpPage() {
             permission: "telemetry.read",
           },
           {
+            icon: Compass,
+            title: "比较航线与导航演练",
+            text: "在飞行导航中计算场景方案或导入真实坐标航线。比较后启用参考引导，查看下一航点、偏航提示与高度剖面；视图操作不下发飞控。",
+            path: "/airspace?navigation=1",
+            action: "打开飞行导航",
+            permission: "map.read",
+          },
+          {
             icon: ShieldCheck,
             title: "邀请团队与保护账户",
             text: "在账户页完成邮箱验证并设置 MFA。管理员可在身份与访问中邀请成员并选择角色；邀请码绑定邮箱，48小时有效，仅可使用一次。",

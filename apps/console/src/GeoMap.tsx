@@ -20,6 +20,8 @@ import { GRID, GRID_STEP, pointAlong, TerrainModel } from "./terrain";
 import { RADAR_TILE_ZOOM, WIND_REGION, type WindField } from "./weather";
 import { createWindLayer, WIND_MAX_ZOOM } from "./WindLayer";
 import { useTheme } from "./portal/Theme";
+import type { NavigationOverlay } from "./navigation/engine";
+import { airspaceKinds } from "./navigation/airspace";
 import {
   enuToLngLat,
   type GeoMission,
@@ -79,6 +81,13 @@ const polygon = (points: LngLat[], properties: FeatureProps = {}) =>
     properties,
   );
 export type GeoMapHandle = {
+  navigate: (
+    center: LngLat,
+    zoom: number,
+    bearing: number,
+    pitch: number,
+  ) => void;
+  overview: (points: LngLat[]) => void;
   reset: () => void;
   zoom: (factor: number) => void;
   focus: (point: Point) => void;
@@ -92,6 +101,9 @@ export type WeatherOverlay = {
   wind: WindField | null;
 };
 export type GeoMapProps = {
+  onAirspaceSelect?: (id: string) => void;
+  navigation?: NavigationOverlay | null;
+  onManualMove?: () => void;
   mode: ViewMode;
   basemap: Basemap;
   layers: Layers;
@@ -143,6 +155,27 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         });
     };
     useImperativeHandle(ref, () => ({
+      navigate: (center, zoom, bearing, pitch) =>
+        runtime.current?.map.easeTo({
+          center,
+          zoom,
+          bearing,
+          pitch,
+          duration: dynamic.current.reducedMotion ? 0 : 550,
+          essential: false,
+        }),
+      overview: (points) => {
+        if (!points.length) return;
+        const bounds = new maplibregl.LngLatBounds(points[0], points[0]);
+        points.slice(1).forEach((p) => bounds.extend(p));
+        runtime.current?.map.fitBounds(bounds, {
+          padding: { top: 80, bottom: 65, left: 45, right: 45 },
+          maxZoom: 16,
+          pitch: 0,
+          bearing: 0,
+          duration: dynamic.current.reducedMotion ? 0 : 800,
+        });
+      },
       reset: () =>
         runtime.current?.map.flyTo({
           center: enuToLngLat([1500, 1500]),
@@ -250,9 +283,16 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         new maplibregl.ScaleControl({ maxWidth: 80, unit: "metric" }),
         "bottom-left",
       );
-      map.on("click", (e) =>
-        dynamic.current.onPoint([e.lngLat.wrap().lng, e.lngLat.lat]),
-      );
+      map.on("click", (e) => {
+        const hit = map.getLayer("airspace-regions-fill")
+          ? map.queryRenderedFeatures(e.point, {
+              layers: ["airspace-regions-fill"],
+            })[0]
+          : null;
+        if (hit?.properties?.region_id)
+          dynamic.current.onAirspaceSelect?.(String(hit.properties.region_id));
+        else dynamic.current.onPoint([e.lngLat.wrap().lng, e.lngLat.lat]);
+      });
       const updateWindView = () => {
         const bounds = map.getBounds();
         const center = map.getCenter();
@@ -268,7 +308,8 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           dynamic.current.onWindView(next);
         }
       };
-      map.on("movestart", () => {
+      map.on("movestart", (event) => {
+        if (event.originalEvent) dynamic.current.onManualMove?.();
         dynamic.current.onWindMove(true);
         syncWindAnimation(false);
       });
@@ -809,6 +850,146 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         lastPins = "",
         lastTerrain = false,
         focusedLive = false;
+      let lastNavigation = "";
+      let lastAirspaces = "";
+      let airspaceLabels: maplibregl.Marker[] = [];
+      function syncNavigation() {
+        if (!mapReady) return;
+        const nav = dynamic.current.navigation;
+        const regionKey = JSON.stringify([nav?.regions, nav?.selectedRegion]);
+        if (regionKey !== lastAirspaces || !map.getSource("airspace-regions")) {
+          lastAirspaces = regionKey;
+          source(
+            "airspace-regions",
+            collection(
+              (nav?.regions ?? []).map((r) =>
+                feature(r.geometry, {
+                  region_id: r.id,
+                  color: airspaceKinds[r.kind].color,
+                  selected: r.id === nav?.selectedRegion ? 1 : 0,
+                }),
+              ),
+            ),
+          );
+          if (!map.getLayer("airspace-regions-fill"))
+            map.addLayer({
+              id: "airspace-regions-fill",
+              type: "fill",
+              source: "airspace-regions",
+              paint: {
+                "fill-color": ["get", "color"],
+                "fill-opacity": [
+                  "case",
+                  ["==", ["get", "selected"], 1],
+                  0.24,
+                  0.12,
+                ],
+              },
+            });
+          if (!map.getLayer("airspace-regions-outline"))
+            map.addLayer({
+              id: "airspace-regions-outline",
+              type: "line",
+              source: "airspace-regions",
+              paint: {
+                "line-color": ["get", "color"],
+                "line-width": ["case", ["==", ["get", "selected"], 1], 3, 1.5],
+                "line-dasharray": [4, 2],
+              },
+            });
+          airspaceLabels.forEach((m) => m.remove());
+          airspaceLabels = (nav?.regions ?? []).map((r) => {
+            const el = document.createElement("button");
+            el.className = "geo-airspace-label";
+            el.style.borderColor = airspaceKinds[r.kind].color;
+            el.textContent = `${r.is_simulated ? "演练 · " : "参考 · "}${r.name}`;
+            el.title = `${airspaceKinds[r.kind].title} · ${r.source}`;
+            el.addEventListener("click", (e) => {
+              e.stopPropagation();
+              dynamic.current.onAirspaceSelect?.(r.id);
+            });
+            const ring =
+              r.geometry.type === "Polygon"
+                ? r.geometry.coordinates[0]
+                : r.geometry.coordinates[0][0];
+            return new maplibregl.Marker({ element: el, anchor: "bottom-left" })
+              .setLngLat([ring[0][0], ring[0][1]])
+              .addTo(map);
+          });
+        }
+        const key = JSON.stringify(nav);
+        if (key === lastNavigation && map.getSource("navigation-active"))
+          return;
+        lastNavigation = key;
+        for (const [id, points] of [
+          ["navigation-active", nav?.active ?? []],
+          ["navigation-comparison", nav?.comparison ?? []],
+        ] as const) {
+          source(id, collection(points.length > 1 ? [line([...points])] : []));
+        }
+        source(
+          "navigation-track",
+          collection((nav?.flown ?? []).filter((v) => v.length > 1).map(line)),
+        );
+        source(
+          "navigation-waypoints",
+          collection(
+            (nav?.active ?? []).map((p, i) =>
+              feature({ type: "Point", coordinates: p }, { index: i + 1 }),
+            ),
+          ),
+        );
+        source(
+          "navigation-target",
+          collection(
+            nav?.target
+              ? [feature({ type: "Point", coordinates: nav.target })]
+              : [],
+          ),
+        );
+        for (const [id, color, dash] of [
+          ["navigation-active", "#3698eb", false],
+          ["navigation-comparison", "#b18be8", true],
+          ["navigation-track", "#63d8b0", false],
+        ] as const) {
+          if (!map.getLayer(id + "-line"))
+            map.addLayer({
+              id: id + "-line",
+              type: "line",
+              source: id,
+              paint: {
+                "line-color": color,
+                "line-width": id === "navigation-active" ? 4 : 3,
+                ...(dash ? { "line-dasharray": [3, 3] } : {}),
+              },
+            });
+        }
+        if (!map.getLayer("navigation-waypoints-circle"))
+          map.addLayer({
+            id: "navigation-waypoints-circle",
+            type: "circle",
+            source: "navigation-waypoints",
+            paint: {
+              "circle-radius": 4,
+              "circle-color": "#d4edff",
+              "circle-stroke-color": "#328add",
+              "circle-stroke-width": 2,
+            },
+          });
+        if (!map.getLayer("navigation-target-circle"))
+          map.addLayer({
+            id: "navigation-target-circle",
+            type: "circle",
+            source: "navigation-target",
+            paint: {
+              "circle-radius": 10,
+              "circle-color": "#3295e7",
+              "circle-opacity": 0.25,
+              "circle-stroke-color": "#b6ddff",
+              "circle-stroke-width": 3,
+            },
+          });
+      }
       draw = () => {
         const p = dynamic.current;
         droneLabel.textContent = p.liveMode ? "实时遥测" : "演示航迹";
@@ -832,6 +1013,17 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           p.liveMode || !p.layers.scan || !p.playing || p.reducedMotion,
         );
         syncOverlays();
+        syncNavigation();
+        if (p.navigation?.aircraft) {
+          droneEl.hidden = !mapReady;
+          drone.setLngLat(p.navigation.aircraft);
+          droneLabel.textContent = p.liveMode
+            ? "导航参考 · 遥测"
+            : "导航参考 · 演练";
+        }
+        (
+          droneEl.querySelector(".geo-drone-body") as HTMLElement
+        ).style.transform = `rotate(${p.navigation?.heading ?? 0}deg)`;
         if (p.basemap !== lastBasemap) {
           lastBasemap = p.basemap;
           state(
@@ -846,7 +1038,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         }
         if (disposed || !mapReady || !scene || !map.getSource("demo-route"))
           return;
-        if (!p.liveMode && p.progress !== lastProgress) {
+        if (
+          !p.liveMode &&
+          !p.navigation?.aircraft &&
+          p.progress !== lastProgress
+        ) {
           lastProgress = p.progress;
           const point = pointAlong(scene.route, p.progress);
           drone.setLngLat(enuToLngLat(point));
@@ -1070,6 +1266,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         observer.disconnect();
         pins.forEach((p) => p.remove());
         labels.forEach((p) => p.marker.remove());
+        airspaceLabels.forEach((m) => m.remove());
         drone.remove();
         window.clearInterval(windTimer);
         dynamic.current.onWindMove(false);

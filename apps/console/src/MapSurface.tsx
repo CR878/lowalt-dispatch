@@ -13,6 +13,14 @@ export default forwardRef<
   useImperativeHandle(
     ref,
     () => ({
+      navigate: (center, zoom, bearing, pitch) => {
+        if (props.kind === "world")
+          world.current?.navigate(center, zoom, bearing, pitch);
+      },
+      overview: (points) => {
+        if (props.kind === "world") world.current?.overview(points);
+        else terrain.current?.reset();
+      },
       reset: () =>
         props.kind === "world"
           ? world.current?.reset()
