@@ -90,8 +90,34 @@ def navigation_candidates(body: CandidateInput):
         result = candidate_routes(body)
         write_audit({"type": "navigation_candidates", "input": body.model_dump(), "dispatch_enabled": False})
         return result
+    except Exception as exc:
+        from services.assistant.osm_obstacles import OSMDataUnavailable
+
+        if isinstance(exc, OSMDataUnavailable):
+            raise HTTPException(
+                503,
+                {
+                    "status": "unavailable",
+                    "obstacle_source": "OpenStreetMap / Overpass",
+                    "reason": str(exc),
+                    "dispatch_enabled": False,
+                },
+            ) from exc
+        if isinstance(exc, ValueError):
+            raise HTTPException(422, str(exc)) from exc
+        raise
     finally:
         navigation_slot.release()
+
+
+@app.get("/api/assistant/navigation/scenes/{scene_id}")
+def navigation_scene(scene_id: str):
+    from services.assistant.osm_obstacles import OSMDataUnavailable, load_cached_scene
+
+    try:
+        return load_cached_scene(scene_id)
+    except (OSMDataUnavailable, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(404, "该真实地图快照不存在或已过期，请重新计算航线") from exc
 
 
 audit_lock = threading.Lock()

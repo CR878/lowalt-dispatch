@@ -21,6 +21,7 @@ import { RADAR_TILE_ZOOM, WIND_REGION, type WindField } from "./weather";
 import { createWindLayer, WIND_MAX_ZOOM } from "./WindLayer";
 import { useTheme } from "./portal/Theme";
 import type { NavigationOverlay } from "./navigation/engine";
+import type { RealScene } from "./RealRouting";
 import { airspaceKinds } from "./navigation/airspace";
 import {
   enuToLngLat,
@@ -116,6 +117,8 @@ export type GeoMapProps = {
   reducedMotion: boolean;
   terrainModel: TerrainModel;
   mission: GeoMission;
+  realRoute?: LngLat[];
+  realScene?: RealScene | null;
   selected: GeoPlace | null;
   preview?: { route_id: string; waypoints: Point[] } | null;
   comparison?: { id: string; waypoints: Point[] } | null;
@@ -166,15 +169,22 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         }),
       overview: (points) => {
         if (!points.length) return;
+        const map = runtime.current?.map;
+        if (!map) return;
+        // The real-route panel can change the workspace width in this same
+        // React commit. Fit against its current layout rather than a stale
+        // viewport, and render the matching GPU frame below.
+        map.resize();
         const bounds = new maplibregl.LngLatBounds(points[0], points[0]);
         points.slice(1).forEach((p) => bounds.extend(p));
-        runtime.current?.map.fitBounds(bounds, {
+        map.fitBounds(bounds, {
           padding: { top: 80, bottom: 65, left: 45, right: 45 },
           maxZoom: 16,
           pitch: 0,
           bearing: 0,
           duration: dynamic.current.reducedMotion ? 0 : 800,
         });
+        map.redraw();
       },
       reset: () =>
         runtime.current?.map.flyTo({
@@ -229,6 +239,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       let styleAbort: AbortController | null = null;
       let styleGeneration = 0;
       let tileTimeout: number | undefined;
+      let basemapSourceIds = new Set<string>();
       let terrainFailed = false;
       let satelliteFailed = false;
       let lastBasemap = dynamic.current.basemap;
@@ -240,6 +251,21 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       let glowOpacityCache = -1;
       const visibilityCache = new Map<string, string>();
       let draw: (() => void) | undefined;
+      let realSceneError = "";
+      let inspectRealSceneNextFrame = true;
+      function realSceneStatus(
+        value: "loading" | "ready" | "error",
+        buildings = 0,
+        roads = 0,
+      ) {
+        const container = root.current;
+        if (!container || disposed) return;
+        container.dataset.realSceneStatus = value;
+        container.dataset.realBuildingsRendered = String(buildings);
+        container.dataset.realRoadsRendered = String(roads);
+        container.dataset.realSceneError = realSceneError;
+      }
+      realSceneStatus("loading");
       const labels: { marker: maplibregl.Marker; group: string }[] = [];
       const pins: maplibregl.Marker[] = [];
       const state = (text: string) => {
@@ -815,14 +841,15 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           )
             throw new Error();
           if (disposed || generation !== styleGeneration) return;
+          basemapSourceIds = new Set(Object.keys(style.sources));
           mapReady = false;
           // A retry must rebuild even an identical style, so cached failures and
           // our overlays receive a fresh style.load lifecycle.
-          map.setStyle(style, { diff: false });
           state("底图加载中");
           tileTimeout = window.setTimeout(() => {
             if (!online) state("底图资源响应较慢 · 坐标可用");
           }, 18000);
+          map.setStyle(style, { diff: false });
         } catch {
           if (!disposed && generation === styleGeneration) {
             map.setStyle(offline(appearance.current === "dark"), {
@@ -851,6 +878,8 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         lastTerrain = false,
         focusedLive = false;
       let lastNavigation = "";
+      let lastRealScene: RealScene | null | undefined;
+      let lastRealRoute = "";
       let lastAirspaces = "";
       let airspaceLabels: maplibregl.Marker[] = [];
       function syncNavigation() {
@@ -990,8 +1019,138 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             },
           });
       }
+      function syncRealData() {
+        if (!mapReady) return;
+        const p = dynamic.current;
+        if (lastRealScene !== p.realScene || !map.getSource("real-buildings")) {
+          lastRealScene = p.realScene;
+          realSceneError = "";
+          inspectRealSceneNextFrame = true;
+          realSceneStatus("loading");
+          source("real-buildings", p.realScene?.obstacles ?? collection([]));
+          source("real-roads", p.realScene?.roads ?? collection([]));
+          map.triggerRepaint();
+        }
+        const routeKey = JSON.stringify(p.realRoute);
+        if (lastRealRoute !== routeKey || !map.getSource("real-route")) {
+          lastRealRoute = routeKey;
+          source(
+            "real-route",
+            collection(
+              (p.realRoute?.length ?? 0) > 1 ? [line(p.realRoute!)] : [],
+            ),
+          );
+        }
+        if (!map.getLayer("real-roads-line"))
+          map.addLayer({
+            id: "real-roads-line",
+            type: "line",
+            source: "real-roads",
+            paint: {
+              "line-color": "#66a8b2",
+              "line-width": 1.5,
+              "line-opacity": 0.65,
+            },
+          });
+        if (!map.getLayer("real-buildings-fill"))
+          map.addLayer({
+            id: "real-buildings-fill",
+            type: "fill",
+            source: "real-buildings",
+            paint: {
+              "fill-color": [
+                "case",
+                ["==", ["get", "height_source"], "tag"],
+                "#d49b6d",
+                "#ba8bce",
+              ],
+              "fill-opacity": 0.4,
+            },
+          });
+        if (!map.getLayer("real-buildings-outline"))
+          map.addLayer({
+            id: "real-buildings-outline",
+            type: "line",
+            source: "real-buildings",
+            paint: { "line-color": "#c985a4", "line-width": 1 },
+          });
+        if (!map.getLayer("real-route-line"))
+          map.addLayer({
+            id: "real-route-line",
+            type: "line",
+            source: "real-route",
+            paint: { "line-color": "#36dcb5", "line-width": 4 },
+          });
+        for (const id of ["real-buildings-fill", "real-buildings-outline"])
+          map.setLayoutProperty(
+            id,
+            "visibility",
+            p.layers.buildings ? "visible" : "none",
+          );
+        map.setLayoutProperty(
+          "real-route-line",
+          "visibility",
+          p.layers.routes ? "visible" : "none",
+        );
+        if (map.getLayer("geo-distance-line"))
+          map.setLayoutProperty(
+            "geo-distance-line",
+            "visibility",
+            p.realRoute?.length ? "none" : "visible",
+          );
+      }
+      function inspectRealScene() {
+        if (
+          disposed ||
+          !inspectRealSceneNextFrame ||
+          !dynamic.current.realScene ||
+          lastRealScene !== dynamic.current.realScene
+        )
+          return;
+        if (realSceneError) {
+          realSceneStatus("error");
+          return;
+        }
+        if (
+          !map.getLayer("real-buildings-fill") ||
+          !map.getLayer("real-roads-line") ||
+          !map.isSourceLoaded("real-buildings") ||
+          !map.isSourceLoaded("real-roads")
+        ) {
+          realSceneStatus("loading");
+          return;
+        }
+        // A completed HTTP body or worker index does not mean the map has
+        // painted its tiles. Only inspect after MapLibre's render event, and
+        // require actual visible features from both genuine scene layers.
+        const buildings = map.queryRenderedFeatures({
+          layers: ["real-buildings-fill"],
+        }).length;
+        const roads = map.queryRenderedFeatures({
+          layers: ["real-roads-line"],
+        }).length;
+        const ready = buildings > 0 && roads > 0;
+        realSceneStatus(ready ? "ready" : "loading", buildings, roads);
+        if (ready) inspectRealSceneNextFrame = false;
+      }
+      map.on("render", inspectRealScene);
+      map.on("moveend", () => {
+        inspectRealSceneNextFrame = true;
+        map.triggerRepaint();
+      });
+      map.on("click", "real-buildings-fill", (event) => {
+        const props = event.features?.[0]?.properties;
+        if (!props) return;
+        const node = document.createElement("div");
+        node.textContent = `${props.id} · 高度 ${props.height_m == null ? "未知" : `${props.height_m} m`} · 高度来源 ${props.height_source} · 几何 ${props.geometry_status === "derived_conservative" ? "真实节点派生的保守估算包络" : "OSM 建筑轮廓"} · ${props.source} · 抓取 ${props.fetched_at}`;
+        new maplibregl.Popup()
+          .setLngLat(event.lngLat)
+          .setDOMContent(node)
+          .addTo(map);
+      });
       draw = () => {
         const p = dynamic.current;
+        syncRealData();
         droneLabel.textContent = p.liveMode ? "实时遥测" : "演示航迹";
         droneEl.hidden = p.liveMode
           ? !p.livePoint || !mapReady
@@ -1115,7 +1274,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           marker.getElement().hidden =
             !p.demoVisible || !p.layers[group as keyof Layers];
         });
-        const pinKey = JSON.stringify([p.mission, p.selected]);
+        const pinKey = JSON.stringify([
+          p.mission,
+          p.selected,
+          Boolean(p.realRoute?.length),
+        ]);
         if (lastPins !== pinKey) {
           lastPins = pinKey;
           pins.splice(0).forEach((pin) => pin.remove());
@@ -1141,7 +1304,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           source(
             "geo-distance",
             collection(
-              p.mission.origin && p.mission.destination
+              p.mission.origin && p.mission.destination && !p.realRoute?.length
                 ? [line([p.mission.origin.point, p.mission.destination.point])]
                 : [],
             ),
@@ -1166,10 +1329,20 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         radarTileKey = "";
         glowOpacityCache = -1;
         visibilityCache.clear();
+        inspectRealSceneNextFrame = true;
+        realSceneStatus("loading");
         install();
       });
       map.on("sourcedata", (event) => {
         const sourceId = event.sourceId;
+        if (sourceId === "real-buildings" || sourceId === "real-roads") {
+          inspectRealSceneNextFrame = true;
+          // GeoJSON's heavy worker/tiling completion happens independently
+          // from the route response and its DOM panel. Render its new tiles
+          // before publishing scene-ready diagnostics.
+          map.triggerRepaint();
+          return;
+        }
         if (sourceId === "satellite") {
           // 卫星瓦片成功即恢复状态；失败只更新状态条，不影响主题底图。
           if (event.tile && event.isSourceLoaded && satelliteFailed) {
@@ -1182,9 +1355,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         if (sourceId?.startsWith("weather-")) return;
         if (
           sourceId &&
-          !sourceId.startsWith("demo-") &&
-          !sourceId.startsWith("geo-") &&
-          sourceId !== "global-dem" &&
+          basemapSourceIds.has(sourceId) &&
           event.isSourceLoaded &&
           event.tile
         ) {
@@ -1202,6 +1373,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       map.on("error", (event) => {
         if (disposed) return;
         const sourceId = (event as { sourceId?: string }).sourceId;
+        if (sourceId?.startsWith("real-")) {
+          realSceneError = event.error?.message ?? "真实地图图层加载失败";
+          realSceneStatus("error");
+          return;
+        }
         if (sourceId === "satellite") {
           // 卫星影像失败：只更新状态条并保留 CARTO 主题底图，绝不阻塞地图。
           if (!satelliteFailed) {
@@ -1253,7 +1429,19 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
               "虚拟场景加载失败，请刷新重试；真实地图仍可操作。",
             );
         });
-      const observer = new ResizeObserver(() => map.resize());
+      let resizeFrame: number | undefined;
+      const observer = new ResizeObserver(() => {
+        if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+          resizeFrame = undefined;
+          if (disposed) return;
+          // MapLibre 6 resize() updates its canvas, camera, and DOM markers,
+          // but does not render. Keep the GPU layer projection in the same
+          // frame as the markers after workspace/sidebar layout changes.
+          map.resize();
+          map.redraw();
+        });
+      });
       observer.observe(root.current!);
       const timer = window.setInterval(() => draw?.(), 150);
       void reload();
@@ -1264,6 +1452,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         styleAbort?.abort();
         sceneAbort.abort();
         observer.disconnect();
+        if (resizeFrame !== undefined) cancelAnimationFrame(resizeFrame);
         pins.forEach((p) => p.remove());
         labels.forEach((p) => p.marker.remove());
         airspaceLabels.forEach((m) => m.remove());

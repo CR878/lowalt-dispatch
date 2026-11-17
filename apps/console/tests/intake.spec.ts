@@ -19,6 +19,7 @@ test("future delivery asks full clarification and never treats ENU as WGS84", as
 
   const pins = page.getByTestId("intake-map-pins");
   await expect(pins).toContainText("医疗物资中转站");
-  await expect(pins).toContainText("未定位，请在地图上点选");
+  await expect(pins).toContainText("场景坐标不是经纬度，请搜索或地图选点");
+  await expect(pins).toContainText("坐标未解析，助手不会猜");
   await expect(page.getByTestId("intake-confirm")).toBeDisabled();
 });

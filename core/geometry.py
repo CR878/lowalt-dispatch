@@ -25,6 +25,27 @@ GRID_CLEARANCE_M = 30.0
 GRID_BOUNDS = (0.0, 0.0, 3000.0, 3000.0)  # x0, y0, x1, y1
 
 
+def geographic_grid_clearance_m(res_m: float, physical_clearance_m: float) -> float:
+    """Conservative real-route centre exclusion radius in metres.
+
+    Unlike v0's raster-then-dilate baseline, real-route rasterization measures
+    distance to the original continuous geometry, including sub-cell buildings.
+    For an edge between adjacent cell centres, each continuous point is at most
+    half the diagonal (res/sqrt(2)) from its nearest endpoint. Distance to an
+    obstacle is 1-Lipschitz; keeping both centres farther than physical clearance
+    + res/sqrt(2) therefore protects the entire edge. Exact endpoint connectors
+    are checked separately, and every returned segment is checked continuously.
+    Frozen v0 constants and rasterization intentionally remain unchanged.
+    """
+    import math
+
+    if not math.isfinite(res_m) or res_m <= 0:
+        raise ValueError("res_m 必须为有限正数")
+    if not math.isfinite(physical_clearance_m) or physical_clearance_m <= 0:
+        raise ValueError("physical_clearance_m 必须为有限正数")
+    return physical_clearance_m + res_m / math.sqrt(2.0)
+
+
 # --------------------------------------------------------------------------- #
 # 多边形
 # --------------------------------------------------------------------------- #

@@ -1,10 +1,12 @@
-"""Bounded geometric alternatives for the fixed ENU scene. No flight commands."""
+"""Geometric alternatives with explicit ENU simulation and real WGS84 data."""
 
 from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -19,15 +21,47 @@ class ScenePoint(BaseModel):
     y: float = Field(ge=10, le=2990)
 
 
+class GeographicPoint(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    lng: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-80, le=80)
+
+
 class CandidateInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    origin: ScenePoint
-    destination: ScenePoint
-    frame: str = Field(pattern="^ENU$")
+    origin: ScenePoint | GeographicPoint
+    destination: ScenePoint | GeographicPoint
+    frame: Literal["ENU", "WGS84"]
+    scheduled_for: str | None = None
+    vehicle_key: str | None = Field(default=None, max_length=100, pattern=r"^[\w-]+$")
+    resolution_m: Literal[10, 20, 30] = 10
+    max_expand: int = Field(default=500_000, ge=1000, le=1_000_000)
 
     @model_validator(mode="after")
     def distinct(self):
-        if (self.origin.x - self.destination.x) ** 2 + (self.origin.y - self.destination.y) ** 2 < 100:
+        if self.scheduled_for is not None:
+            instant = datetime.fromisoformat(self.scheduled_for.replace("Z", "+00:00"))
+            if instant.tzinfo is None:
+                raise ValueError("起飞时刻须包含时区")
+        if self.frame == "WGS84":
+            from planner.georef import distance_m
+
+            if not isinstance(self.origin, GeographicPoint) or not isinstance(
+                self.destination, GeographicPoint
+            ):
+                raise ValueError("WGS84 起终点须使用 lng、lat，经度在前")
+            start = (self.origin.lng, self.origin.lat)
+            goal = (self.destination.lng, self.destination.lat)
+            distance = distance_m(start, goal)
+            if abs(start[0] - goal[0]) > 180 or distance > 80_000:
+                raise ValueError("真实航线限80km局部区域，跨日期变更线请分段规划")
+        else:
+            if not isinstance(self.origin, ScenePoint) or not isinstance(self.destination, ScenePoint):
+                raise ValueError("ENU 起终点须使用固定仿真场景 x、y")
+            distance = (
+                (self.origin.x - self.destination.x) ** 2 + (self.origin.y - self.destination.y) ** 2
+            ) ** 0.5
+        if distance < 10:
             raise ValueError("起终点至少相距10米")
         return self
 
@@ -39,6 +73,8 @@ def scene_grid(clearance):
 
 
 def candidate_routes(body: CandidateInput):
+    if body.frame == "WGS84":
+        return real_candidate_routes(body)
     start = (body.origin.x, body.origin.y)
     goal = (body.destination.x, body.destination.y)
     signature = hashlib.sha256(json.dumps([start, goal]).encode()).hexdigest()[:12]
@@ -74,6 +110,107 @@ def candidate_routes(body: CandidateInput):
         "is_simulated": True,
         "limitation": "仅固定3km ENU场景。30/60m为栅格膨胀参数，不是实测净空；全部限制区保守静态避让。"
         "未校验高度、机型、风、时效、能耗与备降可达，不能用于真实地点或直接飞行。",
+    }
+
+
+def real_candidate_routes(body: CandidateInput):
+    from planner.real import plan_real_route
+    from services.assistant.osm_obstacles import fetch_obstacles
+    from services.assistant.route_weather import assess_route_weather
+
+    start = (body.origin.lng, body.origin.lat)
+    goal = (body.destination.lng, body.destination.lat)
+    dataset = fetch_obstacles(start, goal, margin_m=1000)
+    result = plan_real_route(
+        start,
+        goal,
+        dataset["obstacles"],
+        resolution_m=body.resolution_m,
+        max_expand=body.max_expand,
+    )
+    metadata = dataset["metadata"]
+    warnings = list(dataset.get("warnings", [])) + list(result.get("warnings", []))
+    warnings += [
+        "真实空域未接入，NOTAM / UOM 及机场、人口密集区限制须人工核对；此结果不代表获准飞行。",
+        "只验证所下载建筑足迹的水平避障；未验证地形、电线、塔吊、移动障碍和垂直航路。",
+        "道路来自 OSM，仅作地理参照，未视作获准飞行走廊。",
+    ]
+    found = result["found"]
+    weather = (
+        assess_route_weather(result["waypoints"], body.scheduled_for, vehicle_key=body.vehicle_key)
+        if found
+        else {
+            "status": "unavailable",
+            "source": "Open-Meteo / hourly forecast",
+            "warnings": ["未找到几何航线，未请求航路天气"],
+            "energy": {"status": "unavailable", "reason": "无几何航线"},
+        }
+    )
+    warnings += weather.get("warnings", [])
+    signature = hashlib.sha256(
+        json.dumps(
+            [
+                start,
+                goal,
+                metadata.get("fetched_at"),
+                body.resolution_m,
+                result.get("heuristic_weight"),
+                result["waypoints"],
+            ]
+        ).encode()
+    ).hexdigest()[:12]
+    title = "几何 A* · OSM 真实建筑足迹 · 空域待人工核对"
+    route = (
+        {
+            "id": f"real-{signature}",
+            "title": title,
+            "frame": "WGS84",
+            "altitude_ref": None,
+            "is_simulated": False,
+            "source": f"{metadata['source']} · planner.real · 水平几何参考",
+            "task_id": None,
+            "plan_version": None,
+            "waypoints": [{"x": lng, "y": lat, "lng": lng, "lat": lat} for lng, lat in result["waypoints"]],
+            "length_m": result["length_m"],
+        }
+        if found
+        else None
+    )
+    return {
+        "status": "ok" if found else "no_route",
+        "frame": "WGS84",
+        "alternatives": [
+            {
+                "id": f"real-{signature}",
+                "title": title,
+                "available": found,
+                "clearance_m": result["clearance_m"],
+                "reason": result.get("reason"),
+                "route": route,
+            }
+        ],
+        "route": route,
+        "scene_id": metadata.get("scene_id"),
+        "dispatch_enabled": False,
+        "is_simulated": False,
+        "geometric_available": found,
+        "operationally_approved": False,
+        "continuous_clearance_verified": result.get("continuous_clearance_verified", False),
+        "flight_feasibility": weather.get("flight_feasibility", {"status": "unavailable"}),
+        "obstacle_source": metadata["source"],
+        "weather_source": weather["source"],
+        "airspace": {"status": "manual_review_required", "source": None, "dispatch_enabled": False},
+        "clearance_m": result["clearance_m"],
+        "grid_clearance_m": result.get("grid_clearance_m"),
+        "resolution_m": result["resolution_m"],
+        "heuristic_weight": result.get("heuristic_weight"),
+        "nodes_expanded": result["nodes_expanded"],
+        "elapsed_ms": result["elapsed_ms"],
+        "stage_timings_ms": result.get("stage_timings_ms", {}),
+        "data": metadata,
+        "weather": weather,
+        "warnings": list(dict.fromkeys(warnings)),
+        "limitation": "真实建筑、道路来自公开地图，可能漏测；高度含标签推算或未知，不作越顶依据。真实空域、垂直净空、平台能耗须另行核验。",
     }
 
 

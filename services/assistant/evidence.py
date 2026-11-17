@@ -2,15 +2,17 @@
 
 Hard rule: never fabricate a value. When an upstream source cannot be reached,
 return an explicit ``unavailable`` / ``unresolved`` result with a reason. The
-weather values here are FORECASTS, never observations, and they do not feed the
-planner (wind is not modelled in v0).
+weather values here are FORECASTS, never observations. The real-route adapter
+can request the full hourly series; the frozen v0 energy model stays unchanged.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
+from itertools import pairwise
 from pathlib import Path
 
 import httpx
@@ -24,7 +26,9 @@ HOURLY_FIELDS = (
     "temperature_2m",
     "relative_humidity_2m",
     "wind_speed_10m",
+    "wind_direction_10m",
     "wind_gusts_10m",
+    "surface_pressure",
     "precipitation",
     "visibility",
     "weather_code",
@@ -84,7 +88,7 @@ def unavailable_weather(reason: str, scheduled_for: str | None = None) -> dict:
         "valid_for": None,
         "values": {},
         "reason": reason,
-        "note": "模式预报值，不是实测；风速未进入能耗或绕路计算。",
+        "note": "模式预报值，不是实测；天气不可用时不填默认风速。",
     }
 
 
@@ -94,14 +98,29 @@ def fetch_weather_forecast(
     scheduled_for: str | None = None,
     *,
     client: httpx.Client | None = None,
+    include_hourly: bool = False,
 ) -> dict:
-    """Fetch the hourly forecast nearest to ``scheduled_for`` (16-day horizon)."""
+    """Fetch an hourly forecast interpolated at the requested aware instant.
+
+    A naive input is interpreted as Asia/Shanghai for compatibility with intakes.
+    The default instant is now, never the API's first (midnight) sample. Wind
+    speeds are explicitly requested in m/s. ``include_hourly`` is internal to
+    real-route assessment and keeps the existing intake evidence schema intact.
+    """
+    try:
+        target = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00")) if scheduled_for else datetime.now(LOCAL_TZ)
+        target = target.replace(tzinfo=LOCAL_TZ) if target.tzinfo is None else target
+        if not all(math.isfinite(v) for v in (latitude, longitude)) or not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+            raise ValueError("invalid coordinates")
+    except (ValueError, TypeError, AttributeError):
+        return unavailable_weather("气象查询的坐标或日期无效", scheduled_for)
     params = {
         "latitude": latitude,
         "longitude": longitude,
         "hourly": ",".join(HOURLY_FIELDS),
         "forecast_days": 16,
-        "timezone": "Asia/Shanghai",
+        "timezone": "UTC",
+        "wind_speed_unit": "ms",
     }
     try:
         if client is None:
@@ -114,32 +133,96 @@ def fetch_weather_forecast(
     except Exception:
         return unavailable_weather("气象服务当前不可达，未填任何数值", scheduled_for)
 
+    if not isinstance(payload, dict):
+        return unavailable_weather("气象服务返回格式无效", scheduled_for)
     hourly = payload.get("hourly") or {}
+    if not isinstance(hourly, dict):
+        return unavailable_weather("气象服务逐时数据格式无效", scheduled_for)
     times = hourly.get("time") or []
     if not times:
         return unavailable_weather("气象服务未返回逐时数据", scheduled_for)
 
-    index = 0
-    if scheduled_for:
-        wanted = scheduled_for[:13]
-        index = next((i for i, value in enumerate(times) if value[:13] >= wanted), -1)
-        if index < 0 or times[index][:10] > scheduled_for[:10]:
-            return unavailable_weather("预报窗口（最多16天）不覆盖该日期", scheduled_for)
-
-    values = {}
-    for field in HOURLY_FIELDS:
-        series = hourly.get(field) or []
-        values[field] = series[index] if index < len(series) else None
-    return {
+    forecast = {
+        "hourly": hourly,
+        "utc_offset_seconds": payload.get("utc_offset_seconds", 0),
+    }
+    try:
+        values = interpolate_forecast(forecast, target)
+    except (ValueError, TypeError, OverflowError):
+        return unavailable_weather("预报窗口（最多16天）不覆盖该时刻或逐时数据无效", scheduled_for)
+    result = {
         "status": "ok",
         "kind": "forecast",
         "source": "Open-Meteo / hourly forecast",
         "scheduled_for": scheduled_for,
-        "valid_for": times[index],
+        "valid_for": target.astimezone(UTC).isoformat(),
         "values": values,
         "reason": "",
-        "note": "模式预报值，不是实测；风速未进入能耗或绕路计算。",
+        "note": "Open-Meteo模式预报，非实测；按时刻插值；风速/阵风m/s，风向为气象来向°，气压hPa。10m风不能代表飞行高度风场。",
     }
+    if include_hourly:
+        result.update(forecast)
+        result["hourly_units"] = payload.get("hourly_units", {})
+        result["fetched_at"] = datetime.now(UTC).isoformat()
+        result["requested_point"] = [longitude, latitude]
+        result["model_point"] = [payload.get("longitude"), payload.get("latitude")]
+    return result
+
+
+def interpolate_forecast(forecast: dict, when: datetime) -> dict[str, float | None]:
+    """Interpolate an hourly series; wind uses vectors across the 0/360 seam.
+
+    Missing values stay None. No extrapolation beyond the returned time range.
+    API timestamps are interpreted with its UTC offset, never host timezone.
+    """
+    if when.tzinfo is None:
+        raise ValueError("interpolation instant must have a timezone")
+    hourly = forecast.get("hourly") or {}
+    if not isinstance(hourly, dict):
+        raise ValueError("hourly must be an object")
+    offset = timezone(timedelta(seconds=float(forecast.get("utc_offset_seconds", 0))))
+    raw_times = hourly.get("time")
+    if not isinstance(raw_times, list) or not raw_times or not all(isinstance(item, str) for item in raw_times):
+        raise ValueError("hourly timestamps must be a nonempty list of ISO strings")
+    times = []
+    for raw in raw_times:
+        item = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        times.append(item.replace(tzinfo=offset) if item.tzinfo is None else item)
+    if not times or any(b <= a for a, b in pairwise(times)) or not times[0] <= when <= times[-1]:
+        raise ValueError("forecast does not cover instant")
+    right = next(i for i, value in enumerate(times) if value >= when)
+    left = max(0, right - 1) if times[right] != when else right
+    ratio = 0.0 if left == right else (when - times[left]).total_seconds() / (times[right] - times[left]).total_seconds()
+
+    def at(field, index):
+        series = hourly.get(field) or []
+        if not isinstance(series, list):
+            raise ValueError("hourly weather fields must be arrays")
+        value = series[index] if index < len(series) else None
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+            return None
+        if field in {"wind_speed_10m", "wind_gusts_10m"} and value < 0:
+            return None
+        if field == "wind_direction_10m" and not 0 <= value <= 360:
+            return None
+        return float(value)
+
+    values = {}
+    for field in HOURLY_FIELDS:
+        a, b = at(field, left), at(field, right)
+        values[field] = None if a is None or b is None else (a if field == "weather_code" else a + ratio * (b - a))
+    speeds = [at("wind_speed_10m", i) for i in (left, right)]
+    directions = [at("wind_direction_10m", i) for i in (left, right)]
+    if all(v is not None for v in speeds + directions):
+        east, north = [], []
+        for speed, direction in zip(speeds, directions, strict=True):
+            east.append(-speed * math.sin(math.radians(direction)))
+            north.append(-speed * math.cos(math.radians(direction)))
+        u = east[0] + ratio * (east[1] - east[0])
+        v = north[0] + ratio * (north[1] - north[0])
+        values["wind_speed_10m"] = math.hypot(u, v)
+        values["wind_direction_10m"] = math.degrees(math.atan2(-u, -v)) % 360
+    return values
 
 
 def list_airspace_zones() -> dict:

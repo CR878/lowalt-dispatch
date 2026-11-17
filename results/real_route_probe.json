@@ -1,0 +1,1060 @@
+{
+  "created_at": "2026-11-17T07:46:18.573819+00:00",
+  "purpose": "真实数据获取及水平几何规划验证；不是实际飞行验证",
+  "request": {
+    "origin": [
+      121.335209,
+      31.19795
+    ],
+    "destination": [
+      121.8044,
+      31.144383
+    ],
+    "scheduled_for": null,
+    "resolution_m": 10,
+    "selected_scene_id": "4bac5ae2d8f14590"
+  },
+  "straight_distance_m": 45035.02953322302,
+  "dispatch_enabled": false,
+  "airspace": "manual_review_required",
+  "virtual_data_substituted": false,
+  "data": {
+    "source": "OpenStreetMap / API 0.6 map",
+    "attribution": "© OpenStreetMap contributors; ODbL 1.0 https://www.openstreetmap.org/copyright",
+    "bbox": [
+      121.324675,
+      31.135373,
+      121.814934,
+      31.20696
+    ],
+    "fetched_at": "2026-11-17T06:48:59.218259Z",
+    "osm_base_timestamp": null,
+    "endpoint": "https://api.openstreetmap.org/api/0.6",
+    "building_count": 27971,
+    "road_count": 22165,
+    "height_sources": {
+      "tag": 109,
+      "levels": 890,
+      "estimate": 26972
+    },
+    "coverage": "OSM mapped features only; completeness not guaranteed",
+    "derived_geometry_count": 4,
+    "source_fetches": [
+      {
+        "fetched_at": "2026-11-17T06:40:36.843996Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.3246750%2C31.1353730%2C121.3737009%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.3246750,31.1353730,121.3737009,31.1711665"
+        },
+        "sha256": "d4fb1e6fdcae1143ebb5cc2d8bd3e4b9715878307e93fb4acf11541173dfcdfb",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:38.482413Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.3246750%2C31.1711665%2C121.3737009%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.3246750,31.1711665,121.3737009,31.2069600"
+        },
+        "sha256": "16bab0c70742c23dccd532d04f24d1eeb6bc1e4f3ba9354c41f4f47b61cc9e0d",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:48.196490Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.3737009%2C31.1711665%2C121.4227268%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.3737009,31.1711665,121.4227268,31.2069600"
+        },
+        "sha256": "e0b53493417a7512ea4190ccdecbd9cbefc52dc4f98ce051fd35e72a6dcd921b",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:45.083192Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.4227268%2C31.1353730%2C121.4717527%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.4227268,31.1353730,121.4717527,31.1711665"
+        },
+        "sha256": "32fccea326684fc0f05fe1f6833123711981b0e0b45d9f4553e679b77235cb76",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:52.020864Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.4227268%2C31.1711665%2C121.4717527%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.4227268,31.1711665,121.4717527,31.2069600"
+        },
+        "sha256": "edfed87d0b25c578e05781b5b687217070e5f71bff6878f9d45c857217ebb9d0",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:53.383433Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.4717527%2C31.1353730%2C121.5207786%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.4717527,31.1353730,121.5207786,31.1711665"
+        },
+        "sha256": "ff117ea74af6aa95f4cf787632991861365d708a1a05f74470c94ffc8260b44a",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:57.268677Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.4717527%2C31.1711665%2C121.5207786%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.4717527,31.1711665,121.5207786,31.2069600"
+        },
+        "sha256": "99f11363b474af7f649c5eee2264664b4bf4acdc6f06803411c229756b262198",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:59.643537Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.5207786%2C31.1353730%2C121.5698045%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.5207786,31.1353730,121.5698045,31.1711665"
+        },
+        "sha256": "5c2697e964793157e7b30514d9bb2272fd5defb85310dc95cc9f997a86cde2ab",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:01.217185Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.5207786%2C31.1711665%2C121.5698045%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.5207786,31.1711665,121.5698045,31.2069600"
+        },
+        "sha256": "2b1673d36ecdbbefc59b96741d19768b8c782bf133769006754e7282d2b3b2cd",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:02.150182Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.5698045%2C31.1353730%2C121.6188304%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.5698045,31.1353730,121.6188304,31.1711665"
+        },
+        "sha256": "7be855a29253a10ff4db0a986da4b0583168703f107e12190cf16dce10e1441a",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:03.008946Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.5698045%2C31.1711665%2C121.6188304%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.5698045,31.1711665,121.6188304,31.2069600"
+        },
+        "sha256": "7e67bc401a920762d9f2136c2a15759f41cff2f87ab48ddc62ba4ea0a82fa7c8",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:07.536587Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.6188304%2C31.1353730%2C121.6678563%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.6188304,31.1353730,121.6678563,31.1711665"
+        },
+        "sha256": "7a2099e52ffe17e3fd5297752f877cf7119e599334886e840c3e9d2ba09ff0f5",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:07.481636Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.6188304%2C31.1711665%2C121.6678563%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.6188304,31.1711665,121.6678563,31.2069600"
+        },
+        "sha256": "c6c6cda43a428199922010ff2dc3494887552e3ffaf1c911c777dd82e6c1b969",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:09.885481Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.6678563%2C31.1353730%2C121.7168822%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.6678563,31.1353730,121.7168822,31.1711665"
+        },
+        "sha256": "de74210c5ce3df48c9b29265539d45678134eadf0a3fab24e2aa13fbfd5884d1",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:10.589895Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.6678563%2C31.1711665%2C121.7168822%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.6678563,31.1711665,121.7168822,31.2069600"
+        },
+        "sha256": "a33cce1585a2a576236c490ce2b07410856ec227b43cc6b422a577b2c81b7bcd",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:11.641430Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.7168822%2C31.1353730%2C121.7659081%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.7168822,31.1353730,121.7659081,31.1711665"
+        },
+        "sha256": "1c8404bdd0e9ba45b59906937d992f8274a2f1d38642c70ab8fc87341f9c8889",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:11.640784Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.7168822%2C31.1711665%2C121.7659081%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.7168822,31.1711665,121.7659081,31.2069600"
+        },
+        "sha256": "9617d6849a0da887b7777580a85c59d4cdc96f6e35e73e62846d8cb7c2605687",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:14.425713Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.7659081%2C31.1353730%2C121.8149340%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.7659081,31.1353730,121.8149340,31.1711665"
+        },
+        "sha256": "12a392f57cf98f4b801efd4505ba2ac9bf0a6004e730bb8473f4865e5b5c85c2",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:41:13.232425Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.7659081%2C31.1711665%2C121.8149340%2C31.2069600",
+        "path": "map",
+        "params": {
+          "bbox": "121.7659081,31.1711665,121.8149340,31.2069600"
+        },
+        "sha256": "1801abc7a026035eab7ea5f2b4cee36b5d3d6090a9e7ce4d724929e0724c1545",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:40:39.569253Z",
+        "url": "https://api.openstreetmap.org/api/0.6/map?bbox=121.3737009%2C31.1353730%2C121.4227268%2C31.1711665",
+        "path": "map",
+        "params": {
+          "bbox": "121.3737009,31.1353730,121.4227268,31.1711665"
+        },
+        "sha256": "15a6cdc869ea28bead4ce7cf47f51063e0dc4b68b5f68b51b52d750230b8306d",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:45:11.144118Z",
+        "url": "https://www.openstreetmap.org/api/0.6/relation/21913345/full",
+        "path": "relation/21913345/full",
+        "params": null,
+        "sha256": "bc948923446629f21e8e1dda717724d22969749996b574035d9f97a818cc8840",
+        "cache_hit": true
+      },
+      {
+        "fetched_at": "2026-11-17T06:45:17.619603Z",
+        "url": "https://www.openstreetmap.org/api/0.6/relation/16247588/full",
+        "path": "relation/16247588/full",
+        "params": null,
+        "sha256": "8b8240ffff851a858263d5e35adfccd1c25084c0e4270c48ca9c8a2df152f2fc",
+        "cache_hit": true
+      }
+    ],
+    "source_fetched_at": "2026-11-17T06:40:36.843996Z",
+    "status": "real",
+    "schema_version": 1,
+    "tiles": [
+      [
+        121.324675,
+        31.135373,
+        121.3737009,
+        31.171166499999998
+      ],
+      [
+        121.324675,
+        31.171166499999998,
+        121.3737009,
+        31.20696
+      ],
+      [
+        121.3737009,
+        31.135373,
+        121.42272679999999,
+        31.171166499999998
+      ],
+      [
+        121.3737009,
+        31.171166499999998,
+        121.42272679999999,
+        31.20696
+      ],
+      [
+        121.42272679999999,
+        31.135373,
+        121.4717527,
+        31.171166499999998
+      ],
+      [
+        121.42272679999999,
+        31.171166499999998,
+        121.4717527,
+        31.20696
+      ],
+      [
+        121.4717527,
+        31.135373,
+        121.5207786,
+        31.171166499999998
+      ],
+      [
+        121.4717527,
+        31.171166499999998,
+        121.5207786,
+        31.20696
+      ],
+      [
+        121.5207786,
+        31.135373,
+        121.5698045,
+        31.171166499999998
+      ],
+      [
+        121.5207786,
+        31.171166499999998,
+        121.5698045,
+        31.20696
+      ],
+      [
+        121.5698045,
+        31.135373,
+        121.6188304,
+        31.171166499999998
+      ],
+      [
+        121.5698045,
+        31.171166499999998,
+        121.6188304,
+        31.20696
+      ],
+      [
+        121.6188304,
+        31.135373,
+        121.6678563,
+        31.171166499999998
+      ],
+      [
+        121.6188304,
+        31.171166499999998,
+        121.6678563,
+        31.20696
+      ],
+      [
+        121.6678563,
+        31.135373,
+        121.7168822,
+        31.171166499999998
+      ],
+      [
+        121.6678563,
+        31.171166499999998,
+        121.7168822,
+        31.20696
+      ],
+      [
+        121.7168822,
+        31.135373,
+        121.76590809999999,
+        31.171166499999998
+      ],
+      [
+        121.7168822,
+        31.171166499999998,
+        121.76590809999999,
+        31.20696
+      ],
+      [
+        121.76590809999999,
+        31.135373,
+        121.814934,
+        31.171166499999998
+      ],
+      [
+        121.76590809999999,
+        31.171166499999998,
+        121.814934,
+        31.20696
+      ]
+    ],
+    "overpass_errors": [
+      "Live probes: three global Overpass providers failed SSL/timeout"
+    ],
+    "scene_id": "4bac5ae2d8f14590",
+    "query": "OSM API 0.6 map tiles + complete building relations",
+    "cache_hit": true,
+    "cache_ttl_hours": 24,
+    "warnings": [
+      "OSM 是志愿者地图，建筑/道路可能漏绘或过时，不等于实测障碍物全覆盖。",
+      "所有建筑轮廓均保守避让；height_source=levels/estimate 不是实测高度，未知高度不补默认值。",
+      "道路仅作地理参照，不表示允许沿路飞行；未接入地形、线缆、动态障碍物或官方空域。",
+      "4个OSM建筑原始拓扑无效，已用全部真实成员节点凸包作保守避让包络；geometry_status=derived_conservative，可追溯原始角色和坐标。"
+    ]
+  },
+  "sample_building_height_audit": [
+    {
+      "id": "osm-way-1230471984",
+      "osm_url": "https://www.openstreetmap.org/way/1230471984",
+      "raw_height": null,
+      "raw_building_levels": null,
+      "height_m": null,
+      "height_source": "estimate",
+      "expected_height_m": null,
+      "expected_height_source": "estimate",
+      "matches_raw_tags": true,
+      "height_method": "高度未知；无可靠 height/levels，未填任何默认高度",
+      "note": "标签值不等于独立实测；levels×3m 是估算，无标签保持 null。"
+    },
+    {
+      "id": "osm-way-1296014782",
+      "osm_url": "https://www.openstreetmap.org/way/1296014782",
+      "raw_height": null,
+      "raw_building_levels": null,
+      "height_m": null,
+      "height_source": "estimate",
+      "expected_height_m": null,
+      "expected_height_source": "estimate",
+      "matches_raw_tags": true,
+      "height_method": "高度未知；无可靠 height/levels，未填任何默认高度",
+      "note": "标签值不等于独立实测；levels×3m 是估算，无标签保持 null。"
+    },
+    {
+      "id": "osm-way-862248087",
+      "osm_url": "https://www.openstreetmap.org/way/862248087",
+      "raw_height": null,
+      "raw_building_levels": null,
+      "height_m": null,
+      "height_source": "estimate",
+      "expected_height_m": null,
+      "expected_height_source": "estimate",
+      "matches_raw_tags": true,
+      "height_method": "高度未知；无可靠 height/levels，未填任何默认高度",
+      "note": "标签值不等于独立实测；levels×3m 是估算，无标签保持 null。"
+    },
+    {
+      "id": "osm-way-1327498571",
+      "osm_url": "https://www.openstreetmap.org/way/1327498571",
+      "raw_height": null,
+      "raw_building_levels": null,
+      "height_m": null,
+      "height_source": "estimate",
+      "expected_height_m": null,
+      "expected_height_source": "estimate",
+      "matches_raw_tags": true,
+      "height_method": "高度未知；无可靠 height/levels，未填任何默认高度",
+      "note": "标签值不等于独立实测；levels×3m 是估算，无标签保持 null。"
+    },
+    {
+      "id": "osm-way-494347612",
+      "osm_url": "https://www.openstreetmap.org/way/494347612",
+      "raw_height": null,
+      "raw_building_levels": null,
+      "height_m": null,
+      "height_source": "estimate",
+      "expected_height_m": null,
+      "expected_height_source": "estimate",
+      "matches_raw_tags": true,
+      "height_method": "高度未知；无可靠 height/levels，未填任何默认高度",
+      "note": "标签值不等于独立实测；levels×3m 是估算，无标签保持 null。"
+    }
+  ],
+  "planning": {
+    "found": true,
+    "waypoints": [
+      [
+        121.335209,
+        31.19795
+      ],
+      [
+        121.34663942557006,
+        31.187942808370572
+      ],
+      [
+        121.34726935901472,
+        31.187942808370572
+      ],
+      [
+        121.35104895968266,
+        31.18416990143561
+      ],
+      [
+        121.35146891531241,
+        31.18416990143561
+      ],
+      [
+        121.35503853816545,
+        31.180935981205643
+      ],
+      [
+        121.35640339396218,
+        31.181385136793136
+      ],
+      [
+        121.36522246218732,
+        31.173569829570717
+      ],
+      [
+        121.37026192974452,
+        31.175725776390692
+      ],
+      [
+        121.37078687428175,
+        31.175725776390692
+      ],
+      [
+        121.37918598687713,
+        31.167820638050774
+      ],
+      [
+        121.38685017712038,
+        31.170335909340746
+      ],
+      [
+        121.3883200218246,
+        31.167461313580777
+      ],
+      [
+        121.38968487762133,
+        31.167281651345778
+      ],
+      [
+        121.3913647001404,
+        31.167640975815775
+      ],
+      [
+        121.39325450047437,
+        31.164496886703304
+      ],
+      [
+        121.39409441173387,
+        31.16296975770582
+      ],
+      [
+        121.39755904567949,
+        31.160454486415848
+      ],
+      [
+        121.40732301407161,
+        31.15389681483841
+      ],
+      [
+        121.40826791423859,
+        31.154345970425908
+      ],
+      [
+        121.40879285877577,
+        31.154345970425908
+      ],
+      [
+        121.41099762583207,
+        31.152459516958427
+      ],
+      [
+        121.41089263692464,
+        31.151651036900933
+      ],
+      [
+        121.41047268129489,
+        31.151471374665935
+      ],
+      [
+        121.41047268129489,
+        31.151022219078442
+      ],
+      [
+        121.4113125925544,
+        31.149764583433452
+      ],
+      [
+        121.41194252599905,
+        31.149764583433452
+      ],
+      [
+        121.41572212666699,
+        31.150573063490945
+      ],
+      [
+        121.42139152766885,
+        31.155334112718396
+      ],
+      [
+        121.4242262281698,
+        31.156591748363386
+      ],
+      [
+        121.42853077337492,
+        31.157759552890873
+      ],
+      [
+        121.43073554043121,
+        31.159286681888357
+      ],
+      [
+        121.4314704627833,
+        31.159466344123356
+      ],
+      [
+        121.43378021874702,
+        31.15892735741836
+      ],
+      [
+        121.44081447554561,
+        31.159556175240855
+      ],
+      [
+        121.44385915386147,
+        31.160454486415848
+      ],
+      [
+        121.4472187988996,
+        31.161262966473338
+      ],
+      [
+        121.4494235659559,
+        31.161352797590837
+      ],
+      [
+        121.44984352158565,
+        31.161262966473338
+      ],
+      [
+        121.45225826645685,
+        31.16027482418085
+      ],
+      [
+        121.45698276729172,
+        31.157400228420876
+      ],
+      [
+        121.45824263418103,
+        31.158388370713368
+      ],
+      [
+        121.45876757871821,
+        31.158388370713368
+      ],
+      [
+        121.46632678005403,
+        31.152459516958427
+      ],
+      [
+        121.48700959482017,
+        31.139972991626053
+      ],
+      [
+        121.4927839847295,
+        31.137817044806074
+      ],
+      [
+        121.49372888489643,
+        31.13700856474858
+      ],
+      [
+        121.49477877397089,
+        31.137547551453576
+      ],
+      [
+        121.49477877397089,
+        31.137996707041072
+      ],
+      [
+        121.49740349665694,
+        31.140062822743552
+      ],
+      [
+        121.49834839682387,
+        31.140332316096046
+      ],
+      [
+        121.50055316388017,
+        31.140691640566043
+      ],
+      [
+        121.5032828754737,
+        31.14114079615354
+      ],
+      [
+        121.50590759815975,
+        31.142667925151024
+      ],
+      [
+        121.50947722101279,
+        31.1452730275585
+      ],
+      [
+        121.51409673294023,
+        31.148776441140964
+      ],
+      [
+        121.52050105629417,
+        31.151651036900933
+      ],
+      [
+        121.52218087881329,
+        31.152279854723428
+      ],
+      [
+        121.5240706791472,
+        31.152818841428424
+      ],
+      [
+        121.52512056822161,
+        31.152818841428424
+      ],
+      [
+        121.5284802132598,
+        31.15003407678595
+      ],
+      [
+        121.53656435913285,
+        31.153447659250915
+      ],
+      [
+        121.53750925929978,
+        31.153537490368414
+      ],
+      [
+        121.54832311676637,
+        31.144374716383506
+      ],
+      [
+        121.56207666364128,
+        31.145542520910997
+      ],
+      [
+        121.5790848666469,
+        31.14715948102598
+      ],
+      [
+        121.60071258157996,
+        31.146800156555983
+      ],
+      [
+        121.60848176073068,
+        31.14392556079601
+      ],
+      [
+        121.61037156106465,
+        31.143835729678514
+      ],
+      [
+        121.61572599534418,
+        31.144374716383506
+      ],
+      [
+        121.61698586223349,
+        31.145183196441
+      ],
+      [
+        121.61887566256746,
+        31.145542520910997
+      ],
+      [
+        121.62013552945677,
+        31.144374716383506
+      ],
+      [
+        121.62265526323534,
+        31.144823871971003
+      ],
+      [
+        121.64659273413213,
+        31.14410522303101
+      ],
+      [
+        121.64827255665125,
+        31.143745898561015
+      ],
+      [
+        121.64963741244799,
+        31.143566236326016
+      ],
+      [
+        121.65310204639354,
+        31.140781471683542
+      ],
+      [
+        121.65436191328286,
+        31.140062822743552
+      ],
+      [
+        121.65646169143173,
+        31.140422147213545
+      ],
+      [
+        121.65845648067312,
+        31.14114079615354
+      ],
+      [
+        121.66349594823032,
+        31.144554378618505
+      ],
+      [
+        121.66370592604522,
+        31.145003534206
+      ],
+      [
+        121.6644408483973,
+        31.1450933653235
+      ],
+      [
+        121.66696058217593,
+        31.14392556079601
+      ],
+      [
+        121.67000526049173,
+        31.143566236326016
+      ],
+      [
+        121.6708451717513,
+        31.144374716383506
+      ],
+      [
+        121.6769345283829,
+        31.144464547501006
+      ],
+      [
+        121.74612221838726,
+        31.140152653861048
+      ],
+      [
+        121.7509517081296,
+        31.141500120623537
+      ],
+      [
+        121.75588618677938,
+        31.142847587386022
+      ],
+      [
+        121.76397033265243,
+        31.144374716383506
+      ],
+      [
+        121.7763590237306,
+        31.144374716383506
+      ],
+      [
+        121.77772387952734,
+        31.14320691185602
+      ],
+      [
+        121.77824882406458,
+        31.14329674297352
+      ],
+      [
+        121.8035511507581,
+        31.144554378618505
+      ],
+      [
+        121.8044,
+        31.144383
+      ]
+    ],
+    "length_m": 50994.29133671814,
+    "clearance_m": 20.0,
+    "grid_clearance_m": 27.071067811865476,
+    "resolution_m": 10,
+    "nodes_expanded": 57697,
+    "elapsed_ms": 5291.453999932855,
+    "reason": null,
+    "warnings": [
+      "全部建筑按足迹保守绕行；高度标签和估算高度均不用于允许越顶。",
+      "局部等距圆柱投影为近似米制坐标；加权 A* 不保证最短路线。",
+      "仅避让已获取的 OSM 建筑；OSM 覆盖完整性、地形、线缆及官方空域未验证。",
+      "端点以连续几何验证的连接段接入保守网格；航线仍保留原始起终点，未移动地点。"
+    ],
+    "projection_origin": [
+      121.5698045,
+      31.171166499999998
+    ],
+    "heuristic_weight": 1.5,
+    "continuous_clearance_verified": true,
+    "grid_shape": [
+      791,
+      4664
+    ],
+    "endpoint_connector_lengths_m": [
+      4.198233942018625,
+      1.2550236389286737
+    ],
+    "stage_timings_ms": {
+      "geometry_projection": 1015.3546000365168,
+      "spatial_index": 9.182299952954054,
+      "rasterization": 3260.5060000205413,
+      "endpoint_connectors": 0.17939996905624866,
+      "astar_search": 965.4530000407249,
+      "route_simplification": 36.97199991438538,
+      "continuous_validation": 3.806699998676777
+    }
+  },
+  "weather": {
+    "source": "Open-Meteo / hourly forecast",
+    "warnings": [
+      "公开预报为模式网格的10m风、2m温湿度和地面气压，不是航高实测；未提供建筑尾流、阵风控制或局地风场。",
+      "天气沿航线仅取起点、中点、终点三个模式网格，不能证明航路气象完整覆盖。",
+      "温湿度与气压进入湿空气密度及理想旋翼诱导功率敏感性；总电功率和低温电池容量仍需真实平台标定，未套用经验折减系数。",
+      "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    ],
+    "dispatch_enabled": false,
+    "constraints_evaluated": false,
+    "status": "ok",
+    "scheduled_for": "2026-11-17T07:46:24.717184+00:00",
+    "samples": [
+      {
+        "at": "origin",
+        "point": [
+          121.335209,
+          31.19795
+        ],
+        "status": "ok",
+        "valid_for": "2026-11-17T07:46:24.717184+00:00",
+        "fetched_at": "2026-11-17T07:46:26.530319+00:00",
+        "source": "Open-Meteo / hourly forecast",
+        "values": {
+          "temperature_2m": 16.635880469333333,
+          "relative_humidity_2m": 64.09413020444444,
+          "wind_speed_10m": 2.337353255111111,
+          "wind_direction_10m": 6.0,
+          "wind_gusts_10m": 6.143521877333333,
+          "surface_pressure": 1021.0188260408889,
+          "precipitation": 0.0,
+          "visibility": 22159.346850844446,
+          "weather_code": 3.0
+        },
+        "units": {
+          "wind_speed_10m": "m/s",
+          "wind_gusts_10m": "m/s",
+          "wind_direction_10m": "degree FROM",
+          "surface_pressure": "hPa",
+          "temperature_2m": "degC",
+          "relative_humidity_2m": "%"
+        },
+        "atmosphere": {
+          "status": "model",
+          "density_kg_m3": 1.2219218127589502,
+          "ideal_induced_power_ratio_to_isa_sea_level": 1.001258775747269,
+          "reference_density_kg_m3": 1.225,
+          "formula": "rho=(p-e)/(287.05*T)+e/(461.5*T); fixed-thrust ideal rotor Pi proportional to rho^(-1/2)",
+          "source": "Buck saturation vapor pressure; ideal gas mixture; actuator disk momentum theory; ICAO ISA sea-level density 1.225 kg/m3",
+          "limitation": "只表示同推力下理想诱导功率分量的变化，不能当作实际总电功率或电池折减率。"
+        },
+        "reason": ""
+      },
+      {
+        "at": "midpoint",
+        "point": [
+          121.54564915628313,
+          31.146640410713974
+        ],
+        "status": "ok",
+        "valid_for": "2026-11-17T07:46:24.717184+00:00",
+        "fetched_at": "2026-11-17T07:46:26.596323+00:00",
+        "source": "Open-Meteo / hourly forecast",
+        "values": {
+          "temperature_2m": 16.58117395911111,
+          "relative_humidity_2m": 62.86766275555556,
+          "wind_speed_10m": 2.475293489777778,
+          "wind_direction_10m": 346.0,
+          "wind_gusts_10m": 7.071760938666666,
+          "surface_pressure": 1020.4414727857778,
+          "precipitation": 0.0,
+          "visibility": 23032.934897777777,
+          "weather_code": 3.0
+        },
+        "units": {
+          "wind_speed_10m": "m/s",
+          "wind_gusts_10m": "m/s",
+          "wind_direction_10m": "degree FROM",
+          "surface_pressure": "hPa",
+          "temperature_2m": "degC",
+          "relative_humidity_2m": "%"
+        },
+        "atmosphere": {
+          "status": "model",
+          "density_kg_m3": 1.2215826571159385,
+          "ideal_induced_power_ratio_to_isa_sea_level": 1.0013977589732894,
+          "reference_density_kg_m3": 1.225,
+          "formula": "rho=(p-e)/(287.05*T)+e/(461.5*T); fixed-thrust ideal rotor Pi proportional to rho^(-1/2)",
+          "source": "Buck saturation vapor pressure; ideal gas mixture; actuator disk momentum theory; ICAO ISA sea-level density 1.225 kg/m3",
+          "limitation": "只表示同推力下理想诱导功率分量的变化，不能当作实际总电功率或电池折减率。"
+        },
+        "reason": ""
+      },
+      {
+        "at": "destination",
+        "point": [
+          121.8044,
+          31.144383
+        ],
+        "status": "ok",
+        "valid_for": "2026-11-17T07:46:24.717184+00:00",
+        "fetched_at": "2026-11-17T07:46:26.559325+00:00",
+        "source": "Open-Meteo / hourly forecast",
+        "values": {
+          "temperature_2m": 16.65852721422222,
+          "relative_humidity_2m": 60.32059765333334,
+          "wind_speed_10m": 3.8539557972261425,
+          "wind_direction_10m": 345.8114871856885,
+          "wind_gusts_10m": 9.290586979555554,
+          "surface_pressure": 1020.1867662755556,
+          "precipitation": 0.0,
+          "visibility": 23971.05229368889,
+          "weather_code": 3.0
+        },
+        "units": {
+          "wind_speed_10m": "m/s",
+          "wind_gusts_10m": "m/s",
+          "wind_direction_10m": "degree FROM",
+          "surface_pressure": "hPa",
+          "temperature_2m": "degC",
+          "relative_humidity_2m": "%"
+        },
+        "atmosphere": {
+          "status": "model",
+          "density_kg_m3": 1.2211432948267864,
+          "ideal_induced_power_ratio_to_isa_sea_level": 1.0015778921506544,
+          "reference_density_kg_m3": 1.225,
+          "formula": "rho=(p-e)/(287.05*T)+e/(461.5*T); fixed-thrust ideal rotor Pi proportional to rho^(-1/2)",
+          "source": "Buck saturation vapor pressure; ideal gas mixture; actuator disk momentum theory; ICAO ISA sea-level density 1.225 kg/m3",
+          "limitation": "只表示同推力下理想诱导功率分量的变化，不能当作实际总电功率或电池折减率。"
+        },
+        "reason": ""
+      }
+    ],
+    "energy": {
+      "status": "unavailable",
+      "reason": "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    },
+    "flight_feasibility": {
+      "status": "unavailable",
+      "reason": "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    }
+  },
+  "continuous_geometry_audit": {
+    "status": "checked",
+    "minimum_distance_m": 20.123551991199694,
+    "frame": "同一局部等距圆柱米制近似；完整连续折线与原始建筑几何距离",
+    "nearest_osm_id": "osm-way-1435894568"
+  },
+  "checks": {
+    "source_status_real": true,
+    "height_samples_match_raw_tags": true,
+    "exact_endpoints_preserved": true,
+    "waypoint_limit_met": true,
+    "planning_under_30s": true,
+    "horizontal_clearance_verified": true,
+    "no_flight_commands": true
+  },
+  "timings_s": {
+    "data_fetch_or_cache_load": 0.8446954999817535,
+    "planning_including_height_audit": 5.298556299996562,
+    "weather_and_independent_audit": 2.868342800065875,
+    "total": 9.011595000047237
+  },
+  "status": "verified_geometric_route"
+}
