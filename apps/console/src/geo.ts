@@ -6,6 +6,7 @@ export type GeoPlace = {
   point: LngLat;
   source: "map_click" | "coordinates" | "browser" | "osm_search";
   capturedAt: string;
+  address?: string;
   accuracyM?: number;
 };
 export type GeoMission = {

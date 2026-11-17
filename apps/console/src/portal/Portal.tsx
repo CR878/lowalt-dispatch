@@ -57,7 +57,27 @@ import {
 import { MissionList, MissionWizard, TaskDetail } from "./MissionPages";
 import { AccountPage, IdentityPage } from "./IdentityPages";
 import { ThemeToggle } from "./Theme";
+import Assistant from "../assistant/Assistant";
+import type { AssistantContext } from "../assistant/types";
 import "./portal.css";
+
+// Portal pages have no live telemetry; the assistant still answers knowledge and
+// intake questions. Keep one stable object so it does not retrigger effects.
+const PORTAL_ASSISTANT_CONTEXT: AssistantContext = {
+  is_simulated: true,
+  sampled_at: new Date().toISOString(),
+  task_id: "T-S1-01",
+  selected_task_id: null,
+  route_id: "S1-01-baseline",
+  progress: 0,
+  // Portal pages carry no telemetry. The backend rejects demo mode without demo
+  // telemetry, so declare live with empty payloads rather than inventing numbers.
+  telemetry_mode: "live",
+  telemetry: null,
+  live_telemetry: null,
+  terrain: null,
+  events: [],
+};
 import "./workspace-theme.css";
 
 const Console = lazy(() => import("../App"));
@@ -875,7 +895,10 @@ export default function Portal() {
     [search, setSearch] = useState(false),
     [query, setQuery] = useState(""),
     [notifications, setNotifications] = useState(false),
-    [account, setAccount] = useState(false);
+    [account, setAccount] = useState(false),
+    // Declared before any early return: hooks must run in the same order on
+    // every render, including the loading and unauthenticated paths.
+    [portalAssistantOpen, setPortalAssistantOpen] = useState(false);
   const commandRef = useRef<HTMLElement>(null);
   const searchTrigger = useRef<HTMLElement | null>(null);
   function go(to: string) {
@@ -1389,6 +1412,19 @@ export default function Portal() {
           </footer>
         </div>
       </div>
+      {!isConsole && (
+        <Assistant
+          open={portalAssistantOpen}
+          onToggle={() => setPortalAssistantOpen((value) => !value)}
+          context={PORTAL_ASSISTANT_CONTEXT}
+          onDraft={() => true}
+          onFocus={() => {}}
+          onRoute={() => {}}
+          onPanel={() => {}}
+          onInjectTerrain={() => {}}
+          onEvent={() => {}}
+        />
+      )}
       {notice && (
         <div className="p-toast" role="status">
           <CheckCircle2 size={19} />

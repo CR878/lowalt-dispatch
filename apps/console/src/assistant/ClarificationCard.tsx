@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { Check, Clock3, MapPin, RefreshCw } from "lucide-react";
 
-import { formatCoordinates, loadGeoMission, type LngLat } from "../geo";
+import {
+  formatCoordinates,
+  loadGeoMission,
+  type GeoPlace,
+  type LngLat,
+} from "../geo";
+import { MapPicker } from "./MapPicker";
+import { PinPreview } from "./PinPreview";
 import type { Clarification, MapPin as MapPinData } from "./types";
 import "./clarification.css";
 
@@ -19,6 +26,18 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
   const [when, setWhen] = useState(() => (suggested || "").slice(0, 16));
   const [payload, setPayload] = useState("");
   const [priority, setPriority] = useState("P2");
+  const [picker, setPicker] = useState<"origin" | "destination" | null>(null);
+
+  const applyPlace = (field: "origin" | "destination", place: GeoPlace) => {
+    const next = { ...geo, [field]: place };
+    setGeo(next);
+    try {
+      localStorage.setItem("aeris-geo-mission-v1", JSON.stringify(next));
+    } catch {
+      // Storage unavailable: keep the picker result in memory only.
+    }
+    setPicker(null);
+  };
 
   const pins = data.map_pins.map((pin: MapPinData) => {
     const picked = pin.field === "origin" ? geo.origin : geo.destination;
@@ -28,11 +47,22 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
       ...pin,
       point,
       crs: picked ? "EPSG:4326" : pin.crs,
+      address: picked?.address ?? pin.address,
       fromMap: !!picked,
     };
   });
   const located = pins.every((pin) => pin.point);
   const ready = !!when && located && !!payload && !busy;
+
+  const confirmPin = (pin: (typeof pins)[number]) => {
+    if (!pin.point) return;
+    applyPlace(pin.field === "origin" ? "origin" : "destination", {
+      name: pin.name,
+      point: pin.point as LngLat,
+      source: "map_click",
+      capturedAt: new Date().toISOString(),
+    });
+  };
 
   const submit = () => {
     if (!ready) return;
@@ -87,14 +117,55 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
         </div>
         {pins.map((pin) => (
           <div className="intake-pin" key={pin.field} data-pin={pin.field}>
-            <span>{pin.field === "origin" ? "起点" : "终点"}</span>
-            <strong>{pin.name}</strong>
-            <code>
-              {pin.point
-                ? `${formatCoordinates(pin.point as LngLat)} · ${pin.crs}`
-                : "未定位，请在地图上点选"}
-            </code>
-            <small>{pin.fromMap ? "来自地图选点" : pin.source}</small>
+            <div className="intake-pin-head">
+              <span>{pin.field === "origin" ? "起点" : "终点"}</span>
+              <strong>{pin.name}</strong>
+            </div>
+            {pin.address && (
+              <small className="intake-pin-address">{pin.address}</small>
+            )}
+            {pin.point ? (
+              <PinPreview
+                point={pin.point as LngLat}
+                label={pin.name}
+                onOpen={() =>
+                  setPicker(pin.field === "origin" ? "origin" : "destination")
+                }
+              />
+            ) : (
+              <div className="intake-pin-empty">
+                <MapPin size={15} />
+                <span>
+                  {pin.crs && pin.crs !== "EPSG:4326"
+                    ? "场景坐标不是经纬度，请搜索或地图选点"
+                    : "未定位，请搜索或地图选点"}
+                </span>
+              </div>
+            )}
+            <div className="intake-pin-foot">
+              <code>
+                {pin.point
+                  ? formatCoordinates(pin.point as LngLat)
+                  : "坐标未解析，助手不会猜"}
+              </code>
+              <div className="intake-pin-actions">
+                <button
+                  type="button"
+                  disabled={!pin.point}
+                  onClick={() => confirmPin(pin)}
+                >
+                  确定使用
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPicker(pin.field === "origin" ? "origin" : "destination")
+                  }
+                >
+                  搜地点
+                </button>
+              </div>
+            </div>
           </div>
         ))}
         <p className="intake-clarify-hint">
@@ -151,6 +222,19 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
       <small className="intake-clarify-foot">
         工单只做记录，不进入 M3、不产生飞控指令；推荐路线仅为几何预览 · 仿真。
       </small>
+      {picker && (
+        <MapPicker
+          field={picker}
+          initial={
+            (pins.find((pin) => pin.field === picker)?.point as
+              | LngLat
+              | null
+              | undefined) ?? null
+          }
+          onClose={() => setPicker(null)}
+          onPick={(place) => applyPlace(picker, place)}
+        />
+      )}
     </section>
   );
 }

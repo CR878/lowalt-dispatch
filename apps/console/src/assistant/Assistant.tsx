@@ -6,17 +6,13 @@ import {
   BookOpen,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleHelp,
   FileCheck2,
   Globe,
-  ListChecks,
   LoaderCircle,
   MapPin,
   MessageSquareText,
   Minus,
-  Plus,
-  Radio,
   RotateCcw,
   Send,
   ShieldCheck,
@@ -25,13 +21,15 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { getHealth, requestTurn, validDraft } from "./api";
+import { getCapabilities, getHealth, requestTurn, validDraft } from "./api";
 import { ClarificationCard } from "./ClarificationCard";
+import { RichText } from "./RichText";
 import { toolLabels } from "./types";
 import type {
   AssistantContext,
   AssistantDraft,
   AssistantResult,
+  Capabilities,
   Health,
   PreviewRoute,
   ToolTrace,
@@ -58,38 +56,6 @@ type Props = {
   onInjectTerrain: () => void;
   onEvent: (title: string, detail: string) => void;
 };
-const suggestions = [
-  {
-    title: "查询项目文档",
-    text: "ACK 代表飞完了吗？",
-    subtitle: "查看接口语义和原文依据",
-    icon: BookOpen,
-  },
-  {
-    title: "创建配送任务",
-    text: "从医疗物资中转站到北区应急中心，配送1公斤药品，优先级P1",
-    subtitle: "自然语言 → 可编辑任务卡",
-    icon: Plus,
-  },
-  {
-    title: "分析当前风险",
-    text: "分析地形变化对当前航线的影响",
-    subtitle: "变化区域 → 航线影响 → 建议",
-    icon: ShieldCheck,
-  },
-  {
-    title: "查询飞行状态",
-    text: "查询当前飞行状态和电量",
-    subtitle: "带时间和来源的遥测快照",
-    icon: Radio,
-  },
-  {
-    title: "总结任务记录",
-    text: "总结本次任务记录和告警",
-    subtitle: "事件证据 → 页面会话摘要",
-    icon: ListChecks,
-  },
-];
 function loadDraft() {
   try {
     const value = JSON.parse(
@@ -219,6 +185,7 @@ export default function Assistant(props: Props) {
   );
   const [configOpen, setConfigOpen] = useState(false);
   const [clearConfirm, setClearConfirm] = useState(false);
+  const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
   const [preview, setPreview] = useState<PreviewRoute | null>(null);
   const [visiblePreview, setVisiblePreview] = useState(false);
   const [latestResult, setLatestResult] = useState<AssistantResult | null>(
@@ -239,6 +206,13 @@ export default function Assistant(props: Props) {
       if (props.context.terrain?.count) setUnreadRisk(true);
     }
   }, [props.context.terrain]);
+  useEffect(() => {
+    const controller = new AbortController();
+    getCapabilities(controller.signal)
+      .then(setCapabilities)
+      .catch(() => setCapabilities(null));
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     if (!props.open) return;
     const controller = new AbortController();
@@ -565,22 +539,34 @@ export default function Assistant(props: Props) {
                 <br />
                 也可以直接询问当前飞行状态。
               </p>
-              <div className="assistant-suggestions">
-                {suggestions.map((s) => (
-                  <button
-                    key={s.title}
-                    onClick={() => void send(s.text)}
-                    disabled={busy}
-                  >
-                    <s.icon size={17} />
-                    <span>
-                      {s.title}
-                      <small>{s.subtitle}</small>
-                    </span>
-                    <ChevronRight size={14} />
-                  </button>
-                ))}
+              <div
+                className="assistant-capabilities"
+                data-testid="assistant-capabilities"
+              >
+                <div>
+                  <strong>已接入</strong>
+                  <ul>
+                    {(capabilities?.available ?? []).map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                    {!capabilities && <li>能力清单加载中…</li>}
+                  </ul>
+                </div>
+                <div>
+                  <strong>尚未接入</strong>
+                  <ul>
+                    {(capabilities?.pending ?? []).map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                    {!capabilities && <li>—</li>}
+                  </ul>
+                </div>
               </div>
+              <p className="assistant-capabilities-note">
+                直接输入问题或任务描述，例如「真高 120
+                米以下能送快递吗」「下周从医疗物资中转站送东西到北区应急中心」。
+                清单之外的能力尚未接入，助手不会假装能做。
+              </p>
               <div className="assistant-data-note">
                 <ShieldCheck size={13} />{" "}
                 每项工具结果都有来源，重要操作由你确认。
@@ -660,7 +646,9 @@ export default function Assistant(props: Props) {
                 </div>
               )}
               {message.text && (
-                <p className="assistant-message-text">{message.text}</p>
+                <div className="assistant-message-text">
+                  <RichText text={message.text} />
+                </div>
               )}
               {message.result?.documents?.map((doc) => (
                 <details

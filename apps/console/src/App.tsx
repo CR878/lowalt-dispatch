@@ -871,6 +871,55 @@ export default function App({
 
   const notify = useCallback((message: string) => setToast(message), []);
   useEffect(() => {
+    // Works in both standalone and embedded (portal) rendering: the intake link
+    // always points at /airspace?intake=...
+    const intakeId = new URLSearchParams(window.location.search).get("intake");
+    if (!intakeId) return;
+    const controller = new AbortController();
+    fetch(`/api/assistant/intakes/${encodeURIComponent(intakeId)}`, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("工单读取失败");
+        return response.json();
+      })
+      .then(
+        (item: {
+          origin?: { name?: string; point?: number[]; crs?: string };
+          destination?: { name?: string; point?: number[]; crs?: string };
+        }) => {
+          const place = (value: typeof item.origin) =>
+            value?.point?.length === 2 && value.crs === "EPSG:4326"
+              ? {
+                  name: value.name ?? "工单地点",
+                  point: [value.point[0], value.point[1]] as [number, number],
+                  source: "map_click" as const,
+                  capturedAt: new Date().toISOString(),
+                }
+              : null;
+          const origin = place(item.origin);
+          const destination = place(item.destination);
+          if (!origin || !destination) {
+            notify("该工单地点还没有经纬度，请先在工单里地图选点");
+            return;
+          }
+          setGeoMission({ origin, destination });
+          setLayers((current) => ({ ...current, routes: true }));
+          // The map may still be initialising; retry once after it mounts.
+          const focus = () =>
+            map.current?.overview([origin.point, destination.point]);
+          focus();
+          window.setTimeout(focus, 900);
+          notify("已载入工单起终点：连线只是两点示意，不是规划航线");
+        },
+      )
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        notify(error instanceof Error ? error.message : "工单读取失败");
+      });
+    return () => controller.abort();
+  }, [embedded, notify]);
+  useEffect(() => {
     if (!embedded || initialLive) return;
     const query = new URLSearchParams(window.location.search);
     const taskId = query.get("task");

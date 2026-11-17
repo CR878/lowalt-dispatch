@@ -80,6 +80,7 @@ export type MapPin = {
   point: [number, number] | null;
   crs: string;
   source: string;
+  address?: string;
   confirmed: boolean;
   note: string;
 };
@@ -121,6 +122,12 @@ export type AssistantResult = {
   is_simulated: true;
   created_at: string;
   clarification?: Clarification | null;
+};
+export type Capabilities = {
+  available: string[];
+  pending: string[];
+  dispatch_enabled: false;
+  is_simulated: true;
 };
 export type Health = {
   provider: "local" | "maas";

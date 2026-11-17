@@ -2,6 +2,7 @@ import type {
   AssistantContext,
   AssistantDraft,
   AssistantResult,
+  Capabilities,
   Health,
   Packet,
   ToolTrace,
@@ -119,6 +120,24 @@ function validResult(result: AssistantResult) {
   )
     return false;
   return true;
+}
+
+export async function getCapabilities(
+  signal?: AbortSignal,
+): Promise<Capabilities> {
+  const response = await fetch("/api/assistant/capabilities", {
+    signal: signal ?? AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error("能力清单暂不可用");
+  const value = (await response.json()) as Capabilities;
+  if (
+    !Array.isArray(value.available) ||
+    !Array.isArray(value.pending) ||
+    value.dispatch_enabled !== false ||
+    value.is_simulated !== true
+  )
+    throw new Error("能力清单格式不合法");
+  return value;
 }
 
 export async function requestTurn(

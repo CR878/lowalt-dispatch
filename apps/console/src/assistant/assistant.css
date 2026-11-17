@@ -332,11 +332,120 @@
   line-height: 1.8;
 }
 .assistant-message-text {
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 11px;
-  line-height: 1.95;
+  line-height: 1.8;
   color: light-dark(#546078, #b5bdcf);
+}
+.assistant-message-text p {
+  margin: 0 0 7px;
+}
+.assistant-message-text p:last-child {
+  margin-bottom: 0;
+}
+.assistant-message-text ul,
+.assistant-message-text ol {
+  margin: 0 0 8px;
+  padding-left: 17px;
+  display: grid;
+  gap: 3px;
+}
+.assistant-message-text li {
+  line-height: 1.7;
+}
+.assistant-message-text blockquote {
+  margin: 0 0 8px;
+  padding: 5px 9px;
+  border-left: 2px solid light-dark(#c9d6e2, #35506b);
+  opacity: 0.9;
+}
+.assistant-message-text blockquote p {
+  margin: 0 0 3px;
+}
+.assistant-message-text blockquote p:last-child {
+  margin: 0;
+}
+.assistant-message-text code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: light-dark(#eef2f6, #1b2530);
+  font-family: var(--mono, "JetBrains Mono", monospace);
+  font-size: 0.94em;
+}
+.assistant-message-text a {
+  color: light-dark(#2f6df6, #7aa7ff);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+}
+.assistant-rich-table {
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border: 1px solid light-dark(#dbe4ec, #2b3b4c);
+  border-radius: 8px;
+}
+.assistant-rich-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+.assistant-rich-table th,
+.assistant-rich-table td {
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid light-dark(#e6edf3, #24313e);
+  vertical-align: top;
+}
+.assistant-rich-table th {
+  background: light-dark(#f3f7fa, #18232e);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.assistant-rich-table tr:last-child td {
+  border-bottom: 0;
+}
+.assistant-chart {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid light-dark(#e0e8ef, #263544);
+  border-radius: 8px;
+  background: light-dark(#fbfdff, #121a22);
+}
+.assistant-chart figcaption {
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.assistant-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.assistant-chart-label {
+  font-size: 8px;
+  fill: light-dark(#5b6b7d, #9fb0c2);
+}
+.assistant-chart-value {
+  font-size: 8px;
+  fill: light-dark(#34455a, #c3d2e0);
+  text-anchor: end;
+}
+.assistant-chart-legend {
+  font-size: 8px;
+  fill: light-dark(#4b5c6f, #b0c1d2);
+}
+.assistant-chart-track {
+  fill: light-dark(#eef3f8, #1d2833);
+}
+.assistant-chart-fallback,
+.assistant-rich-code {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: light-dark(#f3f6f9, #16202a);
+  overflow-x: auto;
+  font-size: 10px;
 }
 .assistant-message.error .assistant-message-text {
   color: light-dark(#92693a, #dbc4a8);
@@ -717,6 +826,63 @@
   display: flex;
   color: light-dark(#376e95, #a7c6dd);
   padding: 3px;
+}
+.assistant-capabilities {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 12px 0 4px;
+  font-size: 10px;
+}
+.assistant-capabilities > div {
+  padding: 9px 11px;
+  border: 1px solid light-dark(#dbe4ec, #2a3a4b);
+  border-radius: 10px;
+  background: light-dark(#f7fafc, #141c25);
+}
+.assistant-capabilities strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+.assistant-capabilities strong::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: light-dark(#e3ebf2, #253343);
+}
+.assistant-capabilities ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+.assistant-capabilities li {
+  position: relative;
+  padding-left: 12px;
+  line-height: 1.55;
+  opacity: 0.88;
+}
+.assistant-capabilities li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+.assistant-capabilities-note {
+  margin: 10px 0 0;
+  font-size: 9px;
+  line-height: 1.8;
+  opacity: 0.7;
 }
 .assistant-bottom-actions > .assistant-web-toggle {
   display: inline-flex;

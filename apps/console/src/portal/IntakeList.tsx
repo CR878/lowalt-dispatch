@@ -47,7 +47,7 @@ export function IntakeList() {
     <section className="p-card p-spaced" data-testid="intake-list">
       <div className="p-card-head">
         <h2>AI 任务工单</h2>
-        <span className="p-tag">自然语言 · 仅记录</span>
+        <span className="p-tag">{items.length} 条 · 自然语言</span>
       </div>
       {error && <p className="p-muted">工单读取失败：{error}</p>}
       <div className="p-task-rows">
@@ -81,6 +81,17 @@ export function IntakeList() {
                   ? "几何预览（仿真）"
                   : "未生成：真实地理未配准进规划器"}
               </p>
+              <button
+                type="button"
+                className="intake-view-route"
+                onClick={() =>
+                  window.location.assign(
+                    `/airspace?intake=${encodeURIComponent(item.intake_id)}`,
+                  )
+                }
+              >
+                在空域态势查看起终点
+              </button>
               <ul>
                 {item.warnings.map((warning, index) => (
                   <li key={index}>{warning}</li>
