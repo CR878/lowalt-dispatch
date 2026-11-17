@@ -927,10 +927,27 @@ export default function App({
       })
       .then(
         (item: {
+          intake_id?: string;
           origin?: { name?: string; point?: number[]; crs?: string };
           destination?: { name?: string; point?: number[]; crs?: string };
           scheduled_for?: string | null;
           payload_kg?: number | null;
+          real_route?: {
+            status?: string;
+            waypoints?: {
+              x?: number;
+              y?: number;
+              lng?: number;
+              lat?: number;
+            }[];
+            length_m?: number | null;
+            clearance_m?: number | null;
+            resolution_used_m?: number | null;
+            obstacle_source?: string | null;
+            warnings?: string[];
+            note?: string | null;
+            reason?: string | null;
+          } | null;
         }) => {
           const place = (value: typeof item.origin) =>
             value?.point?.length === 2 && value.crs === "EPSG:4326"
@@ -949,11 +966,6 @@ export default function App({
           }
           setGeoMission({ origin, destination });
           setRealSchedule(item.scheduled_for ?? null);
-          setAutoRealRequest({
-            mission: { origin, destination },
-            scheduledFor: item.scheduled_for ?? null,
-            payloadKg: item.payload_kg ?? null,
-          });
           setDemoVisible(false);
           setPlaying(false);
           setTerminalMap(false);
@@ -965,6 +977,56 @@ export default function App({
             map.current?.overview([origin.point, destination.point]);
           focus();
           window.setTimeout(focus, 900);
+
+          const stored = item.real_route;
+          if (
+            stored?.status === "ok" &&
+            realRouting.hydrate(stored, item.scheduled_for ?? null)
+          ) {
+            setAutoRealRequest(null);
+            notify("已载入工单和工单里已保存的真实避障航线");
+            return;
+          }
+          if (stored?.status === "pending" && item.intake_id) {
+            notify("工单航线仍在后台计算，完成后会自动显示");
+            let tries = 0;
+            const timer = window.setInterval(() => {
+              tries += 1;
+              if (tries > 60) {
+                window.clearInterval(timer);
+                notify("后台航线仍未完成，可稍后刷新或点「计算真实避障航线」");
+                return;
+              }
+              fetch(
+                `/api/assistant/intakes/${encodeURIComponent(item.intake_id!)}`,
+                {
+                  signal: controller.signal,
+                },
+              )
+                .then((response) => (response.ok ? response.json() : null))
+                .then((latest) => {
+                  const route = latest?.real_route;
+                  if (route?.status === "ok") {
+                    window.clearInterval(timer);
+                    realRouting.hydrate(route, latest.scheduled_for ?? null);
+                    notify("工单航线已计算完成");
+                  } else if (route?.status === "unavailable") {
+                    window.clearInterval(timer);
+                    notify("工单航线计算失败：" + (route.reason || "未知原因"));
+                  }
+                })
+                .catch(() => undefined);
+            }, 4000);
+            controller.signal.addEventListener("abort", () =>
+              window.clearInterval(timer),
+            );
+            return;
+          }
+          setAutoRealRequest({
+            mission: { origin, destination },
+            scheduledFor: item.scheduled_for ?? null,
+            payloadKg: item.payload_kg ?? null,
+          });
           notify("已载入工单起终点，正在获取真实建筑与道路并计算避障航线");
         },
       )
@@ -1704,13 +1766,24 @@ export default function App({
               <ChevronDown size={14} />
             </div>
             <div className="summary-item">
-              <span>{liveMode ? "电量 / 电压" : "任务编号"}</span>
+              <span>
+                {liveMode
+                  ? "电量 / 电压"
+                  : realPlanningMode
+                    ? "AI 工单"
+                    : "任务编号"}
+              </span>
               <strong>
                 {liveMode ? (
                   <>
                     {metric(liveFrame?.battery)}
                     <small>%</small>
                     <small> / {metric(liveFrame?.voltage)} V</small>
+                  </>
+                ) : realPlanningMode ? (
+                  <>
+                    {geoMission.origin?.name ?? "起点"} →{" "}
+                    {geoMission.destination?.name ?? "终点"} <i>AI 工单</i>
                   </>
                 ) : (
                   <>
@@ -1720,11 +1793,18 @@ export default function App({
               </strong>
             </div>
             <div className="summary-item">
-              <span>{liveMode ? "地速" : "航程进度"}</span>
+              <span>
+                {liveMode ? "地速" : realPlanningMode ? "真实航线" : "航程进度"}
+              </span>
               <strong>
                 {liveMode ? (
                   <>
                     {metric(liveFrame?.speed)} <small>m/s</small>
+                  </>
+                ) : realPlanningMode ? (
+                  <>
+                    {realRouting.route?.waypoints.length ?? 0}{" "}
+                    <small>航点</small>
                   </>
                 ) : (
                   <>

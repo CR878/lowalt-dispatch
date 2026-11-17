@@ -19,6 +19,12 @@ type Intake = {
   };
   airspace: { status: string; note: string; zones: unknown[] };
   route_preview: unknown | null;
+  real_route?: {
+    status?: string;
+    waypoints?: unknown[];
+    length_m?: number | null;
+    reason?: string | null;
+  } | null;
   warnings: string[];
   created_at: string;
   is_simulated: boolean;
@@ -76,10 +82,15 @@ export function IntakeList() {
               <p>天气：{item.weather.note}</p>
               <p>空域：{item.airspace.note}</p>
               <p>
-                路线：
-                {item.route_preview
-                  ? "几何预览（仿真）"
-                  : "未生成：真实地理未配准进规划器"}
+                {item.real_route?.status === "ok"
+                  ? `航线：${item.real_route.waypoints?.length ?? 0} 航点 / ${(((item.real_route.length_m ?? 0) as number) / 1000).toFixed(2)} km（OSM 真实建筑避障）`
+                  : item.real_route?.status === "pending"
+                    ? "航线：后台计算中，稍后刷新查看"
+                    : item.real_route?.status === "unavailable"
+                      ? `航线：未生成（${item.real_route.reason ?? "原因未知"}）`
+                      : item.route_preview
+                        ? "路线：几何预览（仿真）"
+                        : "航线：未计算"}
               </p>
               <button
                 type="button"
@@ -90,7 +101,7 @@ export function IntakeList() {
                   )
                 }
               >
-                在空域态势查看起终点
+                在空域态势查看航线
               </button>
               <ul>
                 {item.warnings.map((warning, index) => (

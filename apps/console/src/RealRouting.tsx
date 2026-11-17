@@ -69,12 +69,17 @@ export function useRealRouting(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const abort = useRef<AbortController | null>(null);
+  const skipClear = useRef(false);
   const key = JSON.stringify([
     mission.origin?.point,
     mission.destination?.point,
   ]);
   // Clear route and downloaded context whenever the actual endpoints change.
   useEffect(() => {
+    if (skipClear.current) {
+      skipClear.current = false;
+      return;
+    }
     abort.current?.abort();
     abort.current = null;
     setResult(null);
@@ -176,6 +181,65 @@ export function useRealRouting(
     },
     [onReady],
   );
+  /**
+   * Paint a route that was already computed and stored with the intake.
+   * Opening an AI 工单 must not trigger a second 6-minute OSM fetch (and must
+   * not fail with "航线计算忙碌" while that fetch is still running).
+   */
+  const hydrate = useCallback(
+    (
+      stored: {
+        status?: string;
+        waypoints?: { x?: number; y?: number; lng?: number; lat?: number }[];
+        length_m?: number | null;
+        clearance_m?: number | null;
+        resolution_used_m?: number | null;
+        obstacle_source?: string | null;
+        warnings?: string[];
+        note?: string | null;
+      },
+      scheduledFor: string | null = null,
+    ) => {
+      if (stored.status !== "ok" || !stored.waypoints?.length) return false;
+      const routePayload = {
+        frame: "WGS84",
+        waypoints: stored.waypoints,
+        length_m: stored.length_m ?? null,
+      };
+      const parsed = parseRoutes(routePayload)[0];
+      if (
+        parsed.frame !== "WGS84" ||
+        !parsed.waypoints.every((p) => validLngLat([p.x, p.y]))
+      )
+        return false;
+      abort.current?.abort();
+      abort.current = null;
+      skipClear.current = true;
+      setBusy(false);
+      setError("");
+      setQueriedSchedule(scheduledFor);
+      setRoute(parsed);
+      setResult({
+        status: "ok",
+        route: routePayload,
+        scene_id: null,
+        clearance_m: stored.clearance_m ?? 0,
+        grid_clearance_m: 0,
+        resolution_m: stored.resolution_used_m ?? 0,
+        elapsed_ms: 0,
+        obstacle_source: stored.obstacle_source ?? "",
+        weather_source: "",
+        warnings: stored.warnings ?? [],
+        limitation: stored.note ?? "",
+        alternatives: [],
+        data: {},
+        weather: { status: "unavailable" },
+      });
+      onReady(parsed);
+      return true;
+    },
+    [onReady],
+  );
   return {
     result,
     route,
@@ -183,6 +247,7 @@ export function useRealRouting(
     busy,
     error,
     compute,
+    hydrate,
     queriedSchedule,
     aircraft,
     payloadKg,

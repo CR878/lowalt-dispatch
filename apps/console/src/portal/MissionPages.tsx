@@ -259,6 +259,7 @@ export function MissionList() {
           <ChevronRight size={14} />
         </button>
       </div>
+      <IntakeList />
       {draft && can("task.create") && (
         <div className="p-draft-notice">
           <Save size={18} />
@@ -335,7 +336,6 @@ export function MissionList() {
           </Empty>
         )}
       </section>
-      <IntakeList />
       {!!summary?.planning_tasks.length && (
         <section className="p-card p-spaced">
           <div className="p-card-head">
