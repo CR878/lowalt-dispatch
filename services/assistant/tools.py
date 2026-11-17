@@ -37,6 +37,27 @@ PLACES = {
     **{key: (site.x, site.y) for key, site in load_scene().sites.items()},
 }
 ALIASES = {"中转站": "医疗物资中转站", "北区中心": "北区应急中心", "应急中心": "北区应急中心"}
+# Single source of truth for what this build actually does. The assistant panel
+# renders it instead of offering clickable prompts that only produce boilerplate.
+CAPABILITIES = {
+    "available": [
+        "项目文档与无人机合规知识检索（带文件、行号或来源链接）",
+        "当前页面的演示或 M4 遥测查询",
+        "本地合成任务状态与回执查询",
+        "真实地点搜索与地图选点（WGS84）",
+        "多轮任务工单：先追问、信息齐了再建单",
+        "几何 A* 路线预览（ENU 仿真）",
+        "地形变化平面影响分析",
+        "本页事件解释",
+    ],
+    "pending": [
+        "M3 跨服务确认与审计查询",
+        "机型能量参数标定",
+        "含备降硬约束的动态规划",
+        "真实空域数据（NOTAM / UOM 暂无公开接口）",
+        "PX4 任务执行与飞控回执",
+    ],
+}
 
 
 def resolve_place(name: str | None):
@@ -389,26 +410,7 @@ class Toolset:
         }
 
     def get_capabilities(self, _args):
-        return {
-            "available": [
-                "项目文档检索与原文出处",
-                "当前页面的演示或 M4 遥测查询",
-                "本地合成任务状态与回执查询",
-                "虚拟地点查询",
-                "多轮任务草稿",
-                "实际几何A*路线预览",
-                "地形变化平面影响分析",
-                "本页事件解释",
-            ],
-            "pending": [
-                "M3跨服务确认与审计查询",
-                "机型能量参数",
-                "含备降硬约束的动态规划",
-                "PX4 任务执行与飞控回执",
-            ],
-            "dispatch_enabled": False,
-            "is_simulated": True,
-        }
+        return {**CAPABILITIES, "dispatch_enabled": False, "is_simulated": True}
 
     def resolve_real_place(self, args: PlaceQuery):
         result = evidence.resolve_place(args.name, local_places=PLACES, aliases=ALIASES)
@@ -471,6 +473,7 @@ class Toolset:
                 "point": item.get("point"),
                 "crs": item.get("crs"),
                 "source": item.get("source"),
+                "address": item.get("address", ""),
                 "confirmed": args.places_confirmed,
                 "note": (
                     "已在地图上定位，请确认是不是这个位置"
@@ -559,9 +562,9 @@ class Toolset:
             }
 
         def as_evidence(value):
-            return PlaceEvidence.model_validate(
-                {key: value.get(key) for key in ("name", "point", "crs", "source", "is_simulated")}
-            )
+            payload = {key: value.get(key) for key in ("name", "point", "crs", "source", "is_simulated")}
+            payload["address"] = str(value.get("address") or "")
+            return PlaceEvidence.model_validate(payload)
 
         weather = self.results.get("get_weather_forecast")
         if weather is None:

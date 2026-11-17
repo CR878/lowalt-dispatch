@@ -57,6 +57,8 @@ def test_candidate_api_is_authenticated_and_rejects_wgs84(client):
     response = client.post("/api/assistant/navigation/candidates", json=body)
     assert response.status_code == 200
     assert response.json()["dispatch_enabled"] is False
-    assert client.post("/api/assistant/navigation/candidates", json=body | {"frame": "WGS84"}).status_code == 422
+    assert (
+        client.post("/api/assistant/navigation/candidates", json=body | {"frame": "WGS84"}).status_code == 422
+    )
     client.post("/api/auth/logout", json={})
     assert client.post("/api/assistant/navigation/candidates", json=body).status_code == 401

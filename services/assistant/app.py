@@ -23,6 +23,7 @@ from services.assistant.models import Turn
 from services.assistant.navigation import CandidateInput, candidate_routes
 from services.assistant.places import search_places
 from services.assistant.telemetry import stream_telemetry
+from services.assistant.tools import CAPABILITIES
 from services.identity.routes import COOKIE
 from services.identity.routes import router as identity_router
 from services.identity.store import IdentityStore
@@ -192,6 +193,12 @@ def health():
 @app.get("/api/assistant/places/search")
 def places(q: str):
     return search_places(q)
+
+
+@app.get("/api/assistant/capabilities")
+def capabilities():
+    """What this build actually does; rendered by the assistant instead of prompt buttons."""
+    return {**CAPABILITIES, "dispatch_enabled": False, "is_simulated": True}
 
 
 @app.get("/api/assistant/intakes")

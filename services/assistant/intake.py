@@ -53,6 +53,7 @@ class PlaceEvidence(Strict):
     point: list[float] | None = None
     crs: str = "unresolved"
     source: str
+    address: str = ""
     is_simulated: bool = True
 
 

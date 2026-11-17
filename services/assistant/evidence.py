@@ -15,9 +15,10 @@ from pathlib import Path
 
 import httpx
 
+from services.assistant import geocode
+
 ROOT = Path(__file__).resolve().parents[2]
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
-NOMINATIM = "https://nominatim.openstreetmap.org/search"
 LOCAL_TZ = timezone(timedelta(hours=8), "Asia/Shanghai")
 HOURLY_FIELDS = (
     "temperature_2m",
@@ -227,31 +228,20 @@ def resolve_place(
             "point": list(point),
             "crs": "local ENU / m",
             "source": "仓库虚拟S1-01场景地点表",
+            "address": "场景登记地点（仿真，非真实地址）",
             "is_simulated": True,
         }
     try:
-        if client is None:
-            with httpx.Client(timeout=8, trust_env=True) as created:
-                response = created.get(
-                    NOMINATIM,
-                    params={"q": name, "format": "jsonv2", "limit": 1, "accept-language": "zh-CN"},
-                    headers={"User-Agent": "Lowalt-Aeris-Console/0.2"},
-                )
-        else:
-            response = client.get(
-                NOMINATIM,
-                params={"q": name, "format": "jsonv2", "limit": 1, "accept-language": "zh-CN"},
-                headers={"User-Agent": "Lowalt-Aeris-Console/0.2"},
-            )
-        response.raise_for_status()
-        rows = response.json()
-        if isinstance(rows, list) and rows:
+        rows, provider = geocode.lookup(name, 1)
+        if rows:
+            first = rows[0]
             return {
                 "status": "ok",
-                "name": name,
-                "point": [float(rows[0]["lon"]), float(rows[0]["lat"])],
+                "name": first["name"],
+                "point": list(first["point"]),
                 "crs": "EPSG:4326",
-                "source": "OpenStreetMap / Nominatim",
+                "source": provider,
+                "address": first.get("address", ""),
                 "is_simulated": False,
             }
     except Exception:
@@ -262,5 +252,6 @@ def resolve_place(
         "point": None,
         "crs": "unresolved",
         "source": "未解析；未猜测坐标",
+        "address": "",
         "is_simulated": True,
     }

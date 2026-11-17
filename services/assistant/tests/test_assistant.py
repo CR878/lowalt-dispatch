@@ -273,11 +273,10 @@ def test_model_document_reply_uses_retrieved_evidence(question):
     result = Engine(Settings(provider="maas"), model).run(make_turn(question), lambda _: None)
     evidence = json.loads(model.messages[1][-1]["content"])
     assert result["documents"] == evidence["excerpts"]
+    # The model's formatted answer is kept (tables/lists survive); provenance lives in documents.
+    assert result["text"] == "假设性回答"
     if evidence["status"] == "ok":
-        assert "执行端受理并启动了执行器" in result["text"]
-    else:
-        assert "没有找到能回答" in result["text"]
-    assert "假设性回答" not in result["text"]
+        assert result["documents"]
 
 
 def test_task_status_uses_selected_dispatch_and_separates_ack_from_completion(tmp_path):
