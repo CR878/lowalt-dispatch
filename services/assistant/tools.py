@@ -312,6 +312,11 @@ class Toolset:
             ForecastQuery,
         ),
         "get_airspace_zones": ("列出仓库草稿限制区；明确标注仿真草稿、非实测空域。", NoArgs),
+        "get_intake_overview": (
+            "给图表用的真实工单数据：最近工单的航线状态计数、载荷、以及最新一条航线的"
+            "累计距离采样（最多12点）。用户要求画折线/饼图/柱状图且与 AI 工单相关时调用。",
+            NoArgs,
+        ),
         "create_task_intake": (
             "把用户原话、起终点、时间与已收集的证据落成一张任务工单；只记录，不下发、不执行。",
             IntakeCreate,
@@ -627,6 +632,63 @@ class Toolset:
 
     def get_airspace_zones(self, _args):
         return evidence.list_airspace_zones()
+
+    def get_intake_overview(self, _args):
+        """Real series for charts: status counts, payloads, latest route profile."""
+        from planner.georef import distance_m
+
+        items = intake_store.list(limit=12)
+        counts = {"航线已生成": 0, "后台计算中": 0, "未生成": 0}
+        payloads: list[dict] = []
+        latest_route = None
+        for item in items:
+            route = item.get("real_route") or {}
+            status = route.get("status")
+            counts[
+                "航线已生成" if status == "ok" else "后台计算中" if status == "pending" else "未生成"
+            ] += 1
+            if item.get("payload_kg") is not None and len(payloads) < 8:
+                origin = (item.get("origin") or {}).get("name", "起点")[:8]
+                destination = (item.get("destination") or {}).get("name", "终点")[:8]
+                payloads.append(
+                    {"label": f"{origin}→{destination}", "value": float(item["payload_kg"])}
+                )
+            if latest_route is None and status == "ok":
+                waypoints = route.get("waypoints") or []
+                if len(waypoints) >= 2:
+                    cumulative, total = [], 0.0
+                    previous = (waypoints[0].get("lng"), waypoints[0].get("lat"))
+                    for index, point in enumerate(waypoints):
+                        current = (point.get("lng"), point.get("lat"))
+                        if index:
+                            total += distance_m(previous, current)
+                        previous = current
+                        cumulative.append(total)
+                    step = max(1, math.ceil((len(cumulative) - 1) / 11))
+                    sampled = list(range(0, len(cumulative), step))
+                    if sampled[-1] != len(cumulative) - 1:
+                        sampled.append(len(cumulative) - 1)
+                    latest_route = {
+                        "origin": (item.get("origin") or {}).get("name"),
+                        "destination": (item.get("destination") or {}).get("name"),
+                        "length_km": round(total / 1000, 2),
+                        "waypoint_count": len(cumulative),
+                        "profile": [
+                            {"label": str(index + 1), "value": round(cumulative[index] / 1000, 2)}
+                            for index in sampled
+                        ][:12],
+                    }
+        return {
+            "status": "ok",
+            "source": "logs/intakes 本机工单文件",
+            "count": len(items),
+            "status_counts": [
+                {"label": label, "value": value} for label, value in counts.items()
+            ],
+            "payloads": payloads,
+            "latest_route": latest_route,
+            "note": "航线为 OSM 建筑足迹的几何避障结果，非飞行实测；可直接用于 chart 代码块。",
+        }
 
     def create_task_intake(self, args: IntakeCreate):
         # A human must see the resolved places before anything is written. In

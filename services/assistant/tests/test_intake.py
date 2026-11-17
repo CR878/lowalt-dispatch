@@ -545,3 +545,49 @@ def test_maas_mode_requires_the_confirmation_card_before_writing(tmp_path, monke
     )
     assert confirmed["status"] == "created"
     assert len(tools.intake_store.list()) == 1
+
+
+def test_intake_overview_returns_real_chart_series(tmp_path, monkeypatch):
+    from services.assistant.intake import IntakeCreate, PlaceEvidence, TaskIntake, WeatherEvidence
+
+    store = IntakeStore(root=tmp_path / "intakes")
+    monkeypatch.setattr(tools, "intake_store", store)
+    waypoints = [
+        {"lng": 115.8319 + index * 0.001, "lat": 28.7649 - index * 0.001, "x": 0, "y": 0}
+        for index in range(20)
+    ]
+    done = TaskIntake.build(
+        IntakeCreate(text="A→B", origin="A", destination="B", payload_kg=3.0),
+        origin=PlaceEvidence(
+            name="江西农业大学", point=[115.8319, 28.7649], crs="EPSG:4326", source="t", is_simulated=False
+        ),
+        destination=PlaceEvidence(
+            name="南昌航空大学", point=[115.8225, 28.6543], crs="EPSG:4326", source="t", is_simulated=False
+        ),
+        weather=WeatherEvidence(),
+        airspace={"status": "draft"},
+        route_preview=None,
+        real_route={"status": "ok", "waypoints": waypoints, "length_m": 12345.0},
+        warnings=[],
+    )
+    pending = TaskIntake.build(
+        IntakeCreate(text="C→D", origin="C", destination="D", payload_kg=1.5),
+        origin=PlaceEvidence(name="C", point=[115.8, 28.7], crs="EPSG:4326", source="t", is_simulated=False),
+        destination=PlaceEvidence(name="D", point=[115.81, 28.69], crs="EPSG:4326", source="t", is_simulated=False),
+        weather=WeatherEvidence(),
+        airspace={"status": "draft"},
+        route_preview=None,
+        real_route={"status": "pending", "waypoints": [], "reason": None},
+        warnings=[],
+    )
+    store.create(done)
+    store.create(pending)
+    data = tools.Toolset(make_turn()).execute("get_intake_overview", {})
+    counts = {item["label"]: item["value"] for item in data["status_counts"]}
+    assert counts["航线已生成"] == 1
+    assert counts["后台计算中"] == 1
+    assert data["latest_route"]["waypoint_count"] == 20
+    assert 2 <= len(data["latest_route"]["profile"]) <= 12
+    assert data["latest_route"]["profile"][0]["value"] == 0
+    assert data["latest_route"]["profile"][-1]["value"] > 0
+    assert {item["value"] for item in data["payloads"]} == {3.0, 1.5}
