@@ -22,8 +22,14 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
     (item) => item.field === "scheduled_for",
   )?.current;
   const [when, setWhen] = useState(() => (suggested || "").slice(0, 16));
-  const [payload, setPayload] = useState("");
-  const [priority, setPriority] = useState("P2");
+  const [payload, setPayload] = useState(() =>
+    data.draft_values?.payload_kg == null
+      ? ""
+      : String(data.draft_values.payload_kg),
+  );
+  const [priority, setPriority] = useState(
+    () => data.draft_values?.priority || "P2",
+  );
   const [picker, setPicker] = useState<"origin" | "destination" | null>(null);
 
   const applyPlace = (field: "origin" | "destination", place: GeoPlace) => {
@@ -68,7 +74,7 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
     if (!origin?.point || !destination?.point) return;
     onConfirm(
       [
-        "确认一下：",
+        "确认建单：",
         `时间是${Number(month)}月${Number(day)}日 ${timePart}，`,
         `起点就是「${origin.name}」，终点是「${destination.name}」，`,
         "我在地图上点过了，",

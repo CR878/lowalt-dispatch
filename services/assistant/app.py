@@ -387,6 +387,9 @@ async def turn(request: Request):
         except ModelUnavailable as error:
             packets.put({"type": "error", "message": str(error)})
         except Exception:
+            import traceback
+
+            traceback.print_exc()
             packets.put(
                 {"type": "error", "message": "本地工具或审计写入失败，请检查服务状态；本轮没有执行飞行操作。"}
             )

@@ -324,11 +324,13 @@ class Toolset:
         read_dispatch_task: Callable[[str], dict] | None = None,
         real_route_provider: Callable[..., dict] | None = None,
         route_background: bool = True,
+        require_confirmation: bool = False,
     ):
         self.turn = turn
         self.read_dispatch_task = read_dispatch_task
         self.real_route_provider = real_route_provider
         self.route_background = route_background
+        self.require_confirmation = require_confirmation
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
         self.place_results: list[dict] = []
@@ -612,6 +614,11 @@ class Toolset:
         return evidence.list_airspace_zones()
 
     def create_task_intake(self, args: IntakeCreate):
+        # A human must see the resolved places before anything is written. In
+        # MaaS mode the confirmation card sends a message starting with
+        # 确认建单; a model that optimistically sets places_confirmed=true cannot
+        # skip that step. Local rule mode keeps its single-shot behaviour.
+        explicit_confirm = (not self.require_confirmation) or ("确认建单" in args.text)
         stated = evidence.extract_confirmations(args.text)
         if stated:
             args = args.model_copy(
@@ -721,7 +728,7 @@ class Toolset:
                 # Conflict already carries a clearer A/B question; do not ask
                 # the generic "is this the place?" on top of it.
                 continue
-            if not args.places_confirmed or not item.get("point"):
+            if not explicit_confirm or not item.get("point"):
                 questions.append(
                     {
                         "field": field,
@@ -733,7 +740,7 @@ class Toolset:
             if f"{field}_question" in conflicts:
                 questions.append(conflicts[f"{field}_question"])
 
-        if not args.schedule_confirmed or not args.scheduled_for:
+        if not explicit_confirm or not args.schedule_confirmed or not args.scheduled_for:
             if args.scheduled_for:
                 schedule_question = {
                     "field": "scheduled_for",
@@ -806,6 +813,11 @@ class Toolset:
                 "source": "信息未齐，先追问确认",
                 "questions": questions,
                 "map_pins": map_pins,
+                "draft_values": {
+                    "scheduled_for": args.scheduled_for,
+                    "payload_kg": args.payload_kg,
+                    "priority": args.priority,
+                },
                 "weather_feasibility": weather_feasibility,
                 "summary": "\n".join(lines),
                 "is_simulated": True,
@@ -903,11 +915,44 @@ class Toolset:
                 record.intake_id, self.real_route_provider or real_route_for_intake, *route_inputs
             )
         self.terminal = True
+        # Keep the model's view small: the full record (including the long
+        # warnings list) lives in the store and the console reads it by id. If
+        # warnings are returned here the model tends to paste all of them.
+        public_record = {
+            key: stored[key]
+            for key in (
+                "intake_id",
+                "origin",
+                "destination",
+                "scheduled_for",
+                "payload_kg",
+                "priority",
+                "real_route",
+                "is_simulated",
+                "dispatch_enabled",
+            )
+            if key in stored
+        }
         return {
             "status": "created",
             "source": "自然语言任务工单（服务端 JSON，非执行任务）",
             "intake_id": record.intake_id,
-            "intake": stored,
+            "intake": public_record,
+            "summary": (
+                f"AI 工单已创建：{origin['name']} → {destination['name']}；"
+                f"{args.scheduled_for or '时间待确认'}；载荷 {args.payload_kg} kg；"
+                "真实航线在后台计算，完成后在工单里查看。"
+            ),
+            "location_review": [
+                {
+                    "field": field,
+                    "name": place["name"],
+                    "point": place.get("point"),
+                    "address": place.get("address", ""),
+                }
+                for field, place in (("origin", origin), ("destination", destination))
+            ],
+            "limits": ["不进入 M3 状态机", "不产生飞控指令", "真实空域需人工核对"],
             "is_simulated": True,
             "dispatch_enabled": False,
         }

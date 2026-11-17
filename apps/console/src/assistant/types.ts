@@ -90,6 +90,11 @@ export type Clarification = {
   source: string;
   questions: ClarificationQuestion[];
   map_pins: MapPin[];
+  draft_values?: {
+    scheduled_for?: string | null;
+    payload_kg?: number | null;
+    priority?: string | null;
+  };
   weather_feasibility: {
     status: "available_if_date_in_window" | "needs_map_pin";
     latitude?: number;

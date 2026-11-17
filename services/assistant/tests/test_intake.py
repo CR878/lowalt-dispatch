@@ -505,3 +505,43 @@ def test_background_route_fills_the_intake_after_creation(tmp_path, monkeypatch)
     assert stored["real_route"]["status"] == "ok"
     assert stored["real_route"]["length_m"] == 12345.0
     assert not any("后台计算中" in warning for warning in stored["warnings"])
+
+
+def test_maas_mode_requires_the_confirmation_card_before_writing(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "intake_store", IntakeStore(root=tmp_path / "intakes"))
+    monkeypatch.setattr(
+        tools.evidence,
+        "resolve_place",
+        lambda name, **kwargs: {
+            "status": "ok",
+            "name": name,
+            "point": [115.83, 28.76] if "农业" in name else [115.82, 28.65],
+            "crs": "EPSG:4326",
+            "source": "test-stub",
+            "is_simulated": False,
+        },
+    )
+    args = {
+        "text": "从江西农业大学送3公斤到南昌航空大学",
+        "origin": "江西农业大学",
+        "destination": "南昌航空大学",
+        "scheduled_for": "2026-11-20T09:00:00+08:00",
+        "schedule_confirmed": True,
+        "places_confirmed": True,
+        "payload_kg": 3.0,
+        "priority": "P2",
+    }
+    toolset = tools.Toolset(make_turn(), require_confirmation=True)
+    first = toolset.execute("create_task_intake", args)
+    assert first["status"] == "needs_clarification"
+    assert tools.intake_store.list() == []
+    pins = {pin["field"]: pin["point"] for pin in first["map_pins"]}
+    assert pins["origin"] == [115.83, 28.76]
+    assert first["draft_values"]["payload_kg"] == 3.0
+
+    confirmed = toolset.execute(
+        "create_task_intake",
+        args | {"text": "确认建单：起点 江西农业大学，终点 南昌航空大学，按这些建任务"},
+    )
+    assert confirmed["status"] == "created"
+    assert len(tools.intake_store.list()) == 1

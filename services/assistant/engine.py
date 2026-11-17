@@ -158,7 +158,12 @@ class Engine:
         *,
         read_dispatch_task: Callable[[str], dict] | None = None,
     ):
-        tools, traces = Toolset(turn, read_dispatch_task), []
+        tools = Toolset(
+            turn,
+            read_dispatch_task,
+            require_confirmation=self.settings.provider == "maas",
+        )
+        traces = []
 
         def call(name, arguments=None, call_id=None):
             arguments = arguments or {}
@@ -216,8 +221,8 @@ class Engine:
         if intake_result and intake_result.get("status") == "needs_clarification":
             text = intake_result["summary"]
         elif intake_result and intake_result.get("status") == "created" and not text.strip():
-            text = f"已创建任务工单 {intake_result['intake_id']}（仅记录，未下发）。\n" + "；".join(
-                intake_result["intake"]["warnings"]
+            text = intake_result.get("summary") or (
+                f"已创建任务工单 {intake_result['intake_id']}（仅记录，未下发）。"
             )
         return {
             "turn_id": str(turn.request_id),
@@ -427,6 +432,8 @@ class Engine:
 真实地名（城市/学校/机场/园区）一律用 resolve_real_place；list_places 只用于 v0 虚拟场景的 6 个 ENU 点，不得用来回答真实地点。
 只在地图选点确实是本轮用户操作结果时才把坐标填进 origin_point/destination_point；不要拿上一次会话或页面里残留的坐标去覆盖用户刚说的地名。若两者相距超过 50 km，工具会返回冲突选项，按选项追问，不要自行决定。
 按序调用resolve_real_place（起终点各一次）、get_airspace_zones，再调create_task_intake取追问清单。该工具返回needs_clarification时不要建单，直接按summary里的问题追问，不要重复调用工具。用户在后续轮次明确给出日期时刻、地图坐标、载荷和优先级时，把用户原话放进create_task_intake的text字段，并把这些值填进对应字段（scheduled_for/origin_point/destination_point/payload_kg/priority/schedule_confirmed/places_confirmed），一次调用即可建单，不要反复追问。不猜坐标、不填占位数值。
+用户消息以「确认建单：」开头时，说明他已经在确认卡里核对过地点与时间：把原话放进 text，并传 places_confirmed=true、schedule_confirmed=true，直接建单，不要再追问。
+建单成功后只回复工具返回的 summary 一句话（可补一句航线在后台计算），不要把 warnings 数组逐条抄给用户；提示只在用户问起时再展开。
 天气预报是模式预报而非实测，限制区是仿真草稿而非实测空域，路线只能是几何预览；这些限制必须如实说明。工单只做记录，不下发、不执行。
 只提取用户在对话中明确给出的字段，不自行补坐标、能量或载荷。只调用提供的工具，每次最多调用3个。
 地形分析只能给出包围框平面交叠，缺垂向净空/备降校验时必须说明；模拟数据须标注。
