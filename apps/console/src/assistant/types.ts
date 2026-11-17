@@ -73,6 +73,7 @@ export type ClarificationQuestion = {
   question: string;
   current?: string | null;
   map_pin?: MapPin | null;
+  options?: { label: string; value: string }[];
 };
 export type MapPin = {
   field: string;

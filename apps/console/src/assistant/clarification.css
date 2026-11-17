@@ -359,3 +359,27 @@
   font-size: 11px;
   opacity: 0.6;
 }
+
+.intake-clarify-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.intake-clarify-options button {
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: rgba(37, 99, 235, 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.intake-clarify-options button:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.24);
+}
+.intake-clarify-options button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

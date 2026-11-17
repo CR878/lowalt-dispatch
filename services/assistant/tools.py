@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -129,11 +131,18 @@ def real_route_for_intake(origin: list[float], destination: list[float], schedul
         )
         result = real_candidate_routes(body, budget_total_s=30.0)
     except Exception as exc:  # network, OSM schema, budget — record, do not guess
+        from pydantic import ValidationError
+
+        if isinstance(exc, ValidationError):
+            first = exc.errors()[0]
+            reason = f"输入不合法：{first.get('msg', '')}（字段 {'.'.join(map(str, first.get('loc', ())))}）"
+        else:
+            reason = f"{type(exc).__name__}: {str(exc)[:200]}"
         return {
             "status": "unavailable",
             "frame": "WGS84",
             "waypoints": [],
-            "reason": f"{type(exc).__name__}: {str(exc)[:300]}",
+            "reason": reason,
             "computed_at": datetime.now(UTC).isoformat(),
             "note": "真实航线未生成；未使用直线或仿真路线代替。",
         }
@@ -161,6 +170,116 @@ def real_route_for_intake(origin: list[float], destination: list[float], schedul
     }
 
 
+def normalize_scheduled_for(value: str | None) -> tuple[str | None, str]:
+    """Coerce a model-supplied time into an ISO instant with timezone.
+
+    Models occasionally pass ``11-17T10:40`` (no year) or a naive local time.
+    That used to reach ``CandidateInput`` and blow up with a raw pydantic error
+    *after* the intake was already written. Here we either return a valid instant
+    plus a note explaining any assumption, or ``None`` so the caller can ask.
+    """
+    if not value or not str(value).strip():
+        return None, ""
+    raw = str(value).strip()
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        parsed = None
+    if parsed is not None:
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=evidence.LOCAL_TZ)
+            return parsed.isoformat(), f"「{raw}」未带时区，按 Asia/Shanghai 解释"
+        return parsed.isoformat(), ""
+    # Yearless forms the model likes: 11-17T10:40 / 11-17 10:40
+    match = re.search(r"(?<!\d)(\d{1,2})-(\d{1,2})[T ]\s*(\d{1,2}):(\d{2})", raw)
+    if match:
+        month, day, hour, minute = (int(part) for part in match.groups())
+        year = datetime.now(evidence.LOCAL_TZ).year
+        try:
+            parsed = datetime(year, month, day, hour, minute, tzinfo=evidence.LOCAL_TZ)
+        except ValueError:
+            return None, f"「{raw}」不是有效日期，未采用"
+        return parsed.isoformat(), f"「{raw}」缺少年份，按 {year} 年解释（可改）"
+    parsed_text, note = evidence.parse_schedule(raw)
+    if parsed_text:
+        return parsed_text, note + "（规则解析，待确认）"
+    return None, f"「{raw}」无法解析为带时区的时刻，需用户补充"
+
+
+_ROUTE_WORKERS: set[str] = set()
+_ROUTE_WORKERS_LOCK = threading.Lock()
+_ROUTE_SEMAPHORE = threading.Semaphore(2)
+
+
+def _unavailable_route(exc: Exception) -> dict:
+    from pydantic import ValidationError
+
+    if isinstance(exc, ValidationError):
+        first = exc.errors()[0]
+        reason = f"输入不合法：{first.get('msg', '')}（字段 {'.'.join(map(str, first.get('loc', ())))}）"
+    else:
+        reason = f"{type(exc).__name__}: {str(exc)[:200]}"
+    return {
+        "status": "unavailable",
+        "frame": "WGS84",
+        "waypoints": [],
+        "reason": reason,
+        "computed_at": datetime.now(UTC).isoformat(),
+        "note": "真实航线未生成；未使用直线或仿真路线代替。",
+    }
+
+
+def _compute_route_in_background(
+    intake_id: str,
+    provider: Callable[..., dict],
+    origin: list[float],
+    destination: list[float],
+    scheduled_for: str | None,
+) -> None:
+    """Fill ``real_route`` after the intake is already visible.
+
+    The first fetch for a new 14 km bbox can take minutes (OSM buildings+roads).
+    Blocking the chat turn on it made the console hit its request timeout while
+    the intake had not been written yet. Now the record is created immediately
+    with ``status=pending`` and updated when the route is ready.
+    """
+    with _ROUTE_WORKERS_LOCK:
+        if intake_id in _ROUTE_WORKERS:
+            return
+        _ROUTE_WORKERS.add(intake_id)
+
+    def worker() -> None:
+        try:
+            with _ROUTE_SEMAPHORE:
+                try:
+                    result = provider(origin, destination, scheduled_for)
+                except Exception as exc:  # never lose the intake
+                    result = _unavailable_route(exc)
+            record = intake_store.get(intake_id)
+            record["real_route"] = result
+            warnings = [item for item in record.get("warnings", []) if "后台计算中" not in item]
+            if result.get("status") == "ok":
+                warnings.append(
+                    "航线为公开地图建筑足迹 + 20 m 物理净空的几何避障结果；"
+                    "未接真实空域、地形、线缆，不代表获准飞行。"
+                )
+            else:
+                warnings.append(
+                    "真实航线未生成：" + str(result.get("reason") or "未知原因") + "；未用直线代替。"
+                )
+            record["warnings"] = warnings
+            intake_store.create(TaskIntake.model_validate(record))
+        except Exception:
+            # The intake itself is already persisted; a failed refresh must not
+            # surface as a turn error.
+            pass
+        finally:
+            with _ROUTE_WORKERS_LOCK:
+                _ROUTE_WORKERS.discard(intake_id)
+
+    threading.Thread(target=worker, name=f"intake-route-{intake_id[:8]}", daemon=True).start()
+
+
 class Toolset:
     SPECS = {
         "search_project_docs": (
@@ -170,7 +289,12 @@ class Toolset:
         "get_flight_status": ("读取当前界面遥测、时间和来源，不作适航或备降安全判断。", NoArgs),
         "get_task_status": ("查询联调面板选中的本地合成任务，读取规划、回执和独立执行状态。", NoArgs),
         "list_events": ("读取本次页面会话的事件记录并按类型统计。", NoArgs),
-        "list_places": ("列出虚拟场景登记地点和局部ENU坐标，未知名称不能猜坐标。", NoArgs),
+        "list_places": (
+            "仅列出 v0 虚拟场景的 6 个 ENU 登记点（医疗物资中转站、北区应急中心等），"
+            "与真实地名无关。用户提到真实城市/学校/机场等名称时必须用 resolve_real_place，"
+            "不要用本工具答真实地点。",
+            NoArgs,
+        ),
         "update_task_draft": ("仅更新用户明确提供的任务草稿字段；可多轮补充，缺失值保留未知。", DraftUpdate),
         "plan_task_preview": ("用现有几何A*计算草稿路线预览；不验证能量/备降，不下发。", NoArgs),
         "inspect_terrain_risk": (
@@ -199,10 +323,12 @@ class Toolset:
         turn: Turn,
         read_dispatch_task: Callable[[str], dict] | None = None,
         real_route_provider: Callable[..., dict] | None = None,
+        route_background: bool = True,
     ):
         self.turn = turn
         self.read_dispatch_task = read_dispatch_task
         self.real_route_provider = real_route_provider
+        self.route_background = route_background
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
         self.place_results: list[dict] = []
@@ -493,7 +619,8 @@ class Toolset:
                     key: value for key, value in stated.items() if getattr(args, key) in (None, False, "")
                 }
             )
-        if not args.scheduled_for:
+        normalized, normalization_note = normalize_scheduled_for(args.scheduled_for)
+        if normalized is None:
             parsed, parsed_note = evidence.parse_schedule(args.text)
             args = args.model_copy(
                 update={
@@ -503,6 +630,13 @@ class Toolset:
                     ),
                 }
             )
+        else:
+            merged_note = "；".join(
+                part for part in (args.schedule_note, normalization_note) if part
+            )
+            args = args.model_copy(
+                update={"scheduled_for": normalized, "schedule_note": merged_note}
+            )
         places = {item["name"]: item for item in self.place_results}
         origin = places.get(args.origin) or evidence.resolve_place(
             args.origin, local_places=PLACES, aliases=ALIASES
@@ -510,8 +644,47 @@ class Toolset:
         destination = places.get(args.destination) or evidence.resolve_place(
             args.destination, local_places=PLACES, aliases=ALIASES
         )
+        # A map pin that is hundreds of km away from the named place is a stale
+        # selection, not a preference. Never write it into the intake; ask with
+        # two explicit options instead of silently choosing one.
+        from planner.georef import distance_m
+
+        conflicts = {}
+        for field, point, item, label in (
+            ("origin", args.origin_point, origin, "起点"),
+            ("destination", args.destination_point, destination, "终点"),
+        ):
+            if not point or item.get("crs") != "EPSG:4326" or not item.get("point"):
+                continue
+            gap = distance_m(tuple(point), tuple(item["point"]))
+            if gap > 50_000:
+                conflicts[field] = gap
+                conflicts[f"{field}_question"] = {
+                    "field": field,
+                    "question": (
+                        f"你在地图上点的{label}距「{item['name']}」约 {gap / 1000:.0f} km，明显不是同一地点。"
+                        f"是用地名坐标，还是坚持用点选坐标并改名？"
+                    ),
+                    "options": [
+                        {
+                            "label": f"A · 用「{item['name']}」的坐标",
+                            "value": (
+                                f"用A方案：{label}采用「{item['name']}」的地图解析坐标 "
+                                f"{item['point'][0]:.6f},{item['point'][1]:.6f}，重新建单"
+                            ),
+                        },
+                        {
+                            "label": "B · 用我点的坐标",
+                            "value": (
+                                f"用B方案：保留我在地图上点的{label}坐标，"
+                                "但请先告诉我这两个点附近的实际地点名称"
+                            ),
+                        },
+                    ],
+                }
+
         for field, point in (("origin", args.origin_point), ("destination", args.destination_point)):
-            if not point:
+            if not point or field in conflicts:
                 continue
             current = origin if field == "origin" else destination
             updated = {
@@ -544,6 +717,10 @@ class Toolset:
                 ),
             }
             map_pins.append(pin)
+            if field in conflicts:
+                # Conflict already carries a clearer A/B question; do not ask
+                # the generic "is this the place?" on top of it.
+                continue
             if not args.places_confirmed or not item.get("point"):
                 questions.append(
                     {
@@ -552,19 +729,31 @@ class Toolset:
                         "map_pin": pin,
                     }
                 )
+        for field in ("origin", "destination"):
+            if f"{field}_question" in conflicts:
+                questions.append(conflicts[f"{field}_question"])
 
-        if not args.schedule_confirmed:
-            questions.insert(
-                0,
-                {
+        if not args.schedule_confirmed or not args.scheduled_for:
+            if args.scheduled_for:
+                schedule_question = {
                     "field": "scheduled_for",
                     "question": (
                         f"时间我暂按 {args.scheduled_for} 理解（{args.schedule_note}）。"
                         "请确认具体日期与起飞时刻。"
                     ),
                     "current": args.scheduled_for,
-                },
-            )
+                    "options": [
+                        {"label": "A · 就用这个时间", "value": f"时间确认：{args.scheduled_for}，按这个建单"},
+                        {"label": "B · 我重说时间", "value": "时间改成：____年__月__日 __:__"},
+                    ],
+                }
+            else:
+                schedule_question = {
+                    "field": "scheduled_for",
+                    "question": "还没识别到起飞时间。请给出年月日、时刻和时区（例如 2026-11-20 09:00 +08:00）。",
+                    "current": None,
+                }
+            questions.insert(0, schedule_question)
         if args.payload_kg is None:
             questions.append(
                 {"field": "payload_kg", "question": "这次运送的载荷重量是多少公斤？（0–100 kg）"}
@@ -642,6 +831,8 @@ class Toolset:
         route_preview = preview if preview and preview.get("status") == "geometry_only" else None
 
         real_route = None
+        route_needs_background = False
+        route_inputs: tuple[list[float], list[float], str | None] | None = None
         if (
             origin.get("crs") == "EPSG:4326"
             and origin.get("point")
@@ -650,17 +841,26 @@ class Toolset:
             and list(origin["point"]) != list(destination["point"])
         ):
             provider = self.real_route_provider or real_route_for_intake
-            try:
-                real_route = provider(list(origin["point"]), list(destination["point"]), args.scheduled_for)
-            except Exception as exc:  # a provider bug must not lose the intake
+            route_inputs = (
+                list(origin["point"]),
+                list(destination["point"]),
+                args.scheduled_for,
+            )
+            if self.route_background:
                 real_route = {
-                    "status": "unavailable",
+                    "status": "pending",
                     "frame": "WGS84",
                     "waypoints": [],
-                    "reason": f"{type(exc).__name__}: {str(exc)[:300]}",
-                    "computed_at": datetime.now(UTC).isoformat(),
-                    "note": "真实航线未生成；未使用直线或仿真路线代替。",
+                    "reason": None,
+                    "requested_at": datetime.now(UTC).isoformat(),
+                    "note": "真实航线后台计算中（首次拉取 OSM 可能数分钟）；完成后刷新工单查看。",
                 }
+                route_needs_background = True
+            else:
+                try:
+                    real_route = provider(*route_inputs)
+                except Exception as exc:  # a provider bug must not lose the intake
+                    real_route = _unavailable_route(exc)
 
         warnings = [
             "天气预报不是实测值；风速未进入能耗或绕路计算。",
@@ -670,6 +870,10 @@ class Toolset:
         if real_route and real_route.get("status") == "ok":
             warnings.append(
                 "航线为公开地图建筑足迹 + 20 m 物理净空的几何避障结果；未接真实空域、地形、线缆，不代表获准飞行。"
+            )
+        elif real_route and real_route.get("status") == "pending":
+            warnings.append(
+                "真实航线在后台计算中（首次拉取 OSM 建筑可能数分钟）；完成后刷新工单查看，失败会写明原因。"
             )
         elif real_route:
             warnings.append(
@@ -693,12 +897,17 @@ class Toolset:
             real_route=real_route,
             warnings=warnings,
         )
+        stored = intake_store.create(record)
+        if route_needs_background and route_inputs is not None:
+            _compute_route_in_background(
+                record.intake_id, self.real_route_provider or real_route_for_intake, *route_inputs
+            )
         self.terminal = True
         return {
             "status": "created",
             "source": "自然语言任务工单（服务端 JSON，非执行任务）",
             "intake_id": record.intake_id,
-            "intake": intake_store.create(record),
+            "intake": stored,
             "is_simulated": True,
             "dispatch_enabled": False,
         }

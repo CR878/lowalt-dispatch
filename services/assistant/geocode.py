@@ -7,6 +7,7 @@ order and the first non-empty result wins; failures never raise to callers.
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 
@@ -89,12 +90,25 @@ def _nominatim(query: str, limit: int) -> list[dict]:
     return rows
 
 
+_CACHE: dict[tuple[str, int], tuple[float, list[dict], str]] = {}
+_CACHE_TTL_S = 300.0
+
+
 def lookup(query: str, limit: int = 5) -> tuple[list[dict], str]:
     """Return (rows, provider). An empty provider means every source failed.
 
     Amap comes first when a key is configured (Chinese POIs are much better), then
     Photon, then Nominatim. Amap results are already converted to WGS84.
+    Photon intermittently answers an empty payload (measured 2026-11-17: the same
+    query returned 5 rows, then 0, then 5), so every provider gets one retry and
+    successful answers are cached briefly — otherwise the same place resolves
+    differently between two tool calls in one turn.
     """
+    cached = _CACHE.get((query, limit))
+    now = time.monotonic()
+    if cached and now - cached[0] < _CACHE_TTL_S:
+        return cached[1], cached[2]
+
     providers: list[tuple[str, Callable[[str, int], list[dict]]]] = []
     if os.getenv("AMAP_WEB_KEY", "").strip():
         providers.append(("高德地图 / GCJ-02→WGS84", amap.lookup))
@@ -103,10 +117,14 @@ def lookup(query: str, limit: int = 5) -> tuple[list[dict], str]:
         ("OpenStreetMap / Nominatim", _nominatim),
     ]
     for name, provider in providers:
-        try:
-            rows = provider(query, limit)
-        except Exception:
-            continue
-        if rows:
-            return rows, name
+        for attempt in range(2):
+            try:
+                rows = provider(query, limit)
+            except Exception:
+                rows = []
+            if rows:
+                _CACHE[(query, limit)] = (now, rows, name)
+                return rows, name
+            if attempt == 0:
+                time.sleep(0.25)
     return [], ""

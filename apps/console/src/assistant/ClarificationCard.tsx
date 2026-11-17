@@ -1,12 +1,7 @@
 import { useState } from "react";
-import { Check, Clock3, MapPin, RefreshCw } from "lucide-react";
+import { Check, Clock3, MapPin } from "lucide-react";
 
-import {
-  formatCoordinates,
-  loadGeoMission,
-  type GeoPlace,
-  type LngLat,
-} from "../geo";
+import { formatCoordinates, type GeoPlace, type LngLat } from "../geo";
 import { MapPicker } from "./MapPicker";
 import { PinPreview } from "./PinPreview";
 import type { Clarification, MapPin as MapPinData } from "./types";
@@ -19,7 +14,10 @@ type Props = {
 };
 
 export function ClarificationCard({ data, busy, onConfirm }: Props) {
-  const [geo, setGeo] = useState(() => loadGeoMission());
+  const [picked, setPicked] = useState<{
+    origin?: GeoPlace;
+    destination?: GeoPlace;
+  }>({});
   const suggested = data.questions.find(
     (item) => item.field === "scheduled_for",
   )?.current;
@@ -29,26 +27,23 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
   const [picker, setPicker] = useState<"origin" | "destination" | null>(null);
 
   const applyPlace = (field: "origin" | "destination", place: GeoPlace) => {
-    const next = { ...geo, [field]: place };
-    setGeo(next);
-    try {
-      localStorage.setItem("aeris-geo-mission-v1", JSON.stringify(next));
-    } catch {
-      // Storage unavailable: keep the picker result in memory only.
-    }
+    // Only a pick made inside THIS card may override the backend pin. Reading
+    // the global map selection here used to overwrite a freshly resolved
+    // Nanchang coordinate with a stale Shanghai click.
+    setPicked((current) => ({ ...current, [field]: place }));
     setPicker(null);
   };
 
   const pins = data.map_pins.map((pin: MapPinData) => {
-    const picked = pin.field === "origin" ? geo.origin : geo.destination;
+    const local = pin.field === "origin" ? picked.origin : picked.destination;
     // Local ENU metres are NOT WGS84. Never send them back as map coordinates.
-    const point = picked?.point ?? (pin.crs === "EPSG:4326" ? pin.point : null);
+    const point = local?.point ?? (pin.crs === "EPSG:4326" ? pin.point : null);
     return {
       ...pin,
       point,
-      crs: picked ? "EPSG:4326" : pin.crs,
-      address: picked?.address ?? pin.address,
-      fromMap: !!picked,
+      crs: local ? "EPSG:4326" : pin.crs,
+      address: local?.address ?? pin.address,
+      fromMap: !!local,
     };
   });
   const located = pins.every((pin) => pin.point);
@@ -97,6 +92,20 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
           <li key={`${item.field}-${index}`} data-field={item.field}>
             <span>{index + 1}</span>
             {item.question}
+            {item.options && item.options.length > 0 && (
+              <div className="intake-clarify-options">
+                {item.options.map((option) => (
+                  <button
+                    key={option.label}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onConfirm(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </ol>
@@ -105,8 +114,12 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
         <div className="intake-clarify-map-head">
           <MapPin size={13} />
           <strong>地图定位</strong>
-          <button type="button" onClick={() => setGeo(loadGeoMission())}>
-            <RefreshCw size={12} /> 重新读取
+          <button
+            type="button"
+            onClick={() => setPicked({})}
+            disabled={!picked.origin && !picked.destination}
+          >
+            恢复助手坐标
           </button>
           <button
             type="button"

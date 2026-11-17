@@ -49,6 +49,17 @@ def _stub_real_route(monkeypatch):
 
     monkeypatch.setattr(tools_module, "real_route_for_intake", stub)
 
+    # Production fills the route on a background thread; tests must be
+    # deterministic, so default every Toolset to the synchronous path unless a
+    # test explicitly asks for background behaviour.
+    original_init = tools_module.Toolset.__init__
+
+    def init(self, *args, **kwargs):
+        kwargs.setdefault("route_background", False)
+        original_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(tools_module.Toolset, "__init__", init)
+
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
