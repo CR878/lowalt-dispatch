@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from planner.astar import plan
 from planner.grid import build_grid
 from planner.scene import load_scene
+from services.assistant.vehicles import VehicleSelection, evaluate_vehicle
 
 
 class ScenePoint(BaseModel):
@@ -27,13 +28,12 @@ class GeographicPoint(BaseModel):
     lat: float = Field(ge=-80, le=80)
 
 
-class CandidateInput(BaseModel):
+class CandidateInput(VehicleSelection):
     model_config = ConfigDict(extra="forbid")
     origin: ScenePoint | GeographicPoint
     destination: ScenePoint | GeographicPoint
     frame: Literal["ENU", "WGS84"]
     scheduled_for: str | None = None
-    vehicle_key: str | None = Field(default=None, max_length=100, pattern=r"^[\w-]+$")
     resolution_m: Literal[10, 20, 30] = 10
     max_expand: int = Field(default=500_000, ge=1000, le=1_000_000)
 
@@ -137,7 +137,12 @@ def real_candidate_routes(body: CandidateInput):
     ]
     found = result["found"]
     weather = (
-        assess_route_weather(result["waypoints"], body.scheduled_for, vehicle_key=body.vehicle_key)
+        assess_route_weather(
+            result["waypoints"],
+            body.scheduled_for,
+            vehicle_key=body.vehicle_key,
+            custom_vehicle=body.custom_vehicle,
+        )
         if found
         else {
             "status": "unavailable",
@@ -197,6 +202,7 @@ def real_candidate_routes(body: CandidateInput):
         "operationally_approved": False,
         "continuous_clearance_verified": result.get("continuous_clearance_verified", False),
         "flight_feasibility": weather.get("flight_feasibility", {"status": "unavailable"}),
+        "vehicle_assessment": evaluate_vehicle(body, result["length_m"] if found else None),
         "obstacle_source": metadata["source"],
         "weather_source": weather["source"],
         "airspace": {"status": "manual_review_required", "source": None, "dispatch_enabled": False},

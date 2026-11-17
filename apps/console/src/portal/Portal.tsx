@@ -81,6 +81,7 @@ const PORTAL_ASSISTANT_CONTEXT: AssistantContext = {
 import "./workspace-theme.css";
 
 const Console = lazy(() => import("../App"));
+const AircraftLibrary = lazy(() => import("../AircraftLibrary"));
 type PortalState = {
   user: User;
   go: (path: string) => void;
@@ -217,6 +218,14 @@ const modules = [
     icon: Radio,
     permission: "telemetry.read",
     index: "03",
+  },
+  {
+    path: "/aircraft",
+    title: "配送机型库",
+    description: "查看官方机型规格，选择或录入配送测试参数。",
+    icon: Cpu,
+    permission: "map.read",
+    index: "05",
   },
   {
     path: "/analytics",
@@ -1118,6 +1127,12 @@ export default function Portal() {
         />
       </Suspense>
     );
+  else if (pathname === "/aircraft")
+    content = (
+      <Suspense fallback={<Loading />}>
+        <AircraftLibrary onNavigate={go} />
+      </Suspense>
+    );
   else if (pathname === "/analytics") content = <Analytics />;
   else if (pathname.startsWith("/identity/"))
     content = <IdentityPage rolesOnly={pathname.endsWith("/roles")} />;
@@ -1191,7 +1206,7 @@ export default function Portal() {
           <nav aria-label="工作区导航">
             <p className="p-nav-group">工作空间</p>
             {pages
-              .slice(0, 5)
+              .slice(0, 6)
               .filter((p) => can(p.permission))
               .map((p) => (
                 <button
@@ -1210,7 +1225,7 @@ export default function Portal() {
             {can("identity.manage") && (
               <>
                 <p className="p-nav-group">身份与访问</p>
-                {pages.slice(5, 7).map((p) => (
+                {pages.slice(6, 8).map((p) => (
                   <button
                     key={p.path}
                     title={p.title}

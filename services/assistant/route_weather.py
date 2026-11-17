@@ -11,6 +11,7 @@ import math
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
+from types import SimpleNamespace
 
 from services.assistant import evidence
 from sim.energy import (
@@ -39,7 +40,15 @@ def _distance(a, b):
 def _bearing(a, b):
     lng1, lat1, lng2, lat2 = map(math.radians, (*a, *b))
     dl = lng2 - lng1
-    return math.degrees(math.atan2(math.sin(dl) * math.cos(lat2), math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dl))) % 360
+    return (
+        math.degrees(
+            math.atan2(
+                math.sin(dl) * math.cos(lat2),
+                math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dl),
+            )
+        )
+        % 360
+    )
 
 
 def _midpoint(points, lengths):
@@ -54,7 +63,9 @@ def _midpoint(points, lengths):
 
 def _atmosphere(values):
     try:
-        rho = moist_air_density_kg_m3(values["temperature_2m"], values["relative_humidity_2m"], values["surface_pressure"])
+        rho = moist_air_density_kg_m3(
+            values["temperature_2m"], values["relative_humidity_2m"], values["surface_pressure"]
+        )
     except (ValueError, TypeError, KeyError):
         return {"status": "unavailable", "reason": "温湿压缺失或超出湿空气公式适用范围；未填标准天气"}
     return {
@@ -71,11 +82,22 @@ def _atmosphere(values):
 def _load_real_profile(vehicle_key):
     if not vehicle_key:
         return None, "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    from services.assistant.vehicles import catalog
+
+    if any(v["id"] == vehicle_key for v in catalog()["vehicles"]):
+        return None, "已选择厂家规格机型；官网未提供实测 Wh/m 与可用电量，未从标称电池或最大航程反推能耗。"
     try:
         profile = load_vehicle(key=vehicle_key)
-        if profile.is_example or not profile.source or profile.source.lower().startswith(("synthetic", "example")) or not profile.calibrated_at:
+        if (
+            profile.is_example
+            or not profile.source
+            or profile.source.lower().startswith(("synthetic", "example"))
+            or not profile.calibrated_at
+        ):
             raise ValueError("真实天气能耗需要有来源及calibrated_at的非示例机型")
-        if not all(math.isfinite(v) and v > 0 for v in (profile.cruise_speed_mps, profile.energy_per_meter_wh)):
+        if not all(
+            math.isfinite(v) and v > 0 for v in (profile.cruise_speed_mps, profile.energy_per_meter_wh)
+        ):
             raise ValueError("机型的标定空速或能耗无效")
         return profile, ""
     except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
@@ -86,7 +108,14 @@ def _mean_wind(values):
     east = north = 0.0
     for item in values:
         speed, direction = item.get("wind_speed_10m"), item.get("wind_direction_10m")
-        if speed is None or direction is None or not math.isfinite(speed) or not math.isfinite(direction) or speed < 0 or not 0 <= direction <= 360:
+        if (
+            speed is None
+            or direction is None
+            or not math.isfinite(speed)
+            or not math.isfinite(direction)
+            or speed < 0
+            or not 0 <= direction <= 360
+        ):
             raise ValueError("预报缺失有效风速或风向；未填默认风")
         east -= speed * math.sin(math.radians(direction)) / len(values)
         north -= speed * math.cos(math.radians(direction)) / len(values)
@@ -121,26 +150,41 @@ def _assess_flight(points, lengths, forecasts, departure, profile: VehicleProfil
             raise ValueError("航段风场时间迭代未收敛，未给出能耗结果")
         atmosphere_start = _atmosphere(departure_values)
         atmosphere_end = _atmosphere(arrival_values)
-        legs.append({
-            "origin": list(a), "destination": list(b), "distance_m": length,
-            "departure_at": begins.isoformat(), "arrival_at": (begins + timedelta(seconds=metrics["duration_s"])).isoformat(),
-            "wind_speed_mps": speed, "wind_from_deg": direction,
-            "atmosphere_start": atmosphere_start, "atmosphere_end": atmosphere_end, **metrics,
-        })
+        legs.append(
+            {
+                "origin": list(a),
+                "destination": list(b),
+                "distance_m": length,
+                "departure_at": begins.isoformat(),
+                "arrival_at": (begins + timedelta(seconds=metrics["duration_s"])).isoformat(),
+                "wind_speed_mps": speed,
+                "wind_from_deg": direction,
+                "atmosphere_start": atmosphere_start,
+                "atmosphere_end": atmosphere_end,
+                **metrics,
+            }
+        )
         duration += metrics["duration_s"]
         energy += metrics["energy_wh"]
         distance += length
     magnitude, _ = _mean_wind([forecast["values"] for forecast in forecasts])
     return {
-        "status": "conditional", "model": MODEL, "duration_s": duration, "energy_wh": energy,
-        "vehicle_source": profile.source, "vehicle_calibrated_at": profile.calibrated_at,
-        "legs": legs, "sensitivity": wind_sensitivity(profile, total, magnitude),
+        "status": "conditional",
+        "model": MODEL,
+        "duration_s": duration,
+        "energy_wh": energy,
+        "vehicle_source": profile.source,
+        "vehicle_calibrated_at": profile.calibrated_at,
+        "legs": legs,
+        "sensitivity": wind_sensitivity(profile, total, magnitude),
         "formula": "Vg=sqrt(Va^2-Wcross^2)+Walong; P=e_calibrated*Va*3600; E_Wh=P_W*t_s/3600",
         "limitation": "单一标定空速的稳态功率点，未编造跨空速功率曲线；未含爬升、转弯、密度对总电功率及温度对可用电量的标定修正。",
     }
 
 
-def assess_route_weather(waypoints, scheduled_for=None, *, vehicle_key=None, client=None):
+def assess_route_weather(
+    waypoints, scheduled_for=None, *, vehicle_key=None, custom_vehicle=None, client=None
+):
     """Return public evidence, honest coverage, and conditional energy if possible.
 
     ``status=ok`` means forecast evidence was obtained. Flight feasibility is
@@ -151,21 +195,37 @@ def assess_route_weather(waypoints, scheduled_for=None, *, vehicle_key=None, cli
     unavailable = {"status": "unavailable", "reason": "缺少真实标定机型或天气覆盖，未计算实际ETA和能耗。"}
     try:
         points = [tuple(map(float, p)) for p in waypoints]
-        if len(points) < 2 or not all(len(p) == 2 and all(math.isfinite(v) for v in p) and -180 <= p[0] <= 180 and -90 <= p[1] <= 90 for p in points):
+        if len(points) < 2 or not all(
+            len(p) == 2 and all(math.isfinite(v) for v in p) and -180 <= p[0] <= 180 and -90 <= p[1] <= 90
+            for p in points
+        ):
             raise ValueError("航线坐标无效")
-        departure = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00")) if scheduled_for else datetime.now(UTC)
+        departure = (
+            datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
+            if scheduled_for
+            else datetime.now(UTC)
+        )
         departure = departure.replace(tzinfo=evidence.LOCAL_TZ) if departure.tzinfo is None else departure
         departure = departure.astimezone(UTC)
         lengths = [_distance(a, b) for a, b in pairwise(points)]
         if sum(lengths) <= 0:
             raise ValueError("航线长度为零")
     except (ValueError, TypeError, AttributeError, OverflowError) as exc:
-        return {**base, "status": "unavailable", "reason": str(exc), "samples": [], "energy": unavailable, "flight_feasibility": unavailable}
+        return {
+            **base,
+            "status": "unavailable",
+            "reason": str(exc),
+            "samples": [],
+            "energy": unavailable,
+            "flight_feasibility": unavailable,
+        }
     anchors = [points[0], _midpoint(points, lengths), points[-1]]
 
     def fetch(point):
         try:
-            return evidence.fetch_weather_forecast(point[1], point[0], departure.isoformat(), client=client, include_hourly=True)
+            return evidence.fetch_weather_forecast(
+                point[1], point[0], departure.isoformat(), client=client, include_hourly=True
+            )
         except Exception:
             return evidence.unavailable_weather("气象服务返回无效，未填任何数值", departure.isoformat())
 
@@ -181,9 +241,41 @@ def assess_route_weather(waypoints, scheduled_for=None, *, vehicle_key=None, cli
             _mean_wind([values])
         except (ValueError, TypeError):
             weather_ok = False
-        samples.append({"at": name, "point": list(point), "status": forecast.get("status", "unavailable"), "valid_for": forecast.get("valid_for"), "fetched_at": forecast.get("fetched_at"), "source": forecast.get("source", SOURCE), "values": values, "units": {"wind_speed_10m": "m/s", "wind_gusts_10m": "m/s", "wind_direction_10m": "degree FROM", "surface_pressure": "hPa", "temperature_2m": "degC", "relative_humidity_2m": "%"}, "atmosphere": _atmosphere(values), "reason": forecast.get("reason", "")})
+        samples.append(
+            {
+                "at": name,
+                "point": list(point),
+                "status": forecast.get("status", "unavailable"),
+                "valid_for": forecast.get("valid_for"),
+                "fetched_at": forecast.get("fetched_at"),
+                "source": forecast.get("source", SOURCE),
+                "values": values,
+                "units": {
+                    "wind_speed_10m": "m/s",
+                    "wind_gusts_10m": "m/s",
+                    "wind_direction_10m": "degree FROM",
+                    "surface_pressure": "hPa",
+                    "temperature_2m": "degC",
+                    "relative_humidity_2m": "%",
+                },
+                "atmosphere": _atmosphere(values),
+                "reason": forecast.get("reason", ""),
+            }
+        )
     profile, profile_reason = _load_real_profile(vehicle_key)
-    result = {**base, "status": "ok" if weather_ok else "unavailable", "scheduled_for": departure.isoformat(), "samples": samples, "energy": unavailable, "flight_feasibility": unavailable}
+    if custom_vehicle is not None:
+        if custom_vehicle.energy_per_meter_wh is None:
+            profile, profile_reason = None, "自定义测试机型未填写巡航 Wh/m；仍可对照载荷和参考航程。"
+        else:
+            profile = SimpleNamespace(**custom_vehicle.model_dump(), calibrated_at=None)
+    result = {
+        **base,
+        "status": "ok" if weather_ok else "unavailable",
+        "scheduled_for": departure.isoformat(),
+        "samples": samples,
+        "energy": unavailable,
+        "flight_feasibility": unavailable,
+    }
     if not weather_ok:
         warnings.append("天气不可用或缺少风向/风速；未填默认风速，未执行天气约束判定。")
         result["reason"] = "航线采样位置的预报未完整获取有效风速与风向。"
@@ -193,8 +285,30 @@ def assess_route_weather(waypoints, scheduled_for=None, *, vehicle_key=None, cli
     elif weather_ok:
         try:
             energy = _assess_flight(points, lengths, forecasts, departure, profile)
+            if custom_vehicle is not None:
+                energy.update(
+                    status="user_test",
+                    model="用户输入空速与 Wh/m 的恒功率风三角测试",
+                    vehicle_data_status="user_supplied_test",
+                    vehicle_calibrated_at=None,
+                )
+                energy["limitation"] = "用户自定义测试参数，未经系统标定认证；未含起降、转弯、返航与备降。"
+                if (
+                    custom_vehicle.usable_battery_wh is not None
+                    and custom_vehicle.reserve_policy_wh is not None
+                ):
+                    margin = (
+                        custom_vehicle.usable_battery_wh
+                        - custom_vehicle.reserve_policy_wh
+                        - energy["energy_wh"]
+                    )
+                    energy["remaining_after_reserve_wh"] = margin
+                    energy["budget_status"] = "exceeded" if margin < 0 else "within_test_budget"
             result["energy"] = energy
-            result["flight_feasibility"] = {"status": "conditional", "reason": "只计算10m预报风下稳态时间/能耗；缺少航高风、性能包线与完整空域，未判真实飞行可行。"}
+            result["flight_feasibility"] = {
+                "status": "conditional",
+                "reason": "只计算10m预报风下稳态时间/能耗；缺少航高风、性能包线与完整空域，未判真实飞行可行。",
+            }
             result["constraints_evaluated"] = "wind_triangle_only"
         except (ValueError, TypeError, KeyError, OverflowError) as exc:
             reason = str(exc)

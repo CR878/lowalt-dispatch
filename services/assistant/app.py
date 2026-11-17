@@ -24,6 +24,7 @@ from services.assistant.navigation import CandidateInput, candidate_routes
 from services.assistant.places import search_places
 from services.assistant.telemetry import stream_telemetry
 from services.assistant.tools import CAPABILITIES
+from services.assistant.vehicles import CustomVehicle, VehicleTestInput
 from services.identity.routes import COOKIE
 from services.identity.routes import router as identity_router
 from services.identity.store import IdentityStore
@@ -80,6 +81,27 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost
 settings = Settings.from_env()
 engine = Engine(settings)
 navigation_slot = threading.BoundedSemaphore(1)
+
+
+@app.get("/api/assistant/vehicles")
+def vehicle_catalog():
+    from services.assistant.vehicles import catalog
+
+    return {**catalog(), "dispatch_enabled": False}
+
+
+@app.post("/api/assistant/vehicles/validate")
+def validate_custom_vehicle(body: CustomVehicle):
+    return {"vehicle": body.model_dump(), "data_status": "user_supplied_test", "dispatch_enabled": False}
+
+
+@app.post("/api/assistant/vehicles/evaluate")
+def evaluate_vehicle_test(body: VehicleTestInput):
+    from services.assistant.vehicles import evaluate_vehicle
+
+    return evaluate_vehicle(
+        body, body.distance_km * 1000, wind_speed_mps=body.wind_speed_mps, wind_direction=body.wind_direction
+    )
 
 
 @app.post("/api/assistant/navigation/candidates")

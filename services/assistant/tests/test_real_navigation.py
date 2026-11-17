@@ -85,6 +85,35 @@ def test_real_endpoint_inside_building_does_not_move(dataset):
     assert "未移动端点" in result["alternatives"][0]["reason"]
 
 
+def test_selected_vehicle_and_payload_reach_route_assessment(dataset, monkeypatch):
+    calls = []
+
+    def weather(points, scheduled_for, **kwargs):
+        calls.append(kwargs)
+        return {"status": "unavailable", "source": "test forecast unavailable", "warnings": []}
+
+    monkeypatch.setattr(route_weather, "assess_route_weather", weather)
+    request = body() | {"vehicle_key": "dji-flycart-30", "payload_kg": 35}
+    result = candidate_routes(CandidateInput.model_validate(request))
+    assert result["route"]
+    assert result["vehicle_assessment"]["status"] == "exceeds_reference"
+    assert result["vehicle_assessment"]["vehicle"]["id"] == "dji-flycart-30"
+    assert result["vehicle_assessment"]["distance_m"] == result["route"]["length_m"]
+    assert calls[-1]["vehicle_key"] == "dji-flycart-30"
+    custom = {
+        "display_name": "test",
+        "source": "synthetic test fixture",
+        "max_payload_kg": 2,
+        "cruise_speed_mps": 10,
+    }
+    result = candidate_routes(
+        CandidateInput.model_validate(body() | {"custom_vehicle": custom, "payload_kg": 1})
+    )
+    assert calls[-1]["custom_vehicle"].display_name == "test"
+    assert result["vehicle_assessment"]["vehicle"]["data_status"] == "user_supplied_test"
+    assert not result["operationally_approved"]
+
+
 def test_real_api_and_cached_scene(client, dataset, monkeypatch):
     response = client.post("/api/assistant/navigation/candidates", json=body())
     assert response.status_code == 200

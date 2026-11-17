@@ -167,7 +167,7 @@ export const message = (error: unknown) =>
 export function safeTarget(value: string | null) {
   if (
     !value ||
-    !/^\/(workspace|missions|airspace|fleet|analytics|identity|account|help)(\/|\?|$)/.test(
+    !/^\/(workspace|missions|airspace|fleet|aircraft|analytics|identity|account|help)(\/|\?|$)/.test(
       value,
     ) ||
     value.includes("\\")

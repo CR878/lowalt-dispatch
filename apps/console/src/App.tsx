@@ -640,6 +640,7 @@ export default function App({
   const [autoRealRequest, setAutoRealRequest] = useState<{
     mission: GeoMission;
     scheduledFor: string | null;
+    payloadKg?: number | null;
   } | null>(null);
   const [terrainModel] = useState(() => new TerrainModel());
   const [motionReduced, setMotionReduced] = useState(() => {
@@ -908,6 +909,7 @@ export default function App({
       void realRouting.compute(
         autoRealRequest.mission,
         autoRealRequest.scheduledFor,
+        autoRealRequest.payloadKg,
       );
   }, [autoRealRequest, realRouting.compute]);
   useEffect(() => {
@@ -928,6 +930,7 @@ export default function App({
           origin?: { name?: string; point?: number[]; crs?: string };
           destination?: { name?: string; point?: number[]; crs?: string };
           scheduled_for?: string | null;
+          payload_kg?: number | null;
         }) => {
           const place = (value: typeof item.origin) =>
             value?.point?.length === 2 && value.crs === "EPSG:4326"
@@ -949,6 +952,7 @@ export default function App({
           setAutoRealRequest({
             mission: { origin, destination },
             scheduledFor: item.scheduled_for ?? null,
+            payloadKg: item.payload_kg ?? null,
           });
           setDemoVisible(false);
           setPlaying(false);

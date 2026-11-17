@@ -3,6 +3,8 @@ import type { FeatureCollection } from "geojson";
 import { validLngLat, type GeoMission, type LngLat } from "./geo";
 import { parseRoutes, type NavRoute } from "./navigation/engine";
 import "./real-routing.css";
+import { useAircraft, type Assessment } from "./aircraft";
+import { VehicleAssessment, VehicleSelect } from "./AircraftLibrary";
 
 export type RealScene = {
   obstacles: FeatureCollection;
@@ -21,6 +23,7 @@ type RoutingResult = {
   warnings: string[];
   limitation: string;
   alternatives: { reason: string | null }[];
+  vehicle_assessment?: Assessment;
   data: {
     building_count?: number;
     road_count?: number;
@@ -30,7 +33,13 @@ type RoutingResult = {
   weather: {
     status: string;
     scheduled_for?: string;
-    energy?: { status: string; reason?: string };
+    energy?: {
+      status: string;
+      reason?: string;
+      duration_s?: number;
+      energy_wh?: number;
+      remaining_after_reserve_wh?: number;
+    };
     warnings?: string[];
     samples?: {
       at: string;
@@ -45,6 +54,14 @@ export function useRealRouting(
   mission: GeoMission,
   onReady: (route: NavRoute) => void,
 ) {
+  const aircraft = useAircraft();
+  const [payloadKg, setPayloadKg] = useState("");
+  const selectionRef = useRef(aircraft.selection);
+  selectionRef.current = aircraft.selection;
+  const payloadRef = useRef(payloadKg);
+  payloadRef.current = payloadKg;
+  const [queriedVehicle, setQueriedVehicle] = useState("");
+  const selectionKey = JSON.stringify([aircraft.selection, payloadKg]);
   const [result, setResult] = useState<RoutingResult | null>(null);
   const [route, setRoute] = useState<NavRoute | null>(null);
   const [scene, setScene] = useState<RealScene | null>(null);
@@ -72,7 +89,11 @@ export function useRealRouting(
     };
   }, [key]);
   const compute = useCallback(
-    async (points: GeoMission, scheduledFor: string | null = null) => {
+    async (
+      points: GeoMission,
+      scheduledFor: string | null = null,
+      intakePayload?: number | null,
+    ) => {
       if (!points.origin || !points.destination) return;
       abort.current?.abort();
       const controller = new AbortController();
@@ -83,6 +104,11 @@ export function useRealRouting(
       setResult(null);
       setRoute(null);
       setScene(null);
+      const selection = selectionRef.current;
+      const payloadText =
+        intakePayload == null ? payloadRef.current : String(intakePayload);
+      if (intakePayload != null) setPayloadKg(payloadText);
+      const vehicleKey = JSON.stringify([selection, payloadText]);
       try {
         const [lng, lat] = points.origin.point;
         const [endLng, endLat] = points.destination.point;
@@ -98,6 +124,8 @@ export function useRealRouting(
             origin: { lng, lat },
             destination: { lng: endLng, lat: endLat },
             scheduled_for: scheduledFor,
+            ...selection,
+            payload_kg: payloadText.trim() ? Number(payloadText) : null,
           }),
         });
         const payload = await response.json();
@@ -110,6 +138,7 @@ export function useRealRouting(
           );
         if (controller.signal.aborted) return;
         setQueriedSchedule(scheduledFor);
+        setQueriedVehicle(vehicleKey);
         setResult(payload);
         if (payload.route) {
           const parsed = parseRoutes(payload.route)[0];
@@ -147,7 +176,19 @@ export function useRealRouting(
     },
     [onReady],
   );
-  return { result, route, scene, busy, error, compute, queriedSchedule };
+  return {
+    result,
+    route,
+    scene,
+    busy,
+    error,
+    compute,
+    queriedSchedule,
+    aircraft,
+    payloadKg,
+    setPayloadKg,
+    vehicleChanged: queriedVehicle !== selectionKey,
+  };
 }
 
 export function RealRoutingPanel({
@@ -180,6 +221,21 @@ export function RealRoutingPanel({
       <p>
         {mission.origin.name} → {mission.destination.name}
       </p>
+      <VehicleSelect aircraft={routing.aircraft} />
+      <a href="/aircraft">查看官方规格 / 管理自定义机型 →</a>
+      <label>
+        配送载荷 (kg)
+        <input
+          aria-label="航线配送载荷"
+          type="number"
+          min="0"
+          max="1000"
+          step="any"
+          placeholder="未填则不判定载荷"
+          value={routing.payloadKg}
+          onChange={(e) => routing.setPayloadKg(e.target.value)}
+        />
+      </label>
       <label>
         起飞时刻（留空查询当前预报）
         <input
@@ -214,6 +270,11 @@ export function RealRoutingPanel({
               起飞时刻已更改，请重新计算；下方结果仍对应上次查询时刻。
             </p>
           )}
+          {routing.vehicleChanged && (
+            <p role="alert">
+              机型或载荷已更改，请重新计算；下方为上次参数的结果。
+            </p>
+          )}
           <p>
             {route
               ? `几何 A* · ${points.length} 个 WGS84 航点`
@@ -236,12 +297,28 @@ export function RealRoutingPanel({
               ? "已获取模式预报"
               : "预报或性能评估不完整"}{" "}
             · 能耗：
-            {result.weather.energy?.status === "conditional"
-              ? "已计算机型条件估算，未判定飞行可行"
-              : result.weather.energy?.status === "infeasible"
-                ? "风场下无法保持航迹，条件不满足"
-                : "缺少有效数据，未计算"}
+            {result.weather.energy?.status === "user_test"
+              ? "用户参数与真实预报的条件测试"
+              : result.weather.energy?.status === "conditional"
+                ? "已计算机型条件估算，未判定飞行可行"
+                : result.weather.energy?.status === "infeasible"
+                  ? "风场下无法保持航迹，条件不满足"
+                  : "缺少有效数据，未计算"}
           </p>
+          {result.vehicle_assessment && (
+            <VehicleAssessment value={result.vehicle_assessment} />
+          )}
+          {result.weather.energy?.energy_wh != null && (
+            <p>
+              预报风场下条件测试：
+              {(result.weather.energy.duration_s! / 60).toFixed(1)} 分钟 ·{" "}
+              {result.weather.energy.energy_wh.toFixed(1)} Wh
+              {result.weather.energy.remaining_after_reserve_wh != null
+                ? ` · 扣除保留量后 ${result.weather.energy.remaining_after_reserve_wh.toFixed(1)} Wh`
+                : ""}
+              。未含起降、返航与备降。
+            </p>
+          )}
           {result.weather.samples?.length ? (
             <details>
               <summary>航路天气预报数值</summary>
