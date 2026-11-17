@@ -33,9 +33,16 @@ MAP_SOURCE = "OpenStreetMap / API 0.6 map"
 MAP_API = "https://api.openstreetmap.org/api/0.6"
 ATTRIBUTION = "© OpenStreetMap contributors; ODbL 1.0 https://www.openstreetmap.org/copyright"
 ENDPOINTS = (
+    # Measured 2026-11-17 from this network: the three canonical instances
+    # returned 502 / read timeouts while the French mirror answered. Order is
+    # operational, not a statement about which instance is "official".
+    "https://overpass.openstreetmap.fr/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
+    # Regional extract (Switzerland): returns empty results outside its area.
+    # Kept last so it can never mask "no data" for other regions.
+    "https://overpass.osm.ch/api/interpreter",
 )
 CACHE_DIR = Path(__file__).resolve().parents[2] / "scenarios" / "real"
 CACHE_TTL_HOURS = 24.0
@@ -497,6 +504,7 @@ def fetch_obstacles(
              f'relation["type"="multipolygon"]["building:part"]["building:part"!="no"]{bounds};'
              f'way["highway"]{bounds};);out meta geom;')
     errors = []
+    empty_result = None
     own_client = client is None
     active = client or httpx.Client(timeout=httpx.Timeout(18, connect=5), trust_env=False,
                                     headers={"User-Agent": USER_AGENT})
@@ -507,6 +515,13 @@ def fetch_obstacles(
                 response.raise_for_status()
                 fetched_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
                 result = _parse(response.json(), bbox, fetched_at, endpoint)
+                if not result["obstacles"]["features"] and not result["roads"]["features"]:
+                    # A regional mirror (e.g. overpass.osm.ch) answers 200 but
+                    # knows nothing outside its own extract. Try other endpoints
+                    # first; accept an empty area only if every source agrees.
+                    empty_result = result
+                    errors.append(f"{endpoint}: 空结果，先尝试其他端点")
+                    continue
                 return _persist(result, directory, scene_id, query, max_age_hours)
             except (httpx.HTTPError, ValueError, OSMDataUnavailable) as exc:
                 errors.append(f"{endpoint}: {type(exc).__name__}: {str(exc)[:160]}")
@@ -527,6 +542,17 @@ def fetch_obstacles(
     finally:
         if own_client:
             active.close()
+    if empty_result is not None:
+        empty_result["warnings"].append(
+            "所有数据源在该范围均未返回建筑/道路记录；不代表现实中没有建筑，规划结果必须按“覆盖未知”读。"
+        )
+        return _persist(
+            empty_result,
+            directory,
+            scene_id,
+            "all Overpass endpoints returned empty for this bbox",
+            max_age_hours,
+        )
     raise OSMDataUnavailable("真实建筑/道路获取失败；未回退到仿真数据。" + " | ".join(errors))
 
 

@@ -35,9 +35,12 @@ def _row(name: str, address: str, lng: float, lat: float) -> dict:
 
 def _photon(query: str, limit: int) -> list[dict]:
     with httpx.Client(timeout=8, follow_redirects=False, trust_env=False) as client:
+        # Photon only accepts default/de/en/fr; ``lang=zh`` returns HTTP 400 and
+        # used to silently disable all place search (found 2026-11-17). OSM
+        # already carries local names, so request without a language hint.
         response = client.get(
             PHOTON,
-            params={"q": query, "limit": limit, "lang": "zh"},
+            params={"q": query, "limit": limit},
             headers={"User-Agent": USER_AGENT},
         )
         response.raise_for_status()

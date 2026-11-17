@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from services.assistant.osm_obstacles import (
+    ENDPOINTS,
     MAP_SOURCE,
     OSMDataUnavailable,
     _height,
@@ -156,7 +157,7 @@ def test_primary_map_fallback_is_real_and_distinctly_attributed(tmp_path):
 
     with httpx.Client(transport=httpx.MockTransport(upstream)) as client:
         result = fetch_obstacles((121, 31), (121.002, 31), client=client, cache_dir=tmp_path)
-    assert len(calls) == 4
+    assert len(calls) == len(ENDPOINTS) + 1
     assert result["metadata"]["source"] == MAP_SOURCE
     assert result["obstacles"]["source"] == MAP_SOURCE
     assert result["obstacles"]["features"][0]["properties"]["source"] == MAP_SOURCE
@@ -199,3 +200,25 @@ def test_partial_relation_coordinates_cannot_be_repaired_with_hull():
     ]}]}
     with pytest.raises(OSMDataUnavailable, match="缺失坐标/成员"):
         _parse(payload, [121, 31, 121.1, 31.1], "2026-11-17T01:00:00Z", "test")
+
+def test_empty_regional_mirror_is_skipped_for_a_later_endpoint(tmp_path, monkeypatch):
+    """An empty 200 must not mask a later endpoint that has real data."""
+    from services.assistant import osm_obstacles as module
+
+    calls = []
+
+    def upstream(request):
+        calls.append(str(request.url))
+        if "empty-mirror" in str(request.url):
+            return httpx.Response(200, json={"elements": []})
+        return httpx.Response(200, json=sample_payload())
+
+    monkeypatch.setattr(
+        module,
+        "ENDPOINTS",
+        ("https://empty-mirror.invalid/api/interpreter", "https://data.invalid/api/interpreter"),
+    )
+    with httpx.Client(transport=httpx.MockTransport(upstream)) as client:
+        result = fetch_obstacles((121, 31), (121.002, 31), client=client, cache_dir=tmp_path)
+    assert len(calls) == 2
+    assert len(result["obstacles"]["features"]) == 1
