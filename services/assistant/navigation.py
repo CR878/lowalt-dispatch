@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import time
 from datetime import datetime
 from functools import lru_cache
 from typing import Literal
@@ -113,23 +115,74 @@ def candidate_routes(body: CandidateInput):
     }
 
 
-def real_candidate_routes(body: CandidateInput):
+def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0):
     from planner.real import plan_real_route
     from services.assistant.osm_obstacles import fetch_obstacles
     from services.assistant.route_weather import assess_route_weather
 
+    if not math.isfinite(budget_total_s) or budget_total_s <= 0:
+        raise ValueError("真实航线总时间预算必须为有限正数")
     start = (body.origin.lng, body.origin.lat)
     goal = (body.destination.lng, body.destination.lat)
     dataset = fetch_obstacles(start, goal, margin_m=1000)
-    result = plan_real_route(
-        start,
-        goal,
-        dataset["obstacles"],
-        resolution_m=body.resolution_m,
-        max_expand=body.max_expand,
-    )
     metadata = dataset["metadata"]
+
+    # Coarse resolutions (20/30 m) carry a larger half-cell margin, so dense
+    # urban corridors can be sealed even when a 10 m grid is traversable. That is
+    # a safety-margin consequence, not a search bug. We therefore retry at 10 m
+    # and report every attempt instead of silently changing the clearance or
+    # claiming the coarse request succeeded.
+    plan_attempts = []
+    result = None
+    attempt = None
+    resolution_used = body.resolution_m
+    deadline = time.perf_counter() + budget_total_s
+    for resolution in sorted({body.resolution_m, 10}, reverse=True):
+        remaining = deadline - time.perf_counter()
+        if remaining <= 2:
+            plan_attempts.append(
+                {
+                    "resolution_m": resolution,
+                    "found": False,
+                    "reason": "总时间预算耗尽，未尝试该分辨率",
+                    "nodes_expanded": 0,
+                    "elapsed_ms": 0,
+                    "length_m": None,
+                }
+            )
+            continue
+        attempt = plan_real_route(
+            start,
+            goal,
+            dataset["obstacles"],
+            resolution_m=resolution,
+            max_expand=body.max_expand,
+            budget_s=min(28.0, remaining),
+        )
+        plan_attempts.append(
+            {
+                "resolution_m": resolution,
+                "found": attempt["found"],
+                "reason": attempt.get("reason"),
+                "nodes_expanded": attempt["nodes_expanded"],
+                "elapsed_ms": round(attempt["elapsed_ms"], 1),
+                "length_m": round(attempt["length_m"], 1) if attempt["found"] else None,
+            }
+        )
+        if attempt["found"]:
+            result, resolution_used = attempt, resolution
+            break
+    if result is None:
+        if attempt is None:
+            raise RuntimeError("真实航线规划没有可用时间预算，未开始任何搜索")
+        # Keep the coarsest failure as the headline result; attempts carry detail.
+        result = attempt
     warnings = list(dataset.get("warnings", [])) + list(result.get("warnings", []))
+    if resolution_used != body.resolution_m:
+        warnings.append(
+            f"请求分辨率 {body.resolution_m:g} m 在 20 m 物理净空下无可行通道，已自动改用 "
+            f"{resolution_used:g} m 重新搜索；净空标准未降低。"
+        )
     warnings += [
         "真实空域未接入，NOTAM / UOM 及机场、人口密集区限制须人工核对；此结果不代表获准飞行。",
         "只验证所下载建筑足迹的水平避障；未验证地形、电线、塔吊、移动障碍和垂直航路。",
@@ -158,7 +211,7 @@ def real_candidate_routes(body: CandidateInput):
                 start,
                 goal,
                 metadata.get("fetched_at"),
-                body.resolution_m,
+                resolution_used,
                 result.get("heuristic_weight"),
                 result["waypoints"],
             ]
@@ -209,6 +262,9 @@ def real_candidate_routes(body: CandidateInput):
         "clearance_m": result["clearance_m"],
         "grid_clearance_m": result.get("grid_clearance_m"),
         "resolution_m": result["resolution_m"],
+        "resolution_requested_m": body.resolution_m,
+        "resolution_used_m": resolution_used,
+        "plan_attempts": plan_attempts,
         "heuristic_weight": result.get("heuristic_weight"),
         "nodes_expanded": result["nodes_expanded"],
         "elapsed_ms": result["elapsed_ms"],

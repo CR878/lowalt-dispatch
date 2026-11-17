@@ -114,6 +114,60 @@ def test_selected_vehicle_and_payload_reach_route_assessment(dataset, monkeypatc
     assert not result["operationally_approved"]
 
 
+def test_coarse_resolution_falls_back_to_10m(dataset, monkeypatch):
+    calls = []
+
+    def fake_plan(origin, destination, obstacles, **kwargs):
+        calls.append(kwargs["resolution_m"])
+        found = kwargs["resolution_m"] == 10
+        return {
+            "found": found,
+            "waypoints": [origin, destination] if found else [],
+            "length_m": 100.0 if found else 0.0,
+            "clearance_m": 20.0,
+            "resolution_m": kwargs["resolution_m"],
+            "nodes_expanded": 127340 if not found else 57697,
+            "elapsed_ms": 12.0,
+            "continuous_clearance_verified": found,
+            "grid_clearance_m": 20.0 + kwargs["resolution_m"] / 2**0.5,
+            "reason": None if found else "搜索空间耗尽，无可行路线",
+            "warnings": [],
+        }
+
+    monkeypatch.setattr("planner.real.plan_real_route", fake_plan)
+    result = candidate_routes(CandidateInput.model_validate(body() | {"resolution_m": 20}))
+    assert calls == [20, 10]
+    assert result["status"] == "ok"
+    assert result["resolution_requested_m"] == 20
+    assert result["resolution_used_m"] == 10
+    assert [item["resolution_m"] for item in result["plan_attempts"]] == [20, 10]
+    assert result["plan_attempts"][0]["found"] is False
+    assert any("自动改用" in warning and "净空标准未降低" in warning for warning in result["warnings"])
+
+
+def test_coarse_and_fine_both_blocked_reports_every_attempt(dataset, monkeypatch):
+    def fake_plan(origin, destination, obstacles, **kwargs):
+        return {
+            "found": False,
+            "waypoints": [],
+            "length_m": 0.0,
+            "clearance_m": 20.0,
+            "resolution_m": kwargs["resolution_m"],
+            "nodes_expanded": 52070,
+            "elapsed_ms": 9.0,
+            "grid_clearance_m": 20.0 + kwargs["resolution_m"] / 2**0.5,
+            "reason": "搜索空间耗尽，无可行路线",
+            "warnings": [],
+        }
+
+    monkeypatch.setattr("planner.real.plan_real_route", fake_plan)
+    result = candidate_routes(CandidateInput.model_validate(body() | {"resolution_m": 30}))
+    assert result["status"] == "no_route"
+    assert result["route"] is None
+    assert [item["resolution_m"] for item in result["plan_attempts"]] == [30, 10]
+    assert result["alternatives"][0]["reason"] == "搜索空间耗尽，无可行路线"
+
+
 def test_real_api_and_cached_scene(client, dataset, monkeypatch):
     response = client.post("/api/assistant/navigation/candidates", json=body())
     assert response.status_code == 200

@@ -17,13 +17,15 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from services.api.routes import router as dispatch_router
 from services.api.routes import runtime as dispatch_runtime
+from services.assistant.dispatch_bridge import DispatchDraftInput, build_task_draft
 from services.assistant.engine import Engine, ModelUnavailable, Settings
+from services.assistant.intake import TaskIntake
 from services.assistant.intake import store as intake_store
 from services.assistant.models import Turn
 from services.assistant.navigation import CandidateInput, candidate_routes
 from services.assistant.places import search_places
 from services.assistant.telemetry import stream_telemetry
-from services.assistant.tools import CAPABILITIES
+from services.assistant.tools import CAPABILITIES, real_route_for_intake
 from services.assistant.vehicles import CustomVehicle, VehicleTestInput
 from services.identity.routes import COOKIE
 from services.identity.routes import router as identity_router
@@ -261,6 +263,56 @@ def get_intake(intake_id: str):
         return intake_store.get(intake_id)
     except KeyError:
         raise HTTPException(404, "找不到该任务工单") from None
+
+
+@app.post("/api/assistant/intakes/{intake_id}/dispatch-draft")
+def dispatch_draft(intake_id: str, body: DispatchDraftInput):
+    """Turn an intake into a core.models.Task draft; never executes or plans."""
+    try:
+        intake = intake_store.get(intake_id)
+    except KeyError:
+        raise HTTPException(404, "找不到该任务工单") from None
+    result = build_task_draft(intake, body)
+    write_audit(
+        {
+            "type": "dispatch_draft",
+            "intake_id": intake_id,
+            "status": result["status"],
+            "blockers": [item["code"] for item in result["blockers"]],
+            "dispatch_enabled": False,
+        }
+    )
+    return result
+
+
+@app.post("/api/assistant/intakes/{intake_id}/route")
+def refresh_intake_route(intake_id: str):
+    """Compute and cache a real-geometry route for an existing intake.
+
+    Older intakes predate intake-side routing. This is explicit and idempotent:
+    the same origin/destination/schedule writes the same record with the newly
+    computed route, and nothing is invented when the network is unavailable.
+    """
+    try:
+        intake = intake_store.get(intake_id)
+    except KeyError:
+        raise HTTPException(404, "找不到该任务工单") from None
+    origin = (intake.get("origin") or {}).get("point")
+    destination = (intake.get("destination") or {}).get("point")
+    if not origin or not destination:
+        raise HTTPException(422, "工单起终点没有 WGS84 坐标，无法计算真实航线")
+    route = real_route_for_intake(list(origin), list(destination), intake.get("scheduled_for"))
+    intake["real_route"] = route
+    warnings = [item for item in intake.get("warnings", []) if "真实航线未生成" not in item]
+    if route.get("status") == "ok":
+        warnings.append(
+            "航线为公开地图建筑足迹 + 20 m 物理净空的几何避障结果；未接真实空域、地形、线缆，不代表获准飞行。"
+        )
+    else:
+        warnings.append("真实航线未生成：" + str(route.get("reason") or "未知原因") + "；未用直线代替。")
+    intake["warnings"] = warnings
+    intake_store.create(TaskIntake.model_validate(intake))
+    return intake
 
 
 @app.get("/api/telemetry/stream")

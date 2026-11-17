@@ -207,7 +207,9 @@ def test_create_task_intake_tool_records_evidence(tmp_path, monkeypatch):
     assert stored["weather"]["status"] == "ok"
     assert stored["weather"]["kind"] == "forecast"
     assert stored["route_preview"] is None
-    assert any("几何预览" in warning for warning in stored["warnings"])
+    assert stored["real_route"]["status"] == "ok"
+    assert len(stored["real_route"]["waypoints"]) == 2
+    assert any("物理净空" in warning for warning in stored["warnings"])
 
 
 def test_engine_asks_full_clarification_before_creating(tmp_path, monkeypatch):
@@ -297,3 +299,46 @@ def test_clarification_then_confirmation_creates_intake(tmp_path, monkeypatch):
     )
     assert second["status"] == "created"
     assert len(tools.intake_store.list()) == 1
+
+
+def test_intake_records_route_failure_instead_of_guessing(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools, "intake_store", IntakeStore(root=tmp_path / "intakes"))
+    monkeypatch.setattr(
+        tools.evidence,
+        "resolve_place",
+        lambda name, **kwargs: {
+            "status": "ok",
+            "name": name,
+            "point": [121.3, 31.2],
+            "crs": "EPSG:4326",
+            "source": "test-stub",
+            "is_simulated": False,
+        },
+    )
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("overpass unavailable")
+
+    toolset = tools.Toolset(make_turn(), real_route_provider=boom)
+    result = toolset.execute(
+        "create_task_intake",
+        {
+            "text": "从 A 送 1 公斤到 B",
+            "origin": "A",
+            "destination": "B",
+            "origin_point": [121.3, 31.2],
+            "destination_point": [121.8, 31.15],
+            "payload_kg": 1.0,
+            "priority": "P2",
+            "places_confirmed": True,
+            "schedule_confirmed": True,
+        },
+    )
+    assert result["status"] == "created"
+    stored = tools.intake_store.get(result["intake_id"])
+    assert stored["real_route"]["status"] == "unavailable"
+    assert "overpass unavailable" in stored["real_route"]["reason"]
+    assert stored["real_route"]["waypoints"] == []
+    assert any("真实航线未生成" in warning for warning in stored["warnings"])
+    assert any("未用直线代替" in warning for warning in stored["warnings"])
+    assert stored["dispatch_enabled"] is False

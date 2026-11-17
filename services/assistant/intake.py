@@ -80,6 +80,7 @@ class TaskIntake(Strict):
     weather: WeatherEvidence
     airspace: dict
     route_preview: dict | None
+    real_route: dict | None = None
     warnings: list[str]
     created_at: str
     is_simulated: Literal[True] = True
@@ -96,6 +97,7 @@ class TaskIntake(Strict):
         airspace: dict,
         route_preview: dict | None,
         warnings: list[str],
+        real_route: dict | None = None,
     ):
         return cls(
             intake_id=str(uuid4()),
@@ -109,6 +111,7 @@ class TaskIntake(Strict):
             weather=weather,
             airspace=airspace,
             route_preview=route_preview,
+            real_route=real_route,
             warnings=warnings,
             created_at=datetime.now(UTC).isoformat(),
         )

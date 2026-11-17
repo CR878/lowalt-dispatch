@@ -108,6 +108,59 @@ def point_at(route, progress):
     return list(route[-1])
 
 
+def real_route_for_intake(origin: list[float], destination: list[float], scheduled_for: str | None) -> dict:
+    """Compute one real-geometry route for an intake; never raises.
+
+    A first call can fetch ~28k OSM buildings and take tens of seconds; the
+    result is cached for 24 h by the obstacle fetcher. Failure is recorded as
+    ``status=unavailable`` with the reason so the intake never pretends a route
+    exists.
+    """
+    from services.assistant.navigation import CandidateInput, real_candidate_routes
+
+    try:
+        body = CandidateInput(
+            frame="WGS84",
+            origin={"lng": float(origin[0]), "lat": float(origin[1])},
+            destination={"lng": float(destination[0]), "lat": float(destination[1])},
+            scheduled_for=scheduled_for,
+            resolution_m=10,
+            max_expand=1_000_000,
+        )
+        result = real_candidate_routes(body, budget_total_s=30.0)
+    except Exception as exc:  # network, OSM schema, budget — record, do not guess
+        return {
+            "status": "unavailable",
+            "frame": "WGS84",
+            "waypoints": [],
+            "reason": f"{type(exc).__name__}: {str(exc)[:300]}",
+            "computed_at": datetime.now(UTC).isoformat(),
+            "note": "真实航线未生成；未使用直线或仿真路线代替。",
+        }
+    route = result.get("route") or {}
+    return {
+        "status": result["status"],
+        "frame": "WGS84",
+        "route_id": route.get("id"),
+        "waypoints": route.get("waypoints") or [],
+        "length_m": route.get("length_m"),
+        "resolution_requested_m": result.get("resolution_requested_m"),
+        "resolution_used_m": result.get("resolution_used_m"),
+        "clearance_m": result.get("clearance_m"),
+        "continuous_clearance_verified": result.get("continuous_clearance_verified", False),
+        "obstacle_source": result.get("obstacle_source"),
+        "reason": (result.get("alternatives") or [{}])[0].get("reason"),
+        "attempts": result.get("plan_attempts", []),
+        "warnings": [
+            warning
+            for warning in result.get("warnings", [])
+            if "空域" in warning or "OSM" in warning or "自动改用" in warning
+        ][:4],
+        "computed_at": datetime.now(UTC).isoformat(),
+        "note": "几何避障参考；未接真实空域、地形、线缆，不代表获准飞行。",
+    }
+
+
 class Toolset:
     SPECS = {
         "search_project_docs": (
@@ -141,9 +194,15 @@ class Toolset:
         ),
     }
 
-    def __init__(self, turn: Turn, read_dispatch_task: Callable[[str], dict] | None = None):
+    def __init__(
+        self,
+        turn: Turn,
+        read_dispatch_task: Callable[[str], dict] | None = None,
+        real_route_provider: Callable[..., dict] | None = None,
+    ):
         self.turn = turn
         self.read_dispatch_task = read_dispatch_task
+        self.real_route_provider = real_route_provider
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
         self.place_results: list[dict] = []
@@ -582,16 +641,44 @@ class Toolset:
         preview = self.results.get("plan_task_preview")
         route_preview = preview if preview and preview.get("status") == "geometry_only" else None
 
+        real_route = None
+        if (
+            origin.get("crs") == "EPSG:4326"
+            and origin.get("point")
+            and destination.get("crs") == "EPSG:4326"
+            and destination.get("point")
+            and list(origin["point"]) != list(destination["point"])
+        ):
+            provider = self.real_route_provider or real_route_for_intake
+            try:
+                real_route = provider(list(origin["point"]), list(destination["point"]), args.scheduled_for)
+            except Exception as exc:  # a provider bug must not lose the intake
+                real_route = {
+                    "status": "unavailable",
+                    "frame": "WGS84",
+                    "waypoints": [],
+                    "reason": f"{type(exc).__name__}: {str(exc)[:300]}",
+                    "computed_at": datetime.now(UTC).isoformat(),
+                    "note": "真实航线未生成；未使用直线或仿真路线代替。",
+                }
+
         warnings = [
             "天气预报不是实测值；风速未进入能耗或绕路计算。",
             "限制区来自仿真草稿，不是实测空域，不能用于安全判定。",
-            "真实经纬度尚未地理配准进规划器，推荐路线只能是几何预览。",
             "工单不是 core.models.Task，不进入 M3 状态机，不产生飞控指令。",
         ]
+        if real_route and real_route.get("status") == "ok":
+            warnings.append(
+                "航线为公开地图建筑足迹 + 20 m 物理净空的几何避障结果；未接真实空域、地形、线缆，不代表获准飞行。"
+            )
+        elif real_route:
+            warnings.append(
+                "真实航线未生成：" + str(real_route.get("reason") or "未知原因") + "；未用直线代替。"
+            )
         if weather.get("status") != "ok":
             warnings.append("气象数据未取到：" + str(weather.get("reason") or "未提供"))
-        if route_preview is None:
-            warnings.append("未生成几何路线预览：真实地点不在虚拟场景登记表中。")
+        if route_preview is None and real_route is None:
+            warnings.append("未生成几何路线预览：起终点不是可用 WGS84 坐标，未用直线代替。")
         for item in (origin, destination):
             if item.get("status") == "unresolved":
                 warnings.append(f"地点「{item['name']}」未解析出坐标，未猜坐标。")
@@ -603,6 +690,7 @@ class Toolset:
             weather=WeatherEvidence.model_validate(weather),
             airspace=airspace,
             route_preview=route_preview,
+            real_route=real_route,
             warnings=warnings,
         )
         self.terminal = True

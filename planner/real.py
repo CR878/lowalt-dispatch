@@ -156,6 +156,7 @@ def plan_real_route(
     physical_clearance_m: float = 20.0,
     max_expand: int = 500_000,
     heuristic_weight: float = 1.50,
+    budget_s: float = PLANNING_BUDGET_S,
 ) -> dict:
     """Plan with exact endpoints, then independently verify continuous clearance.
 
@@ -166,7 +167,9 @@ def plan_real_route(
     fallback is permitted. Weighted A* deliberately makes no shortest-path claim.
     """
     began = time.perf_counter()
-    deadline = began + PLANNING_BUDGET_S
+    if not math.isfinite(budget_s) or budget_s <= 0:
+        raise ValueError("规划时间预算必须为有限正数")
+    deadline = began + budget_s
     stage_started = began
     stage_name = "geometry_projection"
     stage_timings = {}
