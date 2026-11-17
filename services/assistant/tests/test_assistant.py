@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from services.api.runtime import LocalDispatch
 from services.assistant import app as api
-from services.assistant.engine import Engine, ModelUnavailable, Settings
+from services.assistant.engine import Engine, Settings
 from services.assistant.knowledge import ROOT
 from services.assistant.models import Bounds, Draft, Terrain, Turn
 from services.assistant.tools import Toolset, segment_box
@@ -320,10 +320,13 @@ def test_task_status_uses_selected_dispatch_and_separates_ack_from_completion(tm
         dispatch.close()
 
 
-def test_model_loop_is_bounded_and_does_not_fallback_silently():
-    model = FakeModel([tool_call("get_flight_status", {})] * 5)
-    with pytest.raises(ModelUnavailable, match="上限"):
-        Engine(Settings(provider="maas"), model).run(make_turn(), lambda p: None)
+def test_model_loop_is_bounded_and_returns_collected_evidence():
+    model = FakeModel([tool_call("get_flight_status", {})] * 6)
+    result = Engine(Settings(provider="maas"), model).run(make_turn(), lambda p: None)
+    # The loop is still bounded, but the user gets the evidence already fetched
+    # instead of a bare "step limit" error.
+    assert "本轮查询次数较多" in result["text"]
+    assert [trace["name"] for trace in result["traces"]]
 
 
 def test_request_rejects_fake_live_mode_nonfinite_and_unknown_fields():

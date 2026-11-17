@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 from datetime import UTC, datetime, timedelta, timezone
 from itertools import pairwise
 from pathlib import Path
@@ -92,7 +93,11 @@ def unavailable_weather(reason: str, scheduled_for: str | None = None) -> dict:
     }
 
 
-def fetch_weather_forecast(
+_WEATHER_CACHE: dict[tuple, tuple[float, dict]] = {}
+_WEATHER_TTL_S = 120.0
+
+
+def _fetch_weather_forecast(
     latitude: float,
     longitude: float,
     scheduled_for: str | None = None,
@@ -166,6 +171,44 @@ def fetch_weather_forecast(
         result["fetched_at"] = datetime.now(UTC).isoformat()
         result["requested_point"] = [longitude, latitude]
         result["model_point"] = [payload.get("longitude"), payload.get("latitude")]
+    return result
+
+
+
+def fetch_weather_forecast(
+    latitude: float,
+    longitude: float,
+    scheduled_for: str | None = None,
+    *,
+    client: httpx.Client | None = None,
+    include_hourly: bool = False,
+) -> dict:
+    """Cached wrapper: an unreachable Open-Meteo must not cost 8 s twice.
+
+    The model sometimes asks for the same point twice in one turn. Failures are
+    cached for two minutes too, because they are the common case on this
+    network and repeating the timeout only burns the tool budget.
+    """
+    if client is not None:
+        return _fetch_weather_forecast(
+            latitude,
+            longitude,
+            scheduled_for,
+            client=client,
+            include_hourly=include_hourly,
+        )
+    key = (round(latitude, 4), round(longitude, 4), scheduled_for, include_hourly)
+    now = time.monotonic()
+    hit = _WEATHER_CACHE.get(key)
+    if hit and now - hit[0] < _WEATHER_TTL_S:
+        return hit[1]
+    result = _fetch_weather_forecast(
+        latitude,
+        longitude,
+        scheduled_for,
+        include_hourly=include_hourly,
+    )
+    _WEATHER_CACHE[key] = (now, result)
     return result
 
 

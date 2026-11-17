@@ -331,6 +331,7 @@ class Toolset:
         self.real_route_provider = real_route_provider
         self.route_background = route_background
         self.require_confirmation = require_confirmation
+        self.tool_cache: dict[str, dict] = {}
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
         self.place_results: list[dict] = []
@@ -353,9 +354,23 @@ class Toolset:
     def execute(self, name: str, arguments: dict):
         if name not in self.SPECS:
             raise ValueError("Tool is not available")
+        # The same tool+args called again in one turn must not re-hit the
+        # network. Repeated weather calls used to cost 8 s each and pushed the
+        # turn into the step limit without producing an answer.
+        cache_key = ""
+        if name != "create_task_intake":
+            cache_key = name + "|" + json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+            if cache_key in self.tool_cache:
+                return {
+                    **self.tool_cache[cache_key],
+                    "_cached": True,
+                    "_cache_note": "本轮已用相同参数调用过，直接返回上次结果，不要重复调用。",
+                }
         validated = self.SPECS[name][1].model_validate(arguments)
         result = getattr(self, name)(validated)
         self.results[name] = result
+        if cache_key:
+            self.tool_cache[cache_key] = result
         return result
 
     def search_project_docs(self, args: DocumentQuery):
@@ -830,6 +845,10 @@ class Toolset:
             return PlaceEvidence.model_validate(payload)
 
         weather = self.results.get("get_weather_forecast")
+        if weather is not None:
+            # Tool-level dedup marks repeats with _cached/_cache_note; strict
+            # evidence models forbid extra keys.
+            weather = {key: value for key, value in weather.items() if not key.startswith("_")}
         if weather is None:
             point = origin.get("point")
             if origin.get("crs") == "EPSG:4326" and point:
