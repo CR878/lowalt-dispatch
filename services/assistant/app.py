@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import queue
@@ -24,7 +25,7 @@ from services.assistant.intake import store as intake_store
 from services.assistant.models import Turn
 from services.assistant.navigation import CandidateInput, candidate_routes
 from services.assistant.places import search_places
-from services.assistant.telemetry import stream_telemetry
+from services.assistant.telemetry import read_latest, stream_telemetry
 from services.assistant.tools import CAPABILITIES, real_route_for_intake
 from services.assistant.vehicles import CustomVehicle, VehicleTestInput
 from services.identity.routes import COOKIE
@@ -176,6 +177,7 @@ async def local_requests(request: Request, call_next):
             user = app.state.identity.user(request.cookies.get(COOKIE, ""))
             if not user:
                 return JSONResponse({"detail": "请登录后继续"}, status_code=401)
+            request.state.actor_id = user["id"]
             permission = None
             if path.startswith(("/api/dispatch", "/api/planning")):
                 permission = "task.read" if request.method == "GET" else "task.create"
@@ -352,6 +354,7 @@ async def turn(request: Request):
     if not slots.acquire(blocking=False):
         raise HTTPException(429, "Assistant is busy; retry later")
     packets = queue.Queue()
+    stopped = threading.Event()
     try:
         read_dispatch_task = dispatch_runtime(request).get
     except HTTPException:
@@ -373,7 +376,10 @@ async def turn(request: Request):
                     "is_simulated": True,
                 }
             )
-            result = engine.run(value, emit, read_dispatch_task=read_dispatch_task)
+            telemetry_path = os.environ.get("AERIS_TELEMETRY_FILE")
+            result = engine.run(value, emit, read_dispatch_task=read_dispatch_task,
+                                actor_id=request.state.actor_id, cancelled=stopped.is_set,
+                                read_live_telemetry=lambda: read_latest(Path(telemetry_path)) if telemetry_path else None)
             write_audit(
                 {
                     "turn_id": str(value.request_id),
@@ -399,20 +405,23 @@ async def turn(request: Request):
 
     threading.Thread(target=worker, daemon=True).start()
 
-    def stream():
+    async def stream():
         yield (
             json.dumps({"type": "start", "turn_id": str(value.request_id), "provider": settings.provider})
             + "\n"
         )
-        while True:
-            try:
-                packet = packets.get(timeout=5)
-            except queue.Empty:
-                yield '{"type":"heartbeat"}\n'
-                continue
-            if packet is None:
-                break
-            yield json.dumps(packet, ensure_ascii=False, allow_nan=False) + "\n"
+        try:
+            while True:
+                try:
+                    packet = await asyncio.to_thread(packets.get, True, 1)
+                except queue.Empty:
+                    yield '{"type":"heartbeat"}\n'
+                    continue
+                if packet is None:
+                    break
+                yield json.dumps(packet, ensure_ascii=False, allow_nan=False) + "\n"
+        finally:
+            stopped.set()
 
     return StreamingResponse(
         stream(),

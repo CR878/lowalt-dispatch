@@ -1,16 +1,20 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Clock3, MapPin } from "lucide-react";
 
 import { formatCoordinates, type GeoPlace, type LngLat } from "../geo";
 import { MapPicker } from "./MapPicker";
 import { PinPreview } from "./PinPreview";
-import type { Clarification, MapPin as MapPinData } from "./types";
+import type {
+  Clarification,
+  IntakeConfirmation,
+  MapPin as MapPinData,
+} from "./types";
 import "./clarification.css";
 
 type Props = {
   data: Clarification;
   busy: boolean;
-  onConfirm: (text: string) => void;
+  onConfirm: (text: string, confirmation?: IntakeConfirmation) => void;
 };
 
 export function ClarificationCard({ data, busy, onConfirm }: Props) {
@@ -21,7 +25,14 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
   const suggested = data.questions.find(
     (item) => item.field === "scheduled_for",
   )?.current;
-  const [when, setWhen] = useState(() => (suggested || "").slice(0, 16));
+  const [when, setWhen] = useState(() =>
+    suggested
+      ? new Date(new Date(suggested).getTime() + 8 * 3600_000)
+          .toISOString()
+          .slice(0, 16)
+      : "",
+  );
+  const submitted = useRef<{ signature: string; id: string } | null>(null);
   const [payload, setPayload] = useState(() =>
     data.draft_values?.payload_kg == null
       ? ""
@@ -46,6 +57,7 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
     const point = local?.point ?? (pin.crs === "EPSG:4326" ? pin.point : null);
     return {
       ...pin,
+      name: local?.name ?? pin.name,
       point,
       crs: local ? "EPSG:4326" : pin.crs,
       address: local?.address ?? pin.address,
@@ -53,7 +65,14 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
     };
   });
   const located = pins.every((pin) => pin.point);
-  const ready = !!when && located && !!payload && !busy;
+  const weight = payload.trim() === "" ? NaN : Number(payload);
+  const ready =
+    !!when &&
+    located &&
+    Number.isFinite(weight) &&
+    weight >= 0 &&
+    weight <= 100 &&
+    !busy;
 
   const confirmPin = (pin: (typeof pins)[number]) => {
     if (!pin.point) return;
@@ -67,22 +86,33 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
 
   const submit = () => {
     if (!ready) return;
-    const [datePart, timePart = "09:00"] = when.split("T");
-    const [, month, day] = datePart.split("-");
     const origin = pins.find((pin) => pin.field === "origin");
     const destination = pins.find((pin) => pin.field === "destination");
     if (!origin?.point || !destination?.point) return;
-    onConfirm(
-      [
-        "确认建单：",
-        `时间是${Number(month)}月${Number(day)}日 ${timePart}，`,
-        `起点就是「${origin.name}」，终点是「${destination.name}」，`,
-        "我在地图上点过了，",
-        `起点坐标 ${formatCoordinates(origin.point as LngLat)}，`,
-        `终点 ${formatCoordinates(destination.point as LngLat)}，`,
-        `载荷 ${payload} 公斤，优先级 ${priority}。就按这些建任务。`,
-      ].join(""),
-    );
+    const scheduled = `${when}:00+08:00`;
+    const text = `确认创建任务工单：${origin.name} → ${destination.name}，${when.replace("T", " ")} UTC+8，载荷 ${weight} 公斤，优先级 ${priority}。`;
+    const signature = JSON.stringify([
+      origin.name,
+      origin.point,
+      destination.name,
+      destination.point,
+      scheduled,
+      weight,
+      priority,
+    ]);
+    if (submitted.current?.signature !== signature)
+      submitted.current = { signature, id: crypto.randomUUID() };
+    onConfirm(text, {
+      confirmation_id: submitted.current.id,
+      text,
+      origin: origin.name,
+      destination: destination.name,
+      origin_point: origin.point as LngLat,
+      destination_point: destination.point as LngLat,
+      scheduled_for: scheduled,
+      payload_kg: weight,
+      priority: priority as "P1" | "P2",
+    });
   };
 
   return (
@@ -196,7 +226,7 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
 
       <div className="intake-clarify-form">
         <label>
-          具体时间
+          具体时间 · UTC+8
           <input
             type="datetime-local"
             aria-label="确认起飞时间"

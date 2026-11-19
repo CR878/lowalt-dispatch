@@ -99,8 +99,13 @@ function parseBlocks(text: string): Block[] {
       !/^\s*[-*]\s+/.test(lines[index]) &&
       !/^\s*\d+[.)]\s+/.test(lines[index]) &&
       !/^\s*>\s?/.test(lines[index]) &&
+      !lines[index].trim().startsWith("```") &&
       !lines[index].trim().startsWith("|")
     ) {
+      paragraph.push(lines[index]);
+      index += 1;
+    }
+    if (!paragraph.length) {
       paragraph.push(lines[index]);
       index += 1;
     }

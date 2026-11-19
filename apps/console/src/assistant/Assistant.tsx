@@ -24,6 +24,7 @@ import {
 import { getCapabilities, getHealth, requestTurn, validDraft } from "./api";
 import { ClarificationCard } from "./ClarificationCard";
 import { RichText } from "./RichText";
+import { ResponseBlocks } from "./ResponseBlocks";
 import { toolLabels } from "./types";
 import type {
   AssistantContext,
@@ -31,6 +32,7 @@ import type {
   AssistantResult,
   Capabilities,
   Health,
+  IntakeConfirmation,
   PreviewRoute,
   ToolTrace,
 } from "./types";
@@ -44,6 +46,8 @@ type Message = {
   state: "pending" | "done" | "error";
   traces: ToolTrace[];
   result?: AssistantResult;
+  confirmation?: IntakeConfirmation;
+  request_id?: string;
 };
 type Props = {
   open: boolean;
@@ -258,7 +262,11 @@ export default function Assistant(props: Props) {
   }, [messages, busy, draft, preview, latestResult]);
   useEffect(() => () => request.current?.abort(), []);
 
-  const send = async (value = text) => {
+  const send = async (
+    value = text,
+    confirmation?: IntakeConfirmation,
+    requestId: string = crypto.randomUUID(),
+  ) => {
     const question = value.trim();
     if (!question || request.current || question.length > 3000) return;
     const controller = new AbortController();
@@ -280,6 +288,8 @@ export default function Assistant(props: Props) {
           text: question,
           state: "done" as const,
           traces: [],
+          confirmation,
+          request_id: requestId,
         },
         {
           id: identifier,
@@ -303,6 +313,8 @@ export default function Assistant(props: Props) {
           draft,
           context: current.current.context,
           web_search: webSearch,
+          confirmation,
+          request_id: requestId,
         },
         controller.signal,
         (packet) => {
@@ -358,7 +370,7 @@ export default function Assistant(props: Props) {
       const message = stopped
         ? controller.signal.reason === "timeout"
           ? "请求超时，已停止等待。请检查模型服务后重试。"
-          : "已停止接收本轮结果。已开始的只读工具可能仍在完成，未下发飞行命令。"
+          : "已停止本轮请求。若工单已保存，可在任务空间查看或重试获取原结果。"
         : error instanceof Error
           ? error.message
           : "助手请求失败";
@@ -647,8 +659,28 @@ export default function Assistant(props: Props) {
               )}
               {message.text && (
                 <div className="assistant-message-text">
-                  <RichText text={message.text} />
+                  <RichText
+                    text={
+                      message.result?.presentation?.blocks.some(
+                        (block) => block.type === "chart",
+                      )
+                        ? message.text
+                            .replace(/```chart\s[\s\S]*?```/g, "")
+                            .trim()
+                        : message.text
+                    }
+                  />
                 </div>
+              )}
+              {message.result?.presentation && (
+                <ResponseBlocks
+                  presentation={message.result.presentation}
+                  onRoute={(route) => {
+                    setPreview(route);
+                    setVisiblePreview(true);
+                    current.current.onRoute(route);
+                  }}
+                />
               )}
               {message.result?.documents?.map((doc) => (
                 <details
@@ -673,7 +705,9 @@ export default function Assistant(props: Props) {
                 <ClarificationCard
                   data={message.result.clarification}
                   busy={busy}
-                  onConfirm={(value) => void send(value)}
+                  onConfirm={(value, confirmation) =>
+                    void send(value, confirmation)
+                  }
                 />
               )}
               {message.state === "pending" && (
@@ -691,7 +725,12 @@ export default function Assistant(props: Props) {
                   onClick={() => {
                     const index = messages.indexOf(message);
                     const previous = messages[index - 1];
-                    if (previous?.role === "user") void send(previous.text);
+                    if (previous?.role === "user")
+                      void send(
+                        previous.text,
+                        previous.confirmation,
+                        previous.request_id,
+                      );
                   }}
                 >
                   <RotateCcw size={11} /> 重试本轮问题

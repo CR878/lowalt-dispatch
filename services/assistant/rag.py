@@ -27,6 +27,7 @@ def _fingerprint() -> str:
     from services.assistant.knowledge import _documents
 
     digest = hashlib.sha256()
+    digest.update(b"line-chunks-v2")
     for path in _documents():
         digest.update(path.encode())
         digest.update(hashlib.sha256((ROOT / path).read_bytes()).digest())
@@ -102,7 +103,7 @@ def search(query: str, limit: int = 3) -> list[dict]:
                 "start_line": metadata.get("start_line", 0),
                 "end_line": metadata.get("end_line", 0),
                 "revision": metadata.get("revision", ""),
-                "text": (result["documents"][0][index] or "")[:900],
+                "text": result["documents"][0][index] or "",
                 "score": round(1.0 - float(distance), 4) if distance is not None else None,
                 "retriever": "chroma",
                 "id": doc_id,

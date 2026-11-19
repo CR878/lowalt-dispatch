@@ -20,6 +20,7 @@ DOCUMENTS = (
     "docs/M4_计划与验收.md",
     "services/assistant/README.md",
     "services/api/README.md",
+    "docs/Agent富界面输出与复用指南.md",
 )
 KNOWLEDGE_DIR = ROOT / "knowledge"
 HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
@@ -75,7 +76,7 @@ def _split(path: str, data: bytes):
     for number, line in enumerate(data.decode("utf-8-sig").splitlines(), 1):
         marker = re.match(r"^\s*(`{3,}|~{3,})", line)
         heading = HEADING.match(line) if not fence else None
-        boundary = heading or (not fence and size + len(line) > EXCERPT_LIMIT)
+        boundary = heading or (size + len(line) > EXCERPT_LIMIT)
         if boundary and block:
             yield excerpt()
             block.clear()
@@ -159,6 +160,9 @@ def search(query: str) -> list[dict]:
     AERIS_RAG: "auto" (default) | "chroma" (no fallback) | "keyword" (skip vector).
     """
     mode = os.getenv("AERIS_RAG", "auto").strip().lower()
+    keyword = _keyword_search(query) if mode != "chroma" else []
+    if mode == "keyword" or (mode == "auto" and keyword):
+        return keyword
     vector: list[dict] = []
     if mode != "keyword":
         try:
@@ -169,7 +173,6 @@ def search(query: str) -> list[dict]:
             # Missing chromadb, embedding model or index must never break the assistant.
             if mode == "chroma":
                 return []
-    keyword = _keyword_search(query)
     if not vector:
         return keyword
     merged = list(keyword)

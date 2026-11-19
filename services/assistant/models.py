@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from services.assistant.intake import IntakeConfirmation
 from services.assistant.telemetry import LiveTelemetry
 
 
@@ -127,6 +128,7 @@ class Turn(Contract):
     context: Context
     # Only effective when the assistant runs in maas mode; local rules have no network tool.
     web_search: bool = False
+    confirmation: IntakeConfirmation | None = None
 
     @field_validator("text")
     @classmethod

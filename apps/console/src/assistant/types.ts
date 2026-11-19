@@ -5,6 +5,7 @@ import type {
   Telemetry,
   TerrainChange,
 } from "../types";
+import type { Presentation } from "./presentation";
 
 export type AssistantDraft = {
   name: string;
@@ -105,6 +106,17 @@ export type Clarification = {
   is_simulated: true;
   dispatch_enabled: false;
 };
+export type IntakeConfirmation = {
+  confirmation_id: string;
+  text: string;
+  origin: string;
+  destination: string;
+  origin_point: [number, number];
+  destination_point: [number, number];
+  scheduled_for: string;
+  payload_kg: number;
+  priority: "P1" | "P2";
+};
 export type AssistantResult = {
   turn_id: string;
   provider: "local" | "maas";
@@ -128,6 +140,7 @@ export type AssistantResult = {
   is_simulated: true;
   created_at: string;
   clarification?: Clarification | null;
+  presentation?: Presentation;
 };
 export type Capabilities = {
   available: string[];
@@ -164,4 +177,5 @@ export const toolLabels: Record<string, string> = {
   get_weather_forecast: "读取时段天气预报",
   get_airspace_zones: "列出草稿限制区",
   create_task_intake: "确认/生成任务工单",
+  get_intake_overview: "汇总工单图表数据",
 };

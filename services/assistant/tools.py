@@ -30,7 +30,7 @@ from services.assistant.intake import (
 )
 from services.assistant.knowledge import search
 from services.assistant.models import DocumentQuery, Draft, DraftUpdate, NoArgs, Turn
-from services.assistant.telemetry import STALE_SECONDS
+from services.assistant.telemetry import STALE_SECONDS, LiveTelemetry
 
 ROOT = Path(__file__).resolve().parents[2]
 PLACES = {
@@ -330,12 +330,18 @@ class Toolset:
         real_route_provider: Callable[..., dict] | None = None,
         route_background: bool = True,
         require_confirmation: bool = False,
+        actor_id: str = "local",
+        checkpoint: Callable[[], None] = lambda: None,
+        read_live_telemetry: Callable[[], LiveTelemetry | None] | None = None,
     ):
         self.turn = turn
         self.read_dispatch_task = read_dispatch_task
         self.real_route_provider = real_route_provider
         self.route_background = route_background
         self.require_confirmation = require_confirmation
+        self.actor_id = actor_id
+        self.checkpoint = checkpoint
+        self.read_live_telemetry = read_live_telemetry
         self.tool_cache: dict[str, dict] = {}
         self.draft = turn.draft
         self.results: dict[str, dict] = {}
@@ -363,9 +369,12 @@ class Toolset:
         # network. Repeated weather calls used to cost 8 s each and pushed the
         # turn into the step limit without producing an answer.
         cache_key = ""
-        if name != "create_task_intake":
+        if name not in {"create_task_intake", "update_task_draft", "get_flight_status", "get_task_status"}:
             cache_key = name + "|" + json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+            if name == "plan_task_preview":
+                cache_key += "|" + (draft_digest(self.draft) if self.draft else "no-draft")
             if cache_key in self.tool_cache:
+                self.results[name] = self.tool_cache[cache_key]
                 return {
                     **self.tool_cache[cache_key],
                     "_cached": True,
@@ -383,16 +392,18 @@ class Toolset:
         return {
             "status": "ok" if excerpts else "no_match",
             "source": "仓库项目文档",
+            "retrievers": sorted({item.get("retriever", "keyword") for item in excerpts}),
             "excerpts": excerpts,
         }
 
     def get_flight_status(self, _args):
         ctx = self.turn.context
         if ctx.telemetry_mode == "live":
-            frame = ctx.live_telemetry
+            frame = self.read_live_telemetry() if self.read_live_telemetry else ctx.live_telemetry
             age = frame.age_seconds() if frame else None
             return {
                 "telemetry_mode": "live",
+                "evidence_origin": "server_file" if self.read_live_telemetry else "browser_context",
                 "source": frame.source if frame else "M4 遥测",
                 "sampled_at": frame.captured_at.isoformat() if frame else None,
                 "age_s": round(age, 1) if age is not None else None,
@@ -506,6 +517,8 @@ class Toolset:
     def update_task_draft(self, args: DraftUpdate):
         previous = self.draft or Draft()
         self.draft = Draft.model_validate({**previous.model_dump(), **args.model_dump(exclude_unset=True)})
+        if self.draft != previous:
+            self.results.pop("plan_task_preview", None)
         missing = [
             key
             for key in ("origin", "destination", "payload_kg")
@@ -682,6 +695,7 @@ class Toolset:
             "status": "ok",
             "source": "logs/intakes 本机工单文件",
             "count": len(items),
+            "scope": "最近 12 张工单",
             "status_counts": [
                 {"label": label, "value": value} for label, value in counts.items()
             ],
@@ -691,11 +705,10 @@ class Toolset:
         }
 
     def create_task_intake(self, args: IntakeCreate):
-        # A human must see the resolved places before anything is written. In
-        # MaaS mode the confirmation card sends a message starting with
-        # 确认建单; a model that optimistically sets places_confirmed=true cannot
-        # skip that step. Local rule mode keeps its single-shot behaviour.
-        explicit_confirm = (not self.require_confirmation) or ("确认建单" in args.text)
+        confirmation = self.turn.confirmation
+        explicit_confirm = not self.require_confirmation or confirmation is not None
+        if confirmation is not None:
+            args = confirmation.as_input(self.turn.text)
         stated = evidence.extract_confirmations(args.text)
         if stated:
             args = args.model_copy(
@@ -721,13 +734,25 @@ class Toolset:
             args = args.model_copy(
                 update={"scheduled_for": normalized, "schedule_note": merged_note}
             )
+        fingerprint = hashlib.sha256(json.dumps(args.model_dump(include={
+            "origin", "destination", "origin_point", "destination_point", "scheduled_for", "payload_kg", "priority",
+        }), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        operation_id = confirmation.confirmation_id if confirmation else self.turn.request_id
+        request_key = f"{self.actor_id}:{operation_id}"
+        if explicit_confirm:
+            self.checkpoint()
+            saved = intake_store.replay(request_key, fingerprint)
+            if saved is not None:
+                self.terminal = True
+                return self._created_result(saved)
         places = {item["name"]: item for item in self.place_results}
-        origin = places.get(args.origin) or evidence.resolve_place(
-            args.origin, local_places=PLACES, aliases=ALIASES
-        )
-        destination = places.get(args.destination) or evidence.resolve_place(
-            args.destination, local_places=PLACES, aliases=ALIASES
-        )
+        def locate(name, point):
+            if confirmation is not None:
+                return {"name": name, "point": point, "crs": "EPSG:4326", "status": "ok",
+                        "source": "用户确认卡", "is_simulated": False}
+            return places.get(name) or evidence.resolve_place(name, local_places=PLACES, aliases=ALIASES)
+        origin = locate(args.origin, args.origin_point)
+        destination = locate(args.destination, args.destination_point)
         # A map pin that is hundreds of km away from the named place is a stale
         # selection, not a preference. Never write it into the intake; ask with
         # two explicit options instead of silently choosing one.
@@ -908,6 +933,15 @@ class Toolset:
 
         weather = self.results.get("get_weather_forecast")
         if weather is not None:
+            valid_time = weather.get("valid_for")
+            same_time = False
+            try:
+                same_time = datetime.fromisoformat(valid_time.replace("Z", "+00:00")) == datetime.fromisoformat(args.scheduled_for)
+            except (AttributeError, ValueError, TypeError):
+                pass
+            if weather.get("requested_point") != origin.get("point") or not same_time:
+                weather = None
+        if weather is not None:
             # Tool-level dedup marks repeats with _cached/_cache_note; strict
             # evidence models forbid extra keys.
             weather = {key: value for key, value in weather.items() if not key.startswith("_")}
@@ -990,12 +1024,18 @@ class Toolset:
             real_route=real_route,
             warnings=warnings,
         )
-        stored = intake_store.create(record)
-        if route_needs_background and route_inputs is not None:
+        self.checkpoint()
+        stored, newly_created = intake_store.create_once(record, request_key, fingerprint)
+        if newly_created and route_needs_background and route_inputs is not None:
             _compute_route_in_background(
-                record.intake_id, self.real_route_provider or real_route_for_intake, *route_inputs
+                stored["intake_id"], self.real_route_provider or real_route_for_intake, *route_inputs
             )
         self.terminal = True
+        return self._created_result(stored)
+
+    @staticmethod
+    def _created_result(stored):
+        origin, destination = stored["origin"], stored["destination"]
         # Keep the model's view small: the full record (including the long
         # warnings list) lives in the store and the console reads it by id. If
         # warnings are returned here the model tends to paste all of them.
@@ -1017,12 +1057,12 @@ class Toolset:
         return {
             "status": "created",
             "source": "自然语言任务工单（服务端 JSON，非执行任务）",
-            "intake_id": record.intake_id,
+            "intake_id": stored["intake_id"],
             "intake": public_record,
             "summary": (
                 f"AI 工单已创建：{origin['name']} → {destination['name']}；"
-                f"{args.scheduled_for or '时间待确认'}；载荷 {args.payload_kg} kg；"
-                "真实航线在后台计算，完成后在工单里查看。"
+                f"{stored['scheduled_for'] or '时间待确认'}；载荷 {stored['payload_kg']} kg；"
+                "航线结果可在工单中查看。"
             ),
             "location_review": [
                 {

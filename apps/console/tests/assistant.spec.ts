@@ -196,7 +196,7 @@ test("stop, clear confirmation, mobile layout and keyboard shortcuts stay usable
     .click();
   await expect(
     page.locator(".assistant-message.assistant").last(),
-  ).toContainText("已停止接收");
+  ).toContainText("已停止本轮请求");
   await page.getByRole("button", { name: "清空助手会话", exact: true }).click();
   await expect(page.locator(".assistant-clear-confirm")).toBeVisible();
   await page

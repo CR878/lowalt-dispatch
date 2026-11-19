@@ -37,6 +37,39 @@ HOURLY_FIELDS = (
 WEEKDAYS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6}
 
 
+def _clock(text: str) -> tuple[int, int] | None:
+    number = r"[零一二三四五六七八九十两\d]{1,3}"
+    match = re.search(rf"(凌晨|早上|上午|中午|下午|晚上)?\s*({number})(?:[:：](\d{{2}})|[点时](?:({number})分?)?(半)?)", text)
+    if not match:
+        return None
+    def integer(token):
+        if not token:
+            return 0
+        if token.isdigit():
+            return int(token)
+        digits = {c: n for n, c in enumerate("零一二三四五六七八九")}
+        digits["两"] = 2
+        if "十" in token:
+            tens, ones = token.split("十", 1)
+            return (digits.get(tens, 1) * 10) + digits.get(ones, 0)
+        return digits[token]
+    hour = integer(match[2])
+    minute = 30 if match[5] else integer(match[3] or match[4])
+    period = match[1]
+    if period:
+        if not 0 <= hour <= 12:
+            raise ValueError("中文时段的小时应在0到12之间")
+        if period in {"下午", "晚上"} and hour < 12:
+            hour += 12
+        elif period == "中午" and hour < 11:
+            hour += 12
+        elif period in {"凌晨", "上午", "早上"} and hour == 12:
+            hour = 0
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        raise ValueError("时刻无效")
+    return hour, minute
+
+
 def parse_schedule(text: str, now: datetime | None = None) -> tuple[str | None, str]:
     """Resolve a coarse Chinese time expression into an ISO instant + its rule.
 
@@ -44,38 +77,44 @@ def parse_schedule(text: str, now: datetime | None = None) -> tuple[str | None, 
     picked. Nothing is guessed when the expression is absent.
     """
     now = (now or datetime.now(LOCAL_TZ)).astimezone(LOCAL_TZ)
-    base = now.replace(hour=9, minute=0, second=0, microsecond=0)
+    try:
+        clock = _clock(text)
+    except (ValueError, KeyError):
+        return None, "时刻无效，请确认小时和分钟"
+    hour, minute = clock if clock is not None else (9, 0)
+    base = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    time_note = f"{hour:02d}:{minute:02d} Asia/Shanghai" + ("（默认时间，待确认）" if clock is None else "")
+
+    date = re.search(r"(?:(\d{4})\s*年\s*)?(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]", text)
+    if date:
+        month, day = int(date[2]), int(date[3])
+        year = int(date[1]) if date[1] else now.year + (month < now.month)
+        try:
+            target = base.replace(year=year, month=month, day=day)
+        except ValueError:
+            return None, f"{year}年{month}月{day}日不是有效日期，未采用"
+        return target.isoformat(), f"按 {target.date()} {time_note}（年份取 {year}）"
 
     match = re.search(r"(?:下周|下个星期|下星期)\s*([一二三四五六日天1-7])?", text)
     if match:
-        monday = (base - timedelta(days=base.weekday()) + timedelta(days=7)).replace(hour=9)
+        monday = base - timedelta(days=base.weekday()) + timedelta(days=7)
         token = match.group(1)
         if token:
             offset = WEEKDAYS[token] if token in WEEKDAYS else int(token) - 1
             target = monday + timedelta(days=offset)
             note = (
                 f"「{match.group(0)}」按下一个自然周一起算（{monday.date()}），"
-                f"取第 {offset + 1} 天 {target.date()}，默认 09:00 Asia/Shanghai"
+                f"取第 {offset + 1} 天 {target.date()}，{time_note}"
             )
         else:
             target = monday
-            note = f"「下周」未指定具体日，暂按下周一 {target.date()} 09:00 Asia/Shanghai 计"
+            note = f"「下周」未指定具体日，暂按下周一 {target.date()} {time_note} 计"
         return target.isoformat(), note
 
     for word, days in (("后天", 2), ("明天", 1)):
         if word in text:
             target = base + timedelta(days=days)
-            return target.isoformat(), f"「{word}」按 {target.date()} 09:00 Asia/Shanghai 计"
-
-    match = re.search(r"(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]", text)
-    if match:
-        month, day = int(match.group(1)), int(match.group(2))
-        year = now.year + (1 if month < now.month else 0)
-        try:
-            target = base.replace(year=year, month=month, day=day)
-        except ValueError:
-            return None, f"{month}月{day}日不是有效日期，未采用"
-        return target.isoformat(), f"按 {target.date()} 09:00 Asia/Shanghai 计（年份取 {year}）"
+            return target.isoformat(), f"「{word}」按 {target.date()} {time_note} 计"
 
     return None, "未识别到时间，按未指定处理"
 
@@ -161,6 +200,8 @@ def _fetch_weather_forecast(
         "source": "Open-Meteo / hourly forecast",
         "scheduled_for": scheduled_for,
         "valid_for": target.astimezone(UTC).isoformat(),
+        "requested_point": [longitude, latitude],
+        "fetched_at": datetime.now(UTC).isoformat(),
         "values": values,
         "reason": "",
         "note": "Open-Meteo模式预报，非实测；按时刻插值；风速/阵风m/s，风向为气象来向°，气压hPa。10m风不能代表飞行高度风场。",
@@ -303,19 +344,13 @@ def extract_confirmations(text: str) -> dict:
     rule-based fallback keeps the multi-turn clarification loop deterministic.
     """
     result: dict = {}
-    date = re.search(r"(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]", text)
-    clock = re.search(r"(\d{1,2})\s*[:：]\s*(\d{2})", text)
-    if date and clock:
-        now = datetime.now(LOCAL_TZ)
-        month, day = int(date.group(1)), int(date.group(2))
-        hour, minute = int(clock.group(1)), int(clock.group(2))
-        year = now.year + (1 if month < now.month else 0)
-        try:
-            result["scheduled_for"] = datetime(year, month, day, hour, minute, tzinfo=LOCAL_TZ).isoformat()
-            result["schedule_note"] = f"用户明确给出 {month}月{day}日 {hour:02d}:{minute:02d}"
-            result["schedule_confirmed"] = True
-        except ValueError:
-            pass
+    try:
+        clock = _clock(text)
+    except (ValueError, KeyError):
+        clock = None
+    parsed, note = parse_schedule(text)
+    if clock is not None and parsed is not None:
+        result.update(scheduled_for=parsed, schedule_note=note, schedule_confirmed=True)
     for field, pattern in (
         ("origin_point", r"起点(?:坐标|位置)?\s*[:：]?\s*(-?\d+\.\d+)\s*[,，]\s*(-?\d+\.\d+)"),
         ("destination_point", r"终点(?:坐标|位置)?\s*[:：]?\s*(-?\d+\.\d+)\s*[,，]\s*(-?\d+\.\d+)"),

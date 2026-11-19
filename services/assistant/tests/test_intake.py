@@ -539,6 +539,10 @@ def test_maas_mode_requires_the_confirmation_card_before_writing(tmp_path, monke
     assert pins["origin"] == [115.83, 28.76]
     assert first["draft_values"]["payload_kg"] == 3.0
 
+    from services.assistant.intake import IntakeConfirmation
+    toolset.turn.confirmation = IntakeConfirmation.model_validate(args | {
+        "confirmation_id": str(uuid4()), "origin_point": [115.83, 28.76], "destination_point": [115.82, 28.65],
+    })
     confirmed = toolset.execute(
         "create_task_intake",
         args | {"text": "确认建单：起点 江西农业大学，终点 南昌航空大学，按这些建任务"},

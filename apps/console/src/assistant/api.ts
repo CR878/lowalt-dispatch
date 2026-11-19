@@ -6,7 +6,9 @@ import type {
   Health,
   Packet,
   ToolTrace,
+  IntakeConfirmation,
 } from "./types";
+import { readPresentation } from "./presentation";
 
 export async function getHealth(signal: AbortSignal): Promise<Health> {
   const response = await fetch("/api/assistant/health", {
@@ -147,6 +149,8 @@ export async function requestTurn(
     draft: AssistantDraft | null;
     context: AssistantContext;
     web_search?: boolean;
+    confirmation?: IntakeConfirmation;
+    request_id?: string;
   },
   signal: AbortSignal,
   onPacket: (packet: Packet) => void,
@@ -188,6 +192,7 @@ export async function requestTurn(
     if (packet.type === "result") {
       if (!validResult(packet.result))
         throw new Error("助手响应数据不完整，已停止应用结果。");
+      packet.result.presentation = readPresentation(packet.result.presentation);
       result = packet.result;
     }
     onPacket(packet);

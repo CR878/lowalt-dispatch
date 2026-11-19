@@ -68,3 +68,9 @@ def test_hits_carry_provenance():
         assert hit["end_line"] >= hit["start_line"]
         assert len(hit["revision"]) == 12
         assert hit["text"].strip()
+
+
+def test_agent_ui_reuse_guide_is_retrievable(monkeypatch):
+    monkeypatch.setenv("AERIS_RAG", "keyword")
+    hits = search("presentation 指标卡 时间线 CSV 复用")
+    assert any(hit["path"] == "docs/Agent富界面输出与复用指南.md" for hit in hits)

@@ -417,7 +417,7 @@
   font-weight: 600;
   opacity: 0.85;
 }
-.assistant-chart svg {
+.assistant-chart > svg {
   display: block;
   width: 100%;
   height: auto;

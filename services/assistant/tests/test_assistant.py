@@ -325,7 +325,7 @@ def test_model_loop_is_bounded_and_returns_collected_evidence():
     result = Engine(Settings(provider="maas"), model).run(make_turn(), lambda p: None)
     # The loop is still bounded, but the user gets the evidence already fetched
     # instead of a bare "step limit" error.
-    assert "本轮查询次数较多" in result["text"]
+    assert "查询上限" in result["text"]
     assert [trace["name"] for trace in result["traces"]]
 
 
