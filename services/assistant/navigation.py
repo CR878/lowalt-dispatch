@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from planner.astar import plan
 from planner.grid import build_grid
 from planner.scene import load_scene
+from services.assistant import route_weather
 from services.assistant.vehicles import VehicleSelection, evaluate_vehicle
 
 
@@ -89,7 +90,7 @@ def candidate_routes(body: CandidateInput):
                 "id": f"nav-{signature}-{clearance}",
                 "title": title,
                 "available": available,
-                "clearance_m": clearance,
+                "clearance_m": route_weather.truncate_reported(clearance, 1),
                 "reason": None if available else "该净空下无可用路线或端点被占用，需人工调整；未移动端点。",
                 "route": {
                     "id": f"nav-{signature}-{clearance}",
@@ -110,6 +111,7 @@ def candidate_routes(body: CandidateInput):
         "alternatives": alternatives,
         "dispatch_enabled": False,
         "is_simulated": True,
+        "precision_note": route_weather.PRECISION_NOTE,
         "limitation": "仅固定3km ENU场景。30/60m为栅格膨胀参数，不是实测净空；全部限制区保守静态避让。"
         "未校验高度、机型、风、时效、能耗与备降可达，不能用于真实地点或直接飞行。",
     }
@@ -229,11 +231,18 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
             "task_id": None,
             "plan_version": None,
             "waypoints": [{"x": lng, "y": lat, "lng": lng, "lat": lat} for lng, lat in result["waypoints"]],
-            "length_m": result["length_m"],
+            "length_m": route_weather.truncate_reported(result["length_m"], 1),
         }
         if found
         else None
     )
+    reported_clearance = route_weather.truncate_reported(result["clearance_m"], 1)
+    reported_length = route["length_m"] if route is not None else None
+    assessment = evaluate_vehicle(body, reported_length)
+    estimate = assessment.get("estimate")
+    duration = estimate.get("duration_s") if isinstance(estimate, dict) else None
+    if isinstance(duration, (int, float)) and not isinstance(duration, bool):
+        estimate["duration_s"] = route_weather.truncate_reported(duration, 1)
     return {
         "status": "ok" if found else "no_route",
         "frame": "WGS84",
@@ -242,7 +251,7 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
                 "id": f"real-{signature}",
                 "title": title,
                 "available": found,
-                "clearance_m": result["clearance_m"],
+                "clearance_m": reported_clearance,
                 "reason": result.get("reason"),
                 "route": route,
             }
@@ -255,11 +264,12 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
         "operationally_approved": False,
         "continuous_clearance_verified": result.get("continuous_clearance_verified", False),
         "flight_feasibility": weather.get("flight_feasibility", {"status": "unavailable"}),
-        "vehicle_assessment": evaluate_vehicle(body, result["length_m"] if found else None),
+        "vehicle_assessment": assessment,
         "obstacle_source": metadata["source"],
         "weather_source": weather["source"],
         "airspace": {"status": "manual_review_required", "source": None, "dispatch_enabled": False},
-        "clearance_m": result["clearance_m"],
+        "clearance_m": reported_clearance,
+        "precision_note": route_weather.PRECISION_NOTE,
         "grid_clearance_m": result.get("grid_clearance_m"),
         "resolution_m": result["resolution_m"],
         "resolution_requested_m": body.resolution_m,
