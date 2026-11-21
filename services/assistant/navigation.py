@@ -197,6 +197,7 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
             body.scheduled_for,
             vehicle_key=body.vehicle_key,
             custom_vehicle=body.custom_vehicle,
+            obstacles=dataset["obstacles"],
         )
         if found
         else {

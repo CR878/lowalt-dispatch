@@ -509,32 +509,87 @@ def _chunk_payloads(payload, count: int) -> list[dict] | None:
     return payload
 
 
-def _fetch_chunk(latitudes, longitudes, scheduled_for, target, *, forecast_days: int, client, include_hourly: bool):
+def _forecast_window(target: datetime, forecast_days: int) -> dict:
+    """Use forecast_days unless the instant is beyond that horizon.
+
+    A departure on day 3 or later is requested with start_date/end_date for the
+    departure day and the next day. This does not reopen a 16-day window.
+    """
+    if target > datetime.now(UTC) + timedelta(days=forecast_days):
+        start = target.astimezone(UTC).date()
+        end = start + timedelta(days=1)
+        return {
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+            "timezone": "UTC",
+            "wind_speed_unit": "ms",
+        }
+    return {"forecast_days": forecast_days, "timezone": "UTC", "wind_speed_unit": "ms"}
+
+
+def _read_response(client, params):
+    """One request, plus a single 2 s retry when the server returns HTTP 429."""
+    started = time.perf_counter()
+    response = None
+    for attempt in (0, 1):
+        response = client.get(OPEN_METEO, params=params)
+        if response.status_code == 429 and attempt == 0:
+            time.sleep(2)
+            continue
+        break
+    elapsed = time.perf_counter() - started
+    body = response.content if response is not None else b""
+    return response, elapsed, len(body)
+
+
+def _fetch_chunk(
+    latitudes,
+    longitudes,
+    scheduled_for,
+    target,
+    *,
+    forecast_days: int,
+    client,
+    include_hourly: bool,
+    batch_index: int,
+    timeout_s: float,
+):
     params = {
         "latitude": ",".join(str(value) for value in latitudes),
         "longitude": ",".join(str(value) for value in longitudes),
         "hourly": ",".join(HOURLY_FIELDS),
-        "forecast_days": forecast_days,
-        "timezone": "UTC",
-        "wind_speed_unit": "ms",
+        **_forecast_window(target, forecast_days),
+    }
+    stats = {
+        "batch_index": batch_index,
+        "point_count": len(latitudes),
+        "elapsed_s": None,
+        "response_bytes": None,
+        "forecast_days": params.get("forecast_days"),
+        "start_date": params.get("start_date"),
+        "end_date": params.get("end_date"),
+        "cache_hit": False,
     }
     try:
         if client is None:
-            with httpx.Client(timeout=8, trust_env=True) as created:
-                response = created.get(OPEN_METEO, params=params)
+            with httpx.Client(timeout=timeout_s, trust_env=True) as created:
+                response, elapsed, nbytes = _read_response(created, params)
         else:
-            response = client.get(OPEN_METEO, params=params)
+            response, elapsed, nbytes = _read_response(client, params)
+        stats["elapsed_s"] = elapsed
+        stats["response_bytes"] = nbytes
         response.raise_for_status()
         payload = response.json()
     except Exception:
-        return None, "气象服务当前不可达，未填任何数值"
+        return None, "气象服务当前不可达或超时，该批不可用，未改用其它源", stats
     rows = _chunk_payloads(payload, len(latitudes))
     if rows is None:
-        return None, "气象服务返回的地点数量与请求不一致，整批不可用"
+        return None, "气象服务返回的地点数量与请求不一致，整批不可用", stats
     if any(not _hourly_arrays_match(row.get("hourly") or {}) for row in rows):
-        return None, "气象服务逐时数组长度不一致，整批不可用"
-    parsed = [
-        _result_from_payload(
+        return None, "气象服务逐时数组长度不一致，整批不可用", stats
+    parsed = []
+    for row, latitude, longitude in zip(rows, latitudes, longitudes, strict=True):
+        item = _result_from_payload(
             row,
             latitude,
             longitude,
@@ -543,9 +598,10 @@ def _fetch_chunk(latitudes, longitudes, scheduled_for, target, *, forecast_days:
             include_hourly=include_hourly,
             forecast_days=forecast_days,
         )
-        for row, latitude, longitude in zip(rows, latitudes, longitudes, strict=True)
-    ]
-    return parsed, ""
+        item["model"] = row.get("model") if isinstance(row.get("model"), str) else None
+        item["request_stats"] = dict(stats)
+        parsed.append(item)
+    return parsed, "", stats
 
 
 def fetch_weather_batch(
@@ -556,30 +612,39 @@ def fetch_weather_batch(
     forecast_days: int = ROUTE_FORECAST_DAYS,
     client: httpx.Client | None = None,
     include_hourly: bool = True,
+    batch_size: int = BATCH_POINT_LIMIT,
+    timeout_s: float = 8.0,
 ) -> list[dict]:
     """Fetch many points, at most 20 per request, defaulting to 2 forecast days.
 
     A length or count mismatch makes the whole batch unavailable. A requested
     field the API omits stays null with a reason and is never replaced by a
-    nearby field. ``model_point`` is the returned grid point.
+    nearby field. ``model_point`` is the returned grid point. Requests are
+    issued one batch at a time, so in-flight requests stay at or below 3.
     """
     latitudes = list(latitudes)
     longitudes = list(longitudes)
     count = max(len(latitudes), len(longitudes))
+    if not isinstance(batch_size, int) or isinstance(batch_size, bool) or not 1 <= batch_size <= BATCH_POINT_LIMIT:
+        batch_size = BATCH_POINT_LIMIT
     if len(latitudes) != len(longitudes) or count == 0:
         return [unavailable_weather("批量坐标数量不一致，未请求气象", scheduled_for) for _ in range(count or 1)]
     try:
         target = _aware_target(scheduled_for)
         if not isinstance(forecast_days, int) or isinstance(forecast_days, bool) or forecast_days < 1:
             raise ValueError("invalid forecast_days")
+        if not isinstance(timeout_s, (int, float)) or isinstance(timeout_s, bool) or timeout_s <= 0:
+            raise ValueError("invalid timeout")
         if not all(_valid_point(lat, lon) for lat, lon in zip(latitudes, longitudes, strict=True)):
             raise ValueError("invalid coordinates")
     except (ValueError, TypeError, AttributeError):
         return [unavailable_weather("气象查询的坐标、日期或预报天数无效", scheduled_for) for _ in latitudes]
 
+    window = _forecast_window(target, forecast_days)
     results: list[dict | None] = [None] * count
-    for start in range(0, count, BATCH_POINT_LIMIT):
-        stop = min(count, start + BATCH_POINT_LIMIT)
+    batch_index = 0
+    for start in range(0, count, batch_size):
+        stop = min(count, start + batch_size)
         chunk_lats = latitudes[start:stop]
         chunk_lons = longitudes[start:stop]
         cache_key = None
@@ -590,13 +655,23 @@ def fetch_weather_batch(
                 scheduled_for,
                 include_hourly,
                 forecast_days,
+                tuple(sorted(window.items())),
                 "batch",
             )
             hit = _WEATHER_CACHE.get(cache_key)
             if hit and time.monotonic() - hit[0] < _WEATHER_TTL_S:
-                results[start:stop] = hit[1]
+                cached = []
+                for item in hit[1]:
+                    copy = dict(item)
+                    stats = dict(copy.get("request_stats") or {})
+                    stats["cache_hit"] = True
+                    stats["elapsed_s"] = None
+                    copy["request_stats"] = stats
+                    cached.append(copy)
+                results[start:stop] = cached
+                batch_index += 1
                 continue
-        parsed, reason = _fetch_chunk(
+        parsed, reason, _stats = _fetch_chunk(
             chunk_lats,
             chunk_lons,
             scheduled_for,
@@ -604,13 +679,15 @@ def fetch_weather_batch(
             forecast_days=forecast_days,
             client=client,
             include_hourly=include_hourly,
+            batch_index=batch_index,
+            timeout_s=float(timeout_s),
         )
         if parsed is None:
-            failed = [unavailable_weather(reason, scheduled_for) for _ in latitudes]
-            return failed
+            return [unavailable_weather(reason, scheduled_for) for _ in latitudes]
         if cache_key is not None:
             _WEATHER_CACHE[cache_key] = (time.monotonic(), parsed)
         results[start:stop] = parsed
+        batch_index += 1
     return results
 
 

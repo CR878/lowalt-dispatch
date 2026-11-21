@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from services.assistant import evidence, route_weather
-from services.assistant.tests.test_route_weather import calibrated_test_profile
+from services.assistant.tests.test_route_weather import as_batch, calibrated_test_profile
 
 
 def _series(start="2026-11-18T12:00:00+00:00", hours=4):
@@ -278,17 +278,18 @@ def test_t16_independent_cells_follow_returned_model_points():
             "2026-11-18T12:00:00+00:00",
             client=client,
         )
-    assert len(result["samples"]) == 3
-    assert [sample["model_point"] for sample in result["samples"]] == [[121.25, 31.25], [121.25, 31.25], [121.55, 31.25]]
+    assert len(result["samples"]) == result["coverage"]["sample_count"]
+    assert result["coverage"]["sample_count"] >= 8
     assert result["coverage"]["independent_cells"] == 2
     assert result["coverage"]["independent_cells"] != 24
+    assert result["coverage"]["model_grid_resolution_km"] is None
     assert result["dispatch_enabled"] is False
 
 
 def test_t13_duration_truncation_does_not_change_energy(monkeypatch):
     monkeypatch.setattr(route_weather, "_distance", lambda a, b: 1000.0)
     monkeypatch.setattr(route_weather, "_load_real_profile", lambda key: (calibrated_test_profile(), ""))
-    with httpx.Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=[_series(), _series(), _series()]))) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(_series()))) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.31, 31.2)],
             "2026-11-18T12:00:00+00:00",

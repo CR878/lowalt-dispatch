@@ -27,6 +27,8 @@ def forecast_payload(start="2026-11-18T00:00:00+00:00", *, speed=4.0, direction=
             ],
             "wind_speed_10m": [speed] * 12,
             "wind_direction_10m": [direction] * 12,
+            "wind_speed_120m": [speed] * 12,
+            "wind_direction_120m": [direction] * 12,
             "temperature_2m": [20.0] * 12,
             "relative_humidity_2m": [50.0] * 12,
             "surface_pressure": [1013.25] * 12,
@@ -177,8 +179,10 @@ def test_weather_without_real_vehicle_never_invents_eta_or_power():
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)], "2026-11-18T08:00:00+08:00", client=client
         )
-    assert result["status"] == "ok"
-    assert len(result["samples"]) == 3
+    assert result["status"] == "unavailable"
+    length = route_weather._distance((121.3, 31.2), (121.6, 31.2))
+    assert len(result["samples"]) == route_weather.sample_count_for(length, route_weather.auto_step_m(length))
+    assert all(sample["eta"] is None for sample in result["samples"])
     assert result["energy"]["status"] == "unavailable"
     assert "energy_wh" not in result["energy"]
     assert result["flight_feasibility"]["status"] == "unavailable"
@@ -186,28 +190,41 @@ def test_weather_without_real_vehicle_never_invents_eta_or_power():
     assert result["dispatch_enabled"] is False
 
 
-def test_missing_forecast_wind_never_assumes_calm():
+def test_missing_forecast_wind_never_assumes_calm(monkeypatch):
+    monkeypatch.setattr(route_weather, "_load_real_profile", lambda key: (calibrated_test_profile(), ""))
     payload = forecast_payload()
-    payload["hourly"]["wind_speed_10m"] = [None] * 12
+    for field in ("wind_speed_10m", "wind_direction_10m", "wind_speed_120m", "wind_direction_120m"):
+        payload["hourly"][field] = [None] * 12
     with httpx.Client(
         transport=httpx.MockTransport(as_batch(payload))
     ) as client:
         result = route_weather.assess_route_weather(
-            [(121.3, 31.2), (121.6, 31.2)], "2026-11-18T08:00:00+08:00", client=client
+            [(121.3, 31.2), (121.6, 31.2)],
+            "2026-11-18T08:00:00+08:00",
+            vehicle_key="test-only",
+            client=client,
         )
     assert result["status"] == "unavailable"
-    assert all(s["values"]["wind_speed_10m"] is None for s in result["samples"])
+    assert all(sample["values"].get("wind_speed_10m") is None for sample in result["samples"])
+    assert all(sample["values"].get("wind_speed_120m") is None for sample in result["samples"])
+    assert result["energy"].get("energy_wh") is None
 
 
 @pytest.mark.parametrize("field,invalid", [("wind_speed_10m", -2), ("wind_direction_10m", 450)])
-def test_invalid_wind_is_not_normalized_into_valid_evidence(field, invalid):
+def test_invalid_wind_is_not_normalized_into_valid_evidence(field, invalid, monkeypatch):
+    monkeypatch.setattr(route_weather, "_load_real_profile", lambda key: (calibrated_test_profile(), ""))
     payload = forecast_payload()
     payload["hourly"][field] = [invalid] * 12
+    paired = "wind_speed_120m" if "speed" in field else "wind_direction_120m"
+    payload["hourly"][paired] = [invalid] * 12
     with httpx.Client(
         transport=httpx.MockTransport(as_batch(payload))
     ) as client:
         result = route_weather.assess_route_weather(
-            [(121.3, 31.2), (121.6, 31.2)], "2026-11-18T08:00:00+08:00", client=client
+            [(121.3, 31.2), (121.6, 31.2)],
+            "2026-11-18T08:00:00+08:00",
+            vehicle_key="test-only",
+            client=client,
         )
     assert result["status"] == "unavailable"
     assert all(sample["values"][field] is None for sample in result["samples"])
