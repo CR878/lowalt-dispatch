@@ -1,0 +1,507 @@
+{
+  "$defs": {
+    "ChartBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "chart",
+          "default": "chart",
+          "title": "Type",
+          "type": "string"
+        },
+        "chart": {
+          "$ref": "#/$defs/ChartSpec"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "chart"
+      ],
+      "title": "ChartBlock",
+      "type": "object"
+    },
+    "ChartSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "bar",
+            "pie",
+            "line"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "unit": {
+          "default": "",
+          "maxLength": 24,
+          "title": "Unit",
+          "type": "string"
+        },
+        "data": {
+          "items": {
+            "$ref": "#/$defs/Datum"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Data",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "title",
+        "data"
+      ],
+      "title": "ChartSpec",
+      "type": "object"
+    },
+    "Datum": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 80,
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ],
+      "title": "Datum",
+      "type": "object"
+    },
+    "Metric": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 60,
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "unit": {
+          "default": "",
+          "maxLength": 24,
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ],
+      "title": "Metric",
+      "type": "object"
+    },
+    "MetricsBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "metrics",
+          "default": "metrics",
+          "title": "Type",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Metric"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "items"
+      ],
+      "title": "MetricsBlock",
+      "type": "object"
+    },
+    "RouteBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "route",
+          "default": "route",
+          "title": "Type",
+          "type": "string"
+        },
+        "route_id": {
+          "maxLength": 160,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "draft_digest": {
+          "maxLength": 160,
+          "title": "Draft Digest",
+          "type": "string"
+        },
+        "length_m": {
+          "minimum": 0,
+          "title": "Length M",
+          "type": "number"
+        },
+        "waypoints": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "maxItems": 5000,
+          "minItems": 2,
+          "title": "Waypoints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "route_id",
+        "draft_digest",
+        "length_m",
+        "waypoints"
+      ],
+      "title": "RouteBlock",
+      "type": "object"
+    },
+    "TableBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "table",
+          "default": "table",
+          "title": "Type",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 6,
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array"
+          },
+          "maxItems": 20,
+          "title": "Rows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "columns",
+        "rows"
+      ],
+      "title": "TableBlock",
+      "type": "object"
+    },
+    "TimelineBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "timeline",
+          "default": "timeline",
+          "title": "Type",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/TimelineItem"
+          },
+          "maxItems": 30,
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "items"
+      ],
+      "title": "TimelineBlock",
+      "type": "object"
+    },
+    "TimelineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "time": {
+          "maxLength": 80,
+          "title": "Time",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "title": "Title",
+          "type": "string"
+        },
+        "detail": {
+          "default": "",
+          "maxLength": 1000,
+          "title": "Detail",
+          "type": "string"
+        },
+        "level": {
+          "default": "info",
+          "enum": [
+            "info",
+            "warning",
+            "success"
+          ],
+          "title": "Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "time",
+        "title"
+      ],
+      "title": "TimelineItem",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "blocks": {
+      "items": {
+        "discriminator": {
+          "mapping": {
+            "chart": "#/$defs/ChartBlock",
+            "metrics": "#/$defs/MetricsBlock",
+            "route": "#/$defs/RouteBlock",
+            "table": "#/$defs/TableBlock",
+            "timeline": "#/$defs/TimelineBlock"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/MetricsBlock"
+          },
+          {
+            "$ref": "#/$defs/ChartBlock"
+          },
+          {
+            "$ref": "#/$defs/TableBlock"
+          },
+          {
+            "$ref": "#/$defs/TimelineBlock"
+          },
+          {
+            "$ref": "#/$defs/RouteBlock"
+          }
+        ]
+      },
+      "maxItems": 6,
+      "title": "Blocks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "blocks"
+  ],
+  "title": "Presentation",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,147 @@
+{
+  "checked_at": "2026-11-17T06:37:22.711929+00:00",
+  "kind": "live_external_probe",
+  "result": {
+    "source": "Open-Meteo / hourly forecast",
+    "warnings": [
+      "公开预报为模式网格的10m风、2m温湿度和地面气压，不是航高实测；未提供建筑尾流、阵风控制或局地风场。",
+      "天气沿航线仅取起点、中点、终点三个模式网格，不能证明航路气象完整覆盖。",
+      "温湿度与气压进入湿空气密度及理想旋翼诱导功率敏感性；总电功率和低温电池容量仍需真实平台标定，未套用经验折减系数。",
+      "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    ],
+    "dispatch_enabled": false,
+    "constraints_evaluated": false,
+    "status": "ok",
+    "scheduled_for": "2026-11-17T06:37:20.626600+00:00",
+    "samples": [
+      {
+        "at": "origin",
+        "point": [
+          121.335209,
+          31.19795
+        ],
+        "status": "ok",
+        "valid_for": "2026-11-17T06:37:20.626600+00:00",
+        "fetched_at": "2026-11-17T06:37:22.707046+00:00",
+        "source": "Open-Meteo / hourly forecast",
+        "values": {
+          "temperature_2m": 17.28880186111111,
+          "relative_humidity_2m": 59.48958511111111,
+          "wind_speed_10m": 2.493326365068385,
+          "wind_direction_10m": 0.2908749211267953,
+          "wind_gusts_10m": 7.962239627777778,
+          "surface_pressure": 1020.2111981388889,
+          "precipitation": 0.0,
+          "visibility": 23660.0,
+          "weather_code": 3.0
+        },
+        "units": {
+          "wind_speed_10m": "m/s",
+          "wind_gusts_10m": "m/s",
+          "wind_direction_10m": "degree FROM",
+          "surface_pressure": "hPa",
+          "temperature_2m": "degC",
+          "relative_humidity_2m": "%"
+        },
+        "atmosphere": {
+          "status": "model",
+          "density_kg_m3": 1.2183855375143136,
+          "ideal_induced_power_ratio_to_isa_sea_level": 1.0027107632584573,
+          "reference_density_kg_m3": 1.225,
+          "formula": "rho=(p-e)/(287.05*T)+e/(461.5*T); fixed-thrust ideal rotor Pi proportional to rho^(-1/2)",
+          "source": "Buck saturation vapor pressure; ideal gas mixture; actuator disk momentum theory; ICAO ISA sea-level density 1.225 kg/m3",
+          "limitation": "只表示同推力下理想诱导功率分量的变化，不能当作实际总电功率或电池折减率。"
+        },
+        "reason": ""
+      },
+      {
+        "at": "midpoint",
+        "point": [
+          121.5698045,
+          31.171166499999998
+        ],
+        "status": "ok",
+        "valid_for": "2026-11-17T06:37:20.626600+00:00",
+        "fetched_at": "2026-11-17T06:37:22.700546+00:00",
+        "source": "Open-Meteo / hourly forecast",
+        "values": {
+          "temperature_2m": 17.35104148888889,
+          "relative_humidity_2m": 58.62239627777778,
+          "wind_speed_10m": 2.7643092289856868,
+          "wind_direction_10m": 344.3673738267286,
+          "wind_gusts_10m": 7.924479255555555,
+          "surface_pressure": 1019.911198138889,
+          "precipitation": 0.0,
+          "visibility": 24580.0,
+          "weather_code": 3.0
+        },
+        "units": {
+          "wind_speed_10m": "m/s",
+          "wind_gusts_10m": "m/s",
+          "wind_direction_10m": "degree FROM",
+          "surface_pressure": "hPa",
+          "temperature_2m": "degC",
+          "relative_humidity_2m": "%"
+        },
+        "atmosphere": {
+          "status": "model",
+          "density_kg_m3": 1.217821629898554,
+          "ideal_induced_power_ratio_to_isa_sea_level": 1.002942887069247,
+          "reference_density_kg_m3": 1.225,
+          "formula": "rho=(p-e)/(287.05*T)+e/(461.5*T); fixed-thrust ideal rotor Pi proportional to rho^(-1/2)",
+          "source": "Buck saturation vapor pressure; ideal gas mixture; actuator disk momentum theory; ICAO ISA sea-level density 1.225 kg/m3",
+          "limitation": "只表示同推力下理想诱导功率分量的变化，不能当作实际总电功率或电池折减率。"
+        },
+        "reason": ""
+      },
+      {
+        "at": "destination",
+        "point": [
+          121.8044,
+          31.144383
+        ],
+        "status": "ok",
+        "valid_for": "2026-11-17T06:37:20.626600+00:00",
+        "fetched_at": "2026-11-17T06:37:22.675711+00:00",
+        "source": "Open-Meteo / hourly forecast",
+        "values": {
+          "temperature_2m": 17.35104148888889,
+          "relative_humidity_2m": 58.0,
+          "wind_speed_10m": 3.8687502133333336,
+          "wind_direction_10m": 342.0,
+          "wind_gusts_10m": 8.995834044444445,
+          "surface_pressure": 1019.5356773944444,
+          "precipitation": 0.0,
+          "visibility": 25580.0,
+          "weather_code": 3.0
+        },
+        "units": {
+          "wind_speed_10m": "m/s",
+          "wind_gusts_10m": "m/s",
+          "wind_direction_10m": "degree FROM",
+          "surface_pressure": "hPa",
+          "temperature_2m": "degC",
+          "relative_humidity_2m": "%"
+        },
+        "atmosphere": {
+          "status": "model",
+          "density_kg_m3": 1.2174271977868958,
+          "ideal_induced_power_ratio_to_isa_sea_level": 1.0031053447689213,
+          "reference_density_kg_m3": 1.225,
+          "formula": "rho=(p-e)/(287.05*T)+e/(461.5*T); fixed-thrust ideal rotor Pi proportional to rho^(-1/2)",
+          "source": "Buck saturation vapor pressure; ideal gas mixture; actuator disk momentum theory; ICAO ISA sea-level density 1.225 kg/m3",
+          "limitation": "只表示同推力下理想诱导功率分量的变化，不能当作实际总电功率或电池折减率。"
+        },
+        "reason": ""
+      }
+    ],
+    "energy": {
+      "status": "unavailable",
+      "reason": "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    },
+    "flight_feasibility": {
+      "status": "unavailable",
+      "reason": "未选择有来源且完成标定的真实机型；未填默认空速、功率或电池参数。"
+    }
+  }
+}

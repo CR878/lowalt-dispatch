@@ -1,0 +1,83 @@
+{
+  "scene_id": "4bac5ae2d8f14590",
+  "verified_at": "2026-11-17T06:50:42.465523+00:00",
+  "selection": "Random(20261117).sample of way buildings with height_source=tag; checks OSM claimed heights, not independent measured truth",
+  "verification_url": "https://api.openstreetmap.org/api/0.6/ways?ways=863165296%2C1156899170%2C960668928%2C377203970%2C792384131",
+  "source": "OSM primary API live read, independently refetched tags",
+  "all_matched": true,
+  "checks": [
+    {
+      "id": "osm-way-863165296",
+      "osm_url": "https://www.openstreetmap.org/way/863165296",
+      "height_tag": "40",
+      "expected_height_m": 40.0,
+      "scene_height_m": 40.0,
+      "matched": true,
+      "height_source": "tag",
+      "raw_osm_tags": {
+        "building": "university",
+        "height": "40"
+      }
+    },
+    {
+      "id": "osm-way-1156899170",
+      "osm_url": "https://www.openstreetmap.org/way/1156899170",
+      "height_tag": "120",
+      "expected_height_m": 120.0,
+      "scene_height_m": 120.0,
+      "matched": true,
+      "height_source": "tag",
+      "raw_osm_tags": {
+        "building": "commercial",
+        "building:levels": "28",
+        "height": "120",
+        "name": "20号楼"
+      }
+    },
+    {
+      "id": "osm-way-960668928",
+      "osm_url": "https://www.openstreetmap.org/way/960668928",
+      "height_tag": "15",
+      "expected_height_m": 15.0,
+      "scene_height_m": 15.0,
+      "matched": true,
+      "height_source": "tag",
+      "raw_osm_tags": {
+        "building": "residential",
+        "building:levels": "5",
+        "height": "15",
+        "name": "学生宿舍楼3"
+      }
+    },
+    {
+      "id": "osm-way-377203970",
+      "osm_url": "https://www.openstreetmap.org/way/377203970",
+      "height_tag": "18",
+      "expected_height_m": 18.0,
+      "scene_height_m": 18.0,
+      "matched": true,
+      "height_source": "tag",
+      "raw_osm_tags": {
+        "building": "residential",
+        "height": "18",
+        "name": "教师公寓楼"
+      }
+    },
+    {
+      "id": "osm-way-792384131",
+      "osm_url": "https://www.openstreetmap.org/way/792384131",
+      "height_tag": "279",
+      "expected_height_m": 279.0,
+      "scene_height_m": 279.0,
+      "matched": true,
+      "height_source": "tag",
+      "raw_osm_tags": {
+        "building": "commercial",
+        "building:levels": "61",
+        "height": "279",
+        "name": "西岸美高酒店",
+        "tourism": "hotel"
+      }
+    }
+  ]
+}

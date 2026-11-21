@@ -1,0 +1,277 @@
+.telemetry-section-nav {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+.telemetry-section-nav a,
+.live-map-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #d6d5e1;
+  border-radius: 5px;
+  color: light-dark(#376e95, #a7c6dd);
+  background: #f5f5f8;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.telemetry-section-nav a:hover,
+.live-map-toggle:hover {
+  background: #f4f2f7;
+}
+.map-stage[hidden],
+.segmented[hidden] {
+  display: none;
+}
+.live-local-track {
+  --track-grid: #283b45;
+  --track-accent: #9be7d3;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  padding: 12px;
+  gap: 8px;
+  background: radial-gradient(ellipse at 45% 25%, #f4f7f9, #f6f8fa 78%);
+}
+.live-track-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  color: light-dark(#546778, #b5c3cf);
+  font-size: 12px;
+}
+.live-local-track:not(.live-track-empty) > svg {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.live-track-empty > svg {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.live-track-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: light-dark(#536879, #b4c3cf);
+  font: 10px var(--mono);
+}
+.live-track-caption span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.live-track-line,
+.live-track-scale path {
+  fill: none;
+  stroke: var(--track-accent);
+}
+.live-track-line {
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.live-track-scale text,
+.live-track-direction {
+  fill: #526d7a;
+  font: 11px var(--mono);
+}
+.live-aircraft-marker,
+.live-trend-tip {
+  transition: transform 650ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.live-aircraft-marker {
+  color: light-dark(#379578, #a7ddcc);
+}
+.live-aircraft-body {
+  fill: #16332d;
+  stroke: var(--track-accent);
+}
+.live-aircraft-heading {
+  fill: var(--track-accent);
+}
+.live-aircraft-halo {
+  fill: var(--track-accent);
+  opacity: 0.12;
+}
+.live-aircraft-marker[data-active="true"] .live-aircraft-halo {
+  animation: telemetry-pulse 1.6s ease-out infinite;
+}
+.live-aircraft-marker[data-active="false"] {
+  opacity: 0.58;
+}
+@keyframes telemetry-pulse {
+  from {
+    transform: scale(0.75);
+    opacity: 0.3;
+  }
+  to {
+    transform: scale(1.22);
+    opacity: 0.04;
+  }
+}
+.live-telemetry-details {
+  margin: 14px 0;
+  padding: 14px;
+  min-width: 0;
+  scroll-margin-top: 64px;
+  animation: telemetry-reveal 240ms ease-out both;
+}
+@keyframes telemetry-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.live-telemetry-details > header,
+.live-trend > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.live-telemetry-details h2 {
+  margin: 0;
+  color: light-dark(#51567b, #b3b7d0);
+  font-size: 14px;
+}
+.live-telemetry-details header div {
+  display: flex;
+  gap: 8px;
+  color: light-dark(#517b75, #b3d0cc);
+  font: 11px var(--mono);
+}
+.live-trends,
+.live-metric-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.live-trend {
+  --trend-color: #bca9ff;
+  padding: 10px;
+  border: 1px solid #d6d8e1;
+  border-radius: 6px;
+  background: #f5f7f9;
+}
+.live-trend[data-series="speed"] {
+  --trend-color: #9be7d3;
+}
+.live-trend div span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: light-dark(#535e79, #b4bccf);
+  font-size: 11px;
+}
+.live-trend strong {
+  color: var(--trend-color);
+  font: 18px var(--mono);
+}
+.live-trend strong small {
+  color: light-dark(#52617a, #b4bed0);
+  font-size: 10px;
+}
+.live-trend svg[role="img"] {
+  display: block;
+  width: 100%;
+  height: 66px;
+}
+.live-trend-grid {
+  stroke: #293342;
+}
+.live-trend-line {
+  fill: none;
+  stroke: var(--trend-color);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.live-trend-tip {
+  fill: var(--trend-color);
+}
+.live-trend-axis {
+  fill: #536879;
+  font: 9px var(--mono);
+}
+.live-trend p,
+.live-metrics-note {
+  color: light-dark(#566176, #b6bece);
+  font-size: 10px;
+}
+.live-metrics {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  align-self: start;
+  font-size: 11px;
+}
+.live-metrics caption {
+  padding: 8px;
+  text-align: left;
+  color: light-dark(#376e95, #a7c6dd);
+  background: #f5f4f8;
+  font-weight: 600;
+}
+.live-metrics caption svg {
+  vertical-align: text-bottom;
+  margin-right: 6px;
+}
+.live-metrics th,
+.live-metrics td {
+  padding: 7px 8px;
+  border-bottom: 1px solid #d5d9e1;
+  overflow-wrap: anywhere;
+}
+.live-metrics thead th {
+  background: #f5f6f9;
+  color: light-dark(#52617a, #b4bed0);
+  font-size: 10px;
+}
+.live-metrics th:first-child {
+  width: 49%;
+  text-align: left;
+}
+.live-metrics th:last-child {
+  width: 18%;
+}
+.live-metrics tbody th {
+  color: light-dark(#525f7a, #b4bdd0);
+  font-weight: 400;
+}
+.live-metrics td {
+  color: light-dark(#376e95, #a7c6dd);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.live-metrics td:last-child,
+.live-metrics .live-metric-missing {
+  color: light-dark(#546278, #b5bfcf);
+}
+.live-metrics tbody tr:nth-child(even) {
+  background: #f5f6f9;
+}
+.live-metrics tbody tr:hover {
+  background: #f3f3f8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-aircraft-marker,
+  .live-trend-tip {
+    transition: none;
+  }
+  .live-aircraft-marker[data-active="true"] .live-aircraft-halo,
+  .live-telemetry-details {
+    animation: none;
+  }
+}

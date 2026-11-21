@@ -16,6 +16,35 @@ import numpy as np
 Point = tuple[float, float]
 Polygon = list[Point]
 
+# 栅格离散化参数。规划器与独立校验器必须共用同一组数字，否则同一段几何会
+# 被量出两个长度，校验结论就失去了可比性。
+# GRID_CLEARANCE_M = 20 m 物理净空 + 10 m 离散化裕量（半格误差 + 八邻域切角），
+# 推导见 planner/grid.py 的模块 docstring。
+GRID_RES_M = 10.0
+GRID_CLEARANCE_M = 30.0
+GRID_BOUNDS = (0.0, 0.0, 3000.0, 3000.0)  # x0, y0, x1, y1
+
+
+def geographic_grid_clearance_m(res_m: float, physical_clearance_m: float) -> float:
+    """Conservative real-route centre exclusion radius in metres.
+
+    Unlike v0's raster-then-dilate baseline, real-route rasterization measures
+    distance to the original continuous geometry, including sub-cell buildings.
+    For an edge between adjacent cell centres, each continuous point is at most
+    half the diagonal (res/sqrt(2)) from its nearest endpoint. Distance to an
+    obstacle is 1-Lipschitz; keeping both centres farther than physical clearance
+    + res/sqrt(2) therefore protects the entire edge. Exact endpoint connectors
+    are checked separately, and every returned segment is checked continuously.
+    Frozen v0 constants and rasterization intentionally remain unchanged.
+    """
+    import math
+
+    if not math.isfinite(res_m) or res_m <= 0:
+        raise ValueError("res_m 必须为有限正数")
+    if not math.isfinite(physical_clearance_m) or physical_clearance_m <= 0:
+        raise ValueError("physical_clearance_m 必须为有限正数")
+    return physical_clearance_m + res_m / math.sqrt(2.0)
+
 
 # --------------------------------------------------------------------------- #
 # 多边形
@@ -65,6 +94,30 @@ def polygon_bbox(poly: Polygon) -> tuple[float, float, float, float]:
     xs = [p[0] for p in poly]
     ys = [p[1] for p in poly]
     return min(xs), min(ys), max(xs), max(ys)
+
+
+def _dist_point_to_segment(px: float, py: float, ax: float, ay: float, bx: float, by: float) -> float:
+    dx, dy = bx - ax, by - ay
+    seg2 = dx * dx + dy * dy
+    if seg2 == 0.0:
+        return ((px - ax) ** 2 + (py - ay) ** 2) ** 0.5
+    t = max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / seg2))
+    return ((px - (ax + t * dx)) ** 2 + (py - (ay + t * dy)) ** 2) ** 0.5
+
+
+def distance_point_to_polygon(x: float, y: float, poly: Polygon) -> float:
+    """点到多边形边界的最小距离；点在多边形内部时返回 0（内部视为距离零）。
+
+    校验器用它来判断安全净空。注意这类"距离"是几何事实，
+    至于"小于多少算违规"是判定，必须由调用方自己定。
+    """
+    if point_in_polygon(x, y, poly):
+        return 0.0
+    n = len(poly)
+    return min(
+        _dist_point_to_segment(x, y, poly[k][0], poly[k][1], poly[(k + 1) % n][0], poly[(k + 1) % n][1])
+        for k in range(n)
+    )
 
 
 def bbox_overlap(a: tuple[float, float, float, float], b: tuple[float, float, float, float]) -> bool:

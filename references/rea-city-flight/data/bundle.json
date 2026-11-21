@@ -1,0 +1,1062 @@
+{
+    "evidence_id":  "ev_c42872e9ef2534e13a12965616f0eacd89587bd2602ec9b544bbe3f65e97ca35",
+    "subject":  null,
+    "provider":  {
+                     "id":  "rea-cdp-browser",
+                     "name":  "REA Chrome DevTools Protocol observation provider",
+                     "version":  "2"
+                 },
+    "analysis_profile":  null,
+    "predicate_type":  "rea.web-bundle-analysis",
+    "operation":  "analyze_web_bundle",
+    "parameters":  {
+                       "cdp_endpoint":  "http://127.0.0.1:9333",
+                       "allowed_origins":  [
+
+                                           ],
+                       "target_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                       "observation_ms":  500,
+                       "include_accessibility_text":  false,
+                       "include_console_text":  false,
+                       "include_json_body_shapes":  false,
+                       "include_websocket_shapes":  false,
+                       "include_storage_keys":  false,
+                       "include_storage_fingerprints":  false,
+                       "include_script_sources":  true,
+                       "fetch_source_maps":  true
+                   },
+    "raw_result":  null,
+    "normalized_result":  {
+                              "capture":  {
+                                              "target_url":  "https://www.kdji.cn/scene/city-flight.html",
+                                              "scripts_observed":  27,
+                                              "scripts_analyzed":  27,
+                                              "source_artifacts":  [
+                                                                       {
+                                                                           "sha256":  "603d4f6b15d1744d35d656525bd4c20ad6d863ec4472569faaff7875415b6f08",
+                                                                           "bytes":  15052,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "f6defe7a3164223805e6a05f7c50f6cfa321dc7fc50d8fb5284425db9f0a90a2",
+                                                                           "bytes":  14804,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "1745efee7abe30aad214e971de00f3230f380e019719646b2f8fbb19748b2577",
+                                                                           "bytes":  1807,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "f596eb9d01e5e2529eb1a1f1b2ae3693ada4381ab77dca901167d3a81586a0b6",
+                                                                           "bytes":  45013,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "e7b24d52847d9a641efdc79bf5df3e888be4b97e9f00577913ce363bf196de1d",
+                                                                           "bytes":  7280,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "728d88e6c582b63bd5501307b32998ed20391fc2ebf4b258dc8b9ff35a294a71",
+                                                                           "bytes":  538,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "e25be95372ef9f094a6d23a6fcb698322ac3f5e3e80e8c8624f813e9844bc05d",
+                                                                           "bytes":  855,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "4628012fce65ba7d57ead303b610c789788b64b642231952da5104e5aed63008",
+                                                                           "bytes":  1477,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "834302016f7a5479c161f518ce6b26962a85db41fea353bd6d8f72b896e03169",
+                                                                           "bytes":  3336,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "ad8ebf41122d98ededa8fab1be5f45c153fe75acf3f2bba90f72f70d90973dc2",
+                                                                           "bytes":  4668,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "ab69b1de0f6696c8b33ffa283598deeeb9d0124e238d3161819c445b1550f88a",
+                                                                           "bytes":  4478,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "ab69b1de0f6696c8b33ffa283598deeeb9d0124e238d3161819c445b1550f88a",
+                                                                           "bytes":  4478,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "e84736018091ca8ceb0089e32e18119c08e95a4bd27e5d0f27858b6a97587f0c",
+                                                                           "bytes":  11988,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "fda7e946b8e0b5ab39b779206589e7a1079a22eb24efb89d7223e03fdfb1f751",
+                                                                           "bytes":  35539,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "4628012fce65ba7d57ead303b610c789788b64b642231952da5104e5aed63008",
+                                                                           "bytes":  1477,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "16de5c76ca98fbe11d14c70ae9e79af08846a3415e49f1dd03dea9e55059c526",
+                                                                           "bytes":  2024,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "358fd940adc8ec3ddb1762befac93e5a2a6e76596618ded722ede5cfd61b0d53",
+                                                                           "bytes":  5176,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "67ac5551fdafa6e349bd80c8f8e5e39c136d6b2fb1ad647db9abb21dc86f9e4a",
+                                                                           "bytes":  114739,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "5b6767839d7a66311ab6e3098ca01dd40cb2f7b8cdc7e2a1fbf3edf9e0c8c94e",
+                                                                           "bytes":  1557,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                           "bytes":  603113,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "19f886ec0c5b1f5233a5e418e4bc8a9d6ade47558388a42c4cac0f04470deb2c",
+                                                                           "bytes":  3663,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "5e43257f01565d9be52ea12203d939998fb309340f7b380bd27c8e3b77060bf6",
+                                                                           "bytes":  7182,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "0cad5dcc737bf8cc3ce3136aabe7ce89f813b216278008044dc110154db48597",
+                                                                           "bytes":  2285,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "41a47c224cd24a3f74bcd203a8e5bbfd642211e66591f1d2d634ffae0f69aaf8",
+                                                                           "bytes":  2581,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "727f67a57e61b89b3e7de0f5a83699a82ae2d2ea2082f186d2ef7333f3a1f0f1",
+                                                                           "bytes":  16480,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "0cad5dcc737bf8cc3ce3136aabe7ce89f813b216278008044dc110154db48597",
+                                                                           "bytes":  2285,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       },
+                                                                       {
+                                                                           "sha256":  "eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20",
+                                                                           "bytes":  1403455,
+                                                                           "media_type":  "text/javascript",
+                                                                           "charset":  "utf-8",
+                                                                           "text_available":  true
+                                                                       }
+                                                                   ]
+                                          },
+                              "observations":  {
+                                                   "chunks":  {
+                                                                  "nodes":  [
+                                                                                {
+                                                                                    "script_key":  "scr_0237ffc78ef99be2dbb2a7a71a872794effe232c58fa69e0bb9d728879302102",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-operations.js?v=city-response-v19",
+                                                                                    "artifact_sha256":  "603d4f6b15d1744d35d656525bd4c20ad6d863ec4472569faaff7875415b6f08",
+                                                                                    "bytes":  15052
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_0944b437015f2cc85b8e7d673cc9f5aaf50f2655c71b3bda0078d1f7132300bb",
+                                                                                    "url":  "https://www.kdji.cn/contact-tools.js?v=1793534846",
+                                                                                    "artifact_sha256":  "f6defe7a3164223805e6a05f7c50f6cfa321dc7fc50d8fb5284425db9f0a90a2",
+                                                                                    "bytes":  14804
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_0d1c1821907f3aa0191b2e56589379a3c680e429666b1eb8eb10bf99e1825bf3",
+                                                                                    "url":  "https://www.kdji.cn/multimodal-page.js?v=1791743222",
+                                                                                    "artifact_sha256":  "1745efee7abe30aad214e971de00f3230f380e019719646b2f8fbb19748b2577",
+                                                                                    "bytes":  1807
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-flight.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "f596eb9d01e5e2529eb1a1f1b2ae3693ada4381ab77dca901167d3a81586a0b6",
+                                                                                    "bytes":  45013
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_50333a0348c3efcf613ef93d0d8ff46501931ed8a243b36586400d7841aff739",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-flight.html",
+                                                                                    "artifact_sha256":  "e7b24d52847d9a641efdc79bf5df3e888be4b97e9f00577913ce363bf196de1d",
+                                                                                    "bytes":  7280
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_51cfe9f29f1c9702e17a68d5338edd991c112a0bedadd77ccb493614e6422563",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-flight.html",
+                                                                                    "artifact_sha256":  "728d88e6c582b63bd5501307b32998ed20391fc2ebf4b258dc8b9ff35a294a71",
+                                                                                    "bytes":  538
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_51ffbe755a644082832f57388b2bdb797035b7d1c0b5abcc0ea483fc4c0c6efa",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "e25be95372ef9f094a6d23a6fcb698322ac3f5e3e80e8c8624f813e9844bc05d",
+                                                                                    "bytes":  855
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_520f94919e6f1dd9081232b5e17155c61e34c038f42ff81bfd771fcdf8da20fd",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-physics.js",
+                                                                                    "artifact_sha256":  "4628012fce65ba7d57ead303b610c789788b64b642231952da5104e5aed63008",
+                                                                                    "bytes":  1477
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_578993d1315994402ee8afa90e926a0f845569b2ea3b9a70b15bd749b99bbf43",
+                                                                                    "url":  "https://www.kdji.cn/airspace-analytics.js?v=1793811063",
+                                                                                    "artifact_sha256":  "834302016f7a5479c161f518ce6b26962a85db41fea353bd6d8f72b896e03169",
+                                                                                    "bytes":  3336
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_65b520e0ba2671937e931ed5e871ad7507e387f6e55e6a129cae2893c53fd4ca",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-atmosphere.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "ad8ebf41122d98ededa8fab1be5f45c153fe75acf3f2bba90f72f70d90973dc2",
+                                                                                    "bytes":  4668
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_75873d226bb9605d29de8e6ae26a0ea3b5102dac3bdf6c1fa4b816bee573570c",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-dispatch.js?v=city-response-v18",
+                                                                                    "artifact_sha256":  "ab69b1de0f6696c8b33ffa283598deeeb9d0124e238d3161819c445b1550f88a",
+                                                                                    "bytes":  4478
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_866d4dd8921eebd0b6e9eafc5185bda9ba423eab4bdd968e646caaba750358db",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-dispatch.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "ab69b1de0f6696c8b33ffa283598deeeb9d0124e238d3161819c445b1550f88a",
+                                                                                    "bytes":  4478
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-world.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "e84736018091ca8ceb0089e32e18119c08e95a4bd27e5d0f27858b6a97587f0c",
+                                                                                    "bytes":  11988
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_94f20bc8c011a1d0da58fb81f7d1be9717c88149cd90540a743574cd0ea667a6",
+                                                                                    "url":  "https://www.kdji.cn/scene/vendor/utils/BufferGeometryUtils.js",
+                                                                                    "artifact_sha256":  "fda7e946b8e0b5ab39b779206589e7a1079a22eb24efb89d7223e03fdfb1f751",
+                                                                                    "bytes":  35539
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_9a2523d53a42a7d66e0932cf16158dd1f2208ca25aa535b4ba07dc41b5be0062",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-physics.js?v=city-v1",
+                                                                                    "artifact_sha256":  "4628012fce65ba7d57ead303b610c789788b64b642231952da5104e5aed63008",
+                                                                                    "bytes":  1477
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_a3d8f1e99b7ac558d4b86eddc6f71e5f2c073390289091894d3a5718624d64b3",
+                                                                                    "url":  "https://www.kdji.cn/contact-solution.js",
+                                                                                    "artifact_sha256":  "16de5c76ca98fbe11d14c70ae9e79af08846a3415e49f1dd03dea9e55059c526",
+                                                                                    "bytes":  2024
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_b47e988af3fb8db051078aaad76d251372232f18bc72a59c91faf0973e86cd42",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-cargo-model.js?v=city-response-v18",
+                                                                                    "artifact_sha256":  "358fd940adc8ec3ddb1762befac93e5a2a6e76596618ded722ede5cfd61b0d53",
+                                                                                    "bytes":  5176
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_b79e853cbdc7ea74decb0a51cb67e1ec560f99add98b89fd2545968821a1bb15",
+                                                                                    "url":  "https://www.kdji.cn/scene/vendor/loaders/GLTFLoader.js",
+                                                                                    "artifact_sha256":  "67ac5551fdafa6e349bd80c8f8e5e39c136d6b2fb1ad647db9abb21dc86f9e4a",
+                                                                                    "bytes":  114739
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_bfe75bfe43e385715f99ff00fc1a40228a5c99e24a08232cf8640498c8d71f5e",
+                                                                                    "url":  "https://www.kdji.cn/low-applications.js?v=1792069831",
+                                                                                    "artifact_sha256":  "5b6767839d7a66311ab6e3098ca01dd40cb2f7b8cdc7e2a1fbf3edf9e0c8c94e",
+                                                                                    "bytes":  1557
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                                    "url":  "https://www.kdji.cn/scene/vendor/three.module.js",
+                                                                                    "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                                    "bytes":  603113
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_c079fb6635ee0a1ea3d5bde10ebdeda1161f0427071d4c6bdbc169cdc3d39416",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-traffic.js",
+                                                                                    "artifact_sha256":  "19f886ec0c5b1f5233a5e418e4bc8a9d6ade47558388a42c4cac0f04470deb2c",
+                                                                                    "bytes":  3663
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-activity.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "5e43257f01565d9be52ea12203d939998fb309340f7b380bd27c8e3b77060bf6",
+                                                                                    "bytes":  7182
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_c87bef2a3213266feb7dfc67497f0008d8b47dfd2683245b977134d579bb818b",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-cargo.js?v=city-response-v16",
+                                                                                    "artifact_sha256":  "0cad5dcc737bf8cc3ce3136aabe7ce89f813b216278008044dc110154db48597",
+                                                                                    "bytes":  2285
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_dc4c30715d50667a35acfb8154af722f7e9fe71b392176b71cd7bd44624708e2",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-patrol.js",
+                                                                                    "artifact_sha256":  "41a47c224cd24a3f74bcd203a8e5bbfd642211e66591f1d2d634ffae0f69aaf8",
+                                                                                    "bytes":  2581
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_e1f3e9043925ebf6b25bdfdd8284542b7219476b39fcec484535bd8bfbbf10e1",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-districts.js?v=city-style-v3",
+                                                                                    "artifact_sha256":  "727f67a57e61b89b3e7de0f5a83699a82ae2d2ea2082f186d2ef7333f3a1f0f1",
+                                                                                    "bytes":  16480
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_e49a1781732c38151c30bef2ad0a04467724c4737a93acd48e055bb1fafe997c",
+                                                                                    "url":  "https://www.kdji.cn/scene/city-cargo.js",
+                                                                                    "artifact_sha256":  "0cad5dcc737bf8cc3ce3136aabe7ce89f813b216278008044dc110154db48597",
+                                                                                    "bytes":  2285
+                                                                                },
+                                                                                {
+                                                                                    "script_key":  "scr_f8689e4e80cd79a5d5b275f52d941e3a4abaa64b8a01d4866ac918a6686c7db7",
+                                                                                    "url":  "https://www.kdji.cn/scene/vendor/three.core.js",
+                                                                                    "artifact_sha256":  "eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20",
+                                                                                    "bytes":  1403455
+                                                                                }
+                                                                            ],
+                                                                  "edges":  [
+                                                                                {
+                                                                                    "from_script_key":  "scr_0237ffc78ef99be2dbb2a7a71a872794effe232c58fa69e0bb9d728879302102",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_0237ffc78ef99be2dbb2a7a71a872794effe232c58fa69e0bb9d728879302102",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_0237ffc78ef99be2dbb2a7a71a872794effe232c58fa69e0bb9d728879302102",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-dispatch.js?v=city-response-v18",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-dispatch.js?v=city-response-v18",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_0237ffc78ef99be2dbb2a7a71a872794effe232c58fa69e0bb9d728879302102",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three/addons/loaders/GLTFLoader.js",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-world.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-world.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  3,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-physics.js?v=city-v1",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-physics.js?v=city-v1",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  4,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-activity.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-activity.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  5,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-patrol.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-patrol.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  6,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-layout.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  7,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-operations.js?v=city-response-v19",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-operations.js?v=city-response-v19",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  8,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-dispatch.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-dispatch.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  9,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-cargo.js?v=city-response-v16",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-cargo.js?v=city-response-v16",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  10,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-cargo-model.js?v=city-response-v18",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-cargo-model.js?v=city-response-v18",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  11,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-atmosphere.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-atmosphere.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                                                     "line":  12,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_65b520e0ba2671937e931ed5e871ad7507e387f6e55e6a129cae2893c53fd4ca",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_65b520e0ba2671937e931ed5e871ad7507e387f6e55e6a129cae2893c53fd4ca",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_75873d226bb9605d29de8e6ae26a0ea3b5102dac3bdf6c1fa4b816bee573570c",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-layout.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_75873d226bb9605d29de8e6ae26a0ea3b5102dac3bdf6c1fa4b816bee573570c",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_866d4dd8921eebd0b6e9eafc5185bda9ba423eab4bdd968e646caaba750358db",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-layout.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_866d4dd8921eebd0b6e9eafc5185bda9ba423eab4bdd968e646caaba750358db",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-layout.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-districts.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-districts.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                                                     "line":  3,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_94f20bc8c011a1d0da58fb81f7d1be9717c88149cd90540a743574cd0ea667a6",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_94f20bc8c011a1d0da58fb81f7d1be9717c88149cd90540a743574cd0ea667a6",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_b47e988af3fb8db051078aaad76d251372232f18bc72a59c91faf0973e86cd42",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_b47e988af3fb8db051078aaad76d251372232f18bc72a59c91faf0973e86cd42",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_b47e988af3fb8db051078aaad76d251372232f18bc72a59c91faf0973e86cd42",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-cargo.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-cargo.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_b47e988af3fb8db051078aaad76d251372232f18bc72a59c91faf0973e86cd42",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_b79e853cbdc7ea74decb0a51cb67e1ec560f99add98b89fd2545968821a1bb15",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_b79e853cbdc7ea74decb0a51cb67e1ec560f99add98b89fd2545968821a1bb15",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_b79e853cbdc7ea74decb0a51cb67e1ec560f99add98b89fd2545968821a1bb15",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "../utils/BufferGeometryUtils.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/vendor/utils/BufferGeometryUtils.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_b79e853cbdc7ea74decb0a51cb67e1ec560f99add98b89fd2545968821a1bb15",
+                                                                                                     "line":  68,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./three.core.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/vendor/three.core.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                                                     "line":  6,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c079fb6635ee0a1ea3d5bde10ebdeda1161f0427071d4c6bdbc169cdc3d39416",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-physics.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-physics.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c079fb6635ee0a1ea3d5bde10ebdeda1161f0427071d4c6bdbc169cdc3d39416",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-world.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-world.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-layout.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                                     "line":  3,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-physics.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-physics.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                                     "line":  4,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-traffic.js",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-traffic.js",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                                                     "line":  5,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_e1f3e9043925ebf6b25bdfdd8284542b7219476b39fcec484535bd8bfbbf10e1",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "three",
+                                                                                    "resolved_url":  null,
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_e1f3e9043925ebf6b25bdfdd8284542b7219476b39fcec484535bd8bfbbf10e1",
+                                                                                                     "line":  1,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                },
+                                                                                {
+                                                                                    "from_script_key":  "scr_e1f3e9043925ebf6b25bdfdd8284542b7219476b39fcec484535bd8bfbbf10e1",
+                                                                                    "kind":  "static_import",
+                                                                                    "specifier":  "./city-layout.js?v=city-style-v3",
+                                                                                    "resolved_url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                                                    "location":  {
+                                                                                                     "script_key":  "scr_e1f3e9043925ebf6b25bdfdd8284542b7219476b39fcec484535bd8bfbbf10e1",
+                                                                                                     "line":  2,
+                                                                                                     "column":  0
+                                                                                                 }
+                                                                                }
+                                                                            ]
+                                                              },
+                                                   "routes":  [
+
+                                                              ],
+                                                   "endpoints":  [
+                                                                     {
+                                                                         "value":  "/cms-message.php",
+                                                                         "mechanism":  "call:fetch",
+                                                                         "location":  {
+                                                                                          "script_key":  "scr_0944b437015f2cc85b8e7d673cc9f5aaf50f2655c71b3bda0078d1f7132300bb",
+                                                                                          "line":  62,
+                                                                                          "column":  27
+                                                                                      }
+                                                                     }
+                                                                 ],
+                                                   "webmcp_declarations":  [
+
+                                                                           ],
+                                                   "source_maps":  {
+                                                                       "status":  "unavailable",
+                                                                       "requested":  0,
+                                                                       "processed":  0,
+                                                                       "items":  [
+
+                                                                                 ]
+                                                                   }
+                                               },
+                              "inferences":  [
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "form_type",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_0944b437015f2cc85b8e7d673cc9f5aaf50f2655c71b3bda0078d1f7132300bb",
+                                                                       "artifact_sha256":  "f6defe7a3164223805e6a05f7c50f6cfa321dc7fc50d8fb5284425db9f0a90a2",
+                                                                       "line":  58,
+                                                                       "column":  5,
+                                                                       "detector":  "call:data.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "phone",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_0944b437015f2cc85b8e7d673cc9f5aaf50f2655c71b3bda0078d1f7132300bb",
+                                                                       "artifact_sha256":  "f6defe7a3164223805e6a05f7c50f6cfa321dc7fc50d8fb5284425db9f0a90a2",
+                                                                       "line":  59,
+                                                                       "column":  34,
+                                                                       "detector":  "call:data.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_multi_draw",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  2211,
+                                                                       "column":  20,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "EXT_texture_filter_anisotropic",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  2276,
+                                                                       "column":  21,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "EXT_clip_control",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  8911,
+                                                                       "column":  17,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_multisampled_render_to_texture",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  10151,
+                                                                       "column":  87,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "EXT_color_buffer_float",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  10366,
+                                                                       "column":  3,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_compressed_texture_s3tc_srgb",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12522,
+                                                                       "column":  16,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_compressed_texture_s3tc",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12539,
+                                                                       "column":  16,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_compressed_texture_pvrtc",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12562,
+                                                                       "column":  15,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_compressed_texture_etc",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12583,
+                                                                       "column":  15,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_compressed_texture_astc",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12606,
+                                                                       "column":  15,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "EXT_texture_compression_bptc",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12637,
+                                                                       "column":  15,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "EXT_texture_compression_rgtc",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  12657,
+                                                                       "column":  15,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "WEBGL_lose_context",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  15398,
+                                                                       "column":  21,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 },
+                                                 {
+                                                     "kind":  "endpoint_candidate",
+                                                     "value":  "KHR_parallel_shader_compile",
+                                                     "confidence":  "low",
+                                                     "basis":  [
+                                                                   {
+                                                                       "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                       "artifact_sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                       "line":  16288,
+                                                                       "column":  9,
+                                                                       "detector":  "call:extensions.get:unverified-network-receiver"
+                                                                   }
+                                                               ]
+                                                 }
+                                             ],
+                              "unknowns":  [
+                                               {
+                                                   "dimension":  "source_maps",
+                                                   "reason":  "One or more requested source maps were unavailable or incomplete",
+                                                   "affected_script_keys":  [
+
+                                                                            ]
+                                               }
+                                           ],
+                              "completeness":  {
+                                                   "status":  "partial",
+                                                   "parsed_scripts":  27,
+                                                   "parse_failures":  0,
+                                                   "visited_ast_nodes":  245371
+                                               },
+                              "limitations":  [
+                                                  "Static bundle findings are observations or bounded inferences; REA does not execute captured JavaScript.",
+                                                  "Bare string arguments of unbound HTTP-method-named calls are low-confidence endpoint candidates; form, translation, storage and other APIs can use the same syntax. URL-shaped findings still do not prove network execution.",
+                                                  "Endpoint candidates are deduplicated by script, value and detector; basis retains only the first matching source coordinate. They are not a complete call-site inventory or a runtime occurrence count. completeness.status=\"complete\" describes examination of captured source, not a call-site census.",
+                                                  "String-built routes and endpoints, encrypted configuration, and server-side behavior may remain unknown.",
+                                                  "Page-declared WebMCP metadata is untrusted and is never registered or invoked as an REA tool."
+                                              ]
+                          },
+    "confidence":  "observed",
+    "authority":  "external-service",
+    "environment":  null,
+    "limitations":  [
+                        "Artifact identity is unavailable for this observation.",
+                        "Static bundle findings are observations or bounded inferences; REA does not execute captured JavaScript.",
+                        "Bare string arguments of unbound HTTP-method-named calls are low-confidence endpoint candidates; form, translation, storage and other APIs can use the same syntax. URL-shaped findings still do not prove network execution.",
+                        "Endpoint candidates are deduplicated by script, value and detector; basis retains only the first matching source coordinate. They are not a complete call-site inventory or a runtime occurrence count. completeness.status=\"complete\" describes examination of captured source, not a call-site census.",
+                        "String-built routes and endpoints, encrypted configuration, and server-side behavior may remain unknown.",
+                        "Page-declared WebMCP metadata is untrusted and is never registered or invoked as an REA tool."
+                    ],
+    "relationship_coverage":  null,
+    "locations":  [
+
+                  ],
+    "evidence_links":  [
+
+                       ]
+}

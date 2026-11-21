@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D1 · FPV 座舱视角 / lowalt-dispatch</title>
+<style>
+:root{--bg:#030805;--fg:#5dff9b;--dim:#1f7a48;--line:#145c34;--hot:#ff6b5a;--warn:#ffd166}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+  font-family:"Cascadia Mono",Consolas,"Courier New",monospace;overflow:hidden}
+.app{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+.bar{border-bottom:1px solid var(--line);padding:7px 14px;font-size:11px;letter-spacing:1px;background:#040a06}
+.bar b{color:var(--hot)}
+.stage{position:relative;min-height:0;overflow:hidden}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:20;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.09) 0 1px,transparent 1px 4px)}
+.hud{position:absolute;z-index:4;font-size:10px;line-height:1.55;letter-spacing:.5px;
+  background:rgba(3,10,6,.72);border:1px solid var(--line);padding:8px 10px;pointer-events:none}
+.tl{left:14px;top:14px;min-width:210px}.tr{right:14px;top:14px;min-width:190px;text-align:right}
+.br{right:14px;bottom:14px;min-width:230px}
+.hud .k{color:var(--dim)}.hud .v{color:#c8ffdd}.hud .bad{color:var(--hot)}.hud .w{color:var(--warn)}
+.mini{position:absolute;left:14px;bottom:14px;z-index:4;width:340px;max-width:44vw;
+  background:rgba(3,10,6,.88);border:1px solid var(--line);padding:7px 8px}
+.mini .h{font-size:9px;letter-spacing:1.2px;color:var(--fg);border-bottom:1px dashed var(--line);
+  padding-bottom:5px;margin-bottom:5px;white-space:nowrap;overflow:hidden}
+.mini pre{margin:0;height:172px;overflow:hidden;font-size:9px;line-height:1.14;white-space:pre}
+.mini .r{color:#c8ffdd;font-weight:700}.mini .z{color:var(--hot);font-weight:700}
+.mini .l{color:var(--warn);font-weight:700}.mini .a{color:#2a6d45}
+.foot{border-top:1px solid var(--line);padding:6px 14px;font-size:9.5px;color:var(--dim);
+  display:flex;justify-content:space-between;gap:14px;background:#040a06}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="bar"><b>[ SIMULATION ONLY · NO REAL FLIGHT ]</b> &nbsp; LOWALT-DISPATCH / FPV COCKPIT
+    &nbsp;·&nbsp; 3D PERSPECTIVE (CANVAS 2D SOFTWARE RENDERER) &nbsp;·&nbsp; ALL VALUES PLACEHOLDER</div>
+
+  <div class="stage">
+    <canvas id="view"></canvas>
+    <div class="hud tl">
+      <div><span class="k">TASK   </span><span class="v">S2-01</span> &nbsp; <span class="k">CLS S2</span></div>
+      <div><span class="k">ROUTE  </span><span class="v">astar_static</span></div>
+      <div><span class="k">SNAP   </span><span class="v">v1</span> &nbsp; <span class="k">GRID 300x300 @10m</span></div>
+      <div><span class="k">ENU    </span><span class="v" id="pos">--</span></div>
+      <div><span class="k">CAM    </span><span class="v" id="cam">--</span></div>
+    </div>
+    <div class="hud tr">
+      <div><span class="k">ALT  </span><span class="v" id="alt">--- m AGL</span></div>
+      <div><span class="k">HDG  </span><span class="v" id="hdg">--- deg</span></div>
+      <div><span class="k">FOV  </span><span class="v" id="fov">-- deg</span></div>
+      <div><span class="k">BEAT </span><span class="v" id="beat">--</span></div>
+      <div><span class="k">MODE </span><span class="w">MOCK / SITL</span></div>
+    </div>
+    <div class="mini">
+      <div class="h">01 ROUTE / LOCAL ENU 3000 x 3000 m (DRAFT)</div>
+      <pre id="map"></pre>
+    </div>
+    <div class="hud br">
+      <div class="k">// INDEPENDENT VALIDATION</div>
+      <div>[<span class="v">PASS</span>] endpoint_binding · clearance</div>
+      <div>[<span class="bad">FAIL</span>] restriction_zone &nbsp;t+98s R01</div>
+      <div>[<span class="w"> -- </span>] energy · diversion_reachability</div>
+      <div class="k">合成参数，无物理意义，不得写入材料</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>硬编码候选 D1 · FPV 第一人称 / 地面透视网格 / 3D 建筑与限制区光柱 / 准星姿态 HUD / ASCII 战术小窗</span>
+    <span>节拍时钟 + 低分辨率 glow 缓冲 + 自动运镜（HALOFLUX 手法）· 真实结果见 事实文档.md</span>
+  </div>
+</div>
+<script src="view3d.js"></script>
+<script>
+var info = View3D.asciiMap(document.getElementById('map'));
+(function fit(){
+  var el=document.getElementById('map'), r=el.getBoundingClientRect();
+  var fs=Math.min(r.width/(info.cols*.62), r.height/(info.rows*1.14), 11);
+  el.style.fontSize=Math.max(7,fs).toFixed(2)+'px';
+})();
+var pal={
+  sky0:'#010503', sky1:'#06160c', sky2:'#020a05',
+  grid:'rgba(60,210,125,ALPHA)', zoneFill:'rgba(255,90,70,.10)',
+  boxTop:'rgba(90,255,160,ALPHA)', boxSide:'rgba(25,110,65,ALPHA)', boxEdge:'rgba(80,230,140,ALPHA)',
+  site:'#ffe08a', route:'#7dffb0', glow:'rgba(120,255,170,ALPHA)', hud:'#8dffb8'
+};
+var cfg={mode:'fpv',pal:pal,tempo:1,glowScale:3,
+  views:[
+    {eye:[150,150,120],yaw:Math.PI/4,pitch:-0.16,fov:78,hold:5},
+    {eye:[900,900,150],yaw:Math.PI/4,pitch:-0.22,fov:72,hold:5},
+    {eye:[1700,1700,160],yaw:Math.PI/4,pitch:-0.12,fov:82,hold:5},
+    {eye:[2400,2400,140],yaw:Math.PI/4,pitch:-0.26,fov:76,hold:5}
+  ],
+  onFrame:function(s){
+    document.getElementById('pos').textContent=Math.round(s.cam.eye[0])+', '+Math.round(s.cam.eye[1]);
+    document.getElementById('cam').textContent='SHOT '+(s.view+1)+'/4';
+    document.getElementById('alt').textContent=Math.round(s.cam.eye[2])+' m AGL';
+    document.getElementById('hdg').textContent=Math.round(s.cam.yaw*180/Math.PI)+' deg';
+    document.getElementById('fov').textContent=Math.round(s.cam.fov)+' deg';
+    document.getElementById('beat').textContent='env '+s.env.toFixed(2)+' / #'+s.beat;
+  }};
+View3D.create(document.getElementById('view'),cfg);
+</script>
+</body>
+</html>

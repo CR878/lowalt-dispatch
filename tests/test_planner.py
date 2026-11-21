@@ -122,8 +122,7 @@ def test_all_scenario_paths_are_truly_obstacle_free() -> None:
         for _s, (px, py) in sample_polyline(res.waypoints, 2.0):
             for poly in blockers:
                 assert not point_in_polygon(px, py, poly), (
-                    f"{sc['id']} 的路径点 ({px:.0f}, {py:.0f}) 落在障碍内 —— "
-                    f"栅格化或净空处理有漏洞"
+                    f"{sc['id']} 的路径点 ({px:.0f}, {py:.0f}) 落在障碍内 —— 栅格化或净空处理有漏洞"
                 )
 
 

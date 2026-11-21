@@ -1,0 +1,75 @@
+name: Test suite (M2 + M3 + M4)
+
+on:
+  push:
+    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "edge/**", "requirements*.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+  pull_request:
+    paths: ["agent/**", "validator/**", "planner/**", "sim/**", "core/**", "eval/**", "scenarios/**", "tests/**", "edge/**", "requirements*.txt", "pyproject.toml", ".github/workflows/m3.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.11", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: python -m pip install -r requirements-m3.txt -r services/assistant/requirements.txt ruff
+      # pytest 单独开 UTF-8：失败信息里一旦出现中文，cp1252 的控制台连报错都打不出来。
+      - run: python -m pytest
+        env:
+          PYTHONUTF8: "1"
+      # 下面几步**故意不设** PYTHONUTF8：让 Windows runner 的真实 cp1252 控制台暴露问题。
+      # 2026-11-09 的 CI 就是在这里红的（validator 打印中文 → UnicodeEncodeError），
+      # 修复在 core/console.py；tests/test_cli_encoding.py 守着它。
+      - run: python -m ruff check agent validator planner sim core tests tools eval edge
+      - run: python -m ruff format --check agent validator core planner tools edge
+      - run: python -m agent.demo --scenario all
+      - run: python -m validator
+      - run: python -m edge.demo --scenario S1-01
+      - run: python -m agent.integration check
+      - run: python -m agent.integration demo --scenario S1-01
+
+  integration-services:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: m3_test
+          POSTGRES_PASSWORD: m3_ci_only
+          POSTGRES_DB: m3_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U m3_test -d m3_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: python -m pip install -r requirements-m3.txt -r services/assistant/requirements.txt
+      # This anonymous broker is bound to runner loopback only. No public/cloud deployment.
+      - run: docker run -d --name m3-test-broker -p 127.0.0.1:1883:1883 -v "$PWD/ops/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro" eclipse-mosquitto:2
+      - run: python -m pytest tests/test_m3_external.py tests/test_local_mqtt.py
+        env:
+          LOWALT_TEST_MQTT: "1"
+          M3_TEST_POSTGRES_DSN: postgresql+psycopg://m3_test:m3_ci_only@127.0.0.1:5432/m3_test
+          M3_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+          M3_TEST_MQTT_HOST: 127.0.0.1

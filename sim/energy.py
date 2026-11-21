@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -63,6 +64,7 @@ class VehicleProfile:
     is_example: bool = False
     display_name: str | None = None
     draft_geometry_vehicle_alias: str | None = None
+    calibrated_at: str | None = None
 
     @property
     def wind_note(self) -> str:
@@ -103,6 +105,7 @@ def load_vehicle(path: Path | None = None, key: str | None = None) -> VehiclePro
         is_example=bool(entry.get("is_example", False) or raw.get("is_example", False)),
         display_name=entry.get("display_name"),
         draft_geometry_vehicle_alias=None if alias is None else str(alias),
+        calibrated_at=entry.get("calibrated_at"),
     )
 
 
@@ -135,3 +138,97 @@ def max_range_m(profile: VehicleProfile, available_energy_wh: float) -> float:
 
 def cruise_time_s(profile: VehicleProfile, distance_m: float) -> float:
     return distance_m / profile.cruise_speed_mps
+
+
+# Real-route additions. The v0 functions above deliberately retain their exact
+# outputs. These functions never invent a vehicle speed or a power coefficient.
+def ground_speed_mps(
+    airspeed_mps: float,
+    track_bearing_deg: float,
+    wind_speed_mps: float,
+    wind_from_deg: float,
+) -> float:
+    """Fixed-TAS wind triangle with crab correction (bearing north=0/east=90).
+
+    Va + W = Vg, so Vg = sqrt(Va² - W_cross²) + W_along.
+    The wind direction is the meteorological FROM direction, not velocity TO.
+    Source: vector addition; FAA Pilot's Handbook of Aeronautical Knowledge,
+    chapter 16, Navigation, wind triangle / wind correction angle.
+    https://www.faa.gov/regulations_policies/handbooks_manuals/aviation/phak
+    """
+    if not all(math.isfinite(v) for v in (airspeed_mps, track_bearing_deg, wind_speed_mps, wind_from_deg)):
+        raise ValueError("风场和空速必须是有限值")
+    if airspeed_mps <= 0 or wind_speed_mps < 0:
+        raise ValueError("空速必须为正，风速不能为负")
+    angle = math.radians(wind_from_deg + 180.0 - track_bearing_deg)
+    along = wind_speed_mps * math.cos(angle)
+    cross = wind_speed_mps * math.sin(angle)
+    if abs(cross) >= airspeed_mps:
+        raise ValueError("侧风达到或超过空速，无法保持地面航迹")
+    ground = math.sqrt(max(0.0, airspeed_mps ** 2 - cross ** 2)) + along
+    if ground <= 0:
+        raise ValueError("逆风阻止前进，无法保持正地速")
+    return ground
+
+
+def wind_leg_energy_wh(
+    profile: VehicleProfile,
+    distance_m: float,
+    track_bearing_deg: float,
+    wind_speed_mps: float,
+    wind_from_deg: float,
+) -> dict[str, float]:
+    """Energy at one calibrated true-airspeed operating point, P × time.
+
+    P_W = e_Wh/m × Va_m/s × 3600. This is NOT a guessed power curve: the
+    supplied profile's calibrated calm-air energy/m fixes this single power
+    point. Wind changes elapsed time; turns/climb/gust control and density
+    effects on total electrical power require additional platform calibration.
+    """
+    if not math.isfinite(distance_m) or distance_m < 0:
+        raise ValueError("航段距离必须是非负有限值")
+    if not math.isfinite(profile.energy_per_meter_wh) or profile.energy_per_meter_wh <= 0:
+        raise ValueError("需要正的标定巡航单位距离能耗")
+    speed = ground_speed_mps(profile.cruise_speed_mps, track_bearing_deg, wind_speed_mps, wind_from_deg)
+    duration = distance_m / speed
+    power_w = profile.energy_per_meter_wh * profile.cruise_speed_mps * 3600.0
+    return {"ground_speed_mps": speed, "duration_s": duration, "energy_wh": power_w * duration / 3600.0, "power_w": power_w}
+
+
+def moist_air_density_kg_m3(temperature_c: float, relative_humidity_pct: float, pressure_hpa: float) -> float:
+    """Ideal moist air rho = (p-e)/(Rd*T) + e/(Rv*T), actual surface pressure.
+
+    Rd=287.05 and Rv=461.5 J/(kg K); saturation pressure is Buck's water/ice
+    equation (1996 revision), not a battery-capacity guess. Buck's original
+    method: J. Applied Meteorology 20:1527–1532 (1981),
+    doi:10.1175/1520-0450(1981)020<1527:NEFCTV>2.0.CO;2.
+    """
+    if not all(math.isfinite(v) for v in (temperature_c, relative_humidity_pct, pressure_hpa)):
+        raise ValueError("温湿压必须为有限值")
+    if not -80 <= temperature_c <= 50 or not 0 <= relative_humidity_pct <= 100 or pressure_hpa <= 0:
+        raise ValueError("温湿压超出公式适用范围")
+    if temperature_c >= 0:
+        saturated_pa = 611.21 * math.exp((18.678 - temperature_c / 234.5) * temperature_c / (257.14 + temperature_c))
+    else:
+        saturated_pa = 611.15 * math.exp((23.036 - temperature_c / 333.7) * temperature_c / (279.82 + temperature_c))
+    vapor_pa = saturated_pa * relative_humidity_pct / 100.0
+    pressure_pa = pressure_hpa * 100.0
+    if vapor_pa >= pressure_pa:
+        raise ValueError("水汽分压必须低于总压")
+    kelvin = temperature_c + 273.15
+    return (pressure_pa - vapor_pa) / (287.05 * kelvin) + vapor_pa / (461.5 * kelvin)
+
+
+def wind_sensitivity(profile: VehicleProfile, distance_m: float, wind_speed_mps: float) -> list[dict]:
+    """Conditional comparison using the supplied wind magnitude and profile.
+
+    Direction scenarios are explicit counterfactuals, never forecast values.
+    """
+    result = []
+    for label, speed, direction in (("calm", 0.0, 0.0), ("tailwind", wind_speed_mps, 270.0), ("headwind", wind_speed_mps, 90.0), ("crosswind", wind_speed_mps, 0.0)):
+        try:
+            values = wind_leg_energy_wh(profile, distance_m, 90.0, speed, direction)
+            result.append({"scenario": label, "status": "conditional", "wind_speed_mps": speed, **values})
+        except ValueError as exc:
+            result.append({"scenario": label, "status": "infeasible", "wind_speed_mps": speed, "reason": str(exc)})
+    return result

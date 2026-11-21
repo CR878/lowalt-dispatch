@@ -1,0 +1,71 @@
+.real-routing {
+  position: absolute;
+  z-index: 24;
+  left: 20px;
+  bottom: 64px;
+  width: min(380px, calc(100% - 40px));
+  padding: 16px;
+  border-radius: 14px;
+  max-height: 48%;
+  overflow: auto;
+  font-size: 12px;
+}
+.real-routing strong {
+  font-size: 14px;
+}
+.real-routing p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+.real-routing small {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.6;
+  opacity: 0.8;
+}
+.real-routing button,
+.real-routing input {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  border: 1px solid var(--border, #52657d);
+  border-radius: 7px;
+  color: inherit;
+  background: transparent;
+}
+.real-routing button {
+  cursor: pointer;
+}
+.real-routing button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.real-routing li {
+  margin-bottom: 6px;
+  line-height: 1.5;
+}
+.real-routing details {
+  margin-top: 10px;
+}
+.real-routing summary {
+  cursor: pointer;
+}
+.real-routing table {
+  width: 100%;
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.real-routing td,
+.real-routing th {
+  padding: 5px 2px;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #52657d);
+}
+.playback[hidden] {
+  display: none;
+}
+.workspace.real-planning {
+  grid-template-columns: minmax(0, 1fr);
+}
