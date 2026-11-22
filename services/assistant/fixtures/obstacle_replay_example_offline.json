@@ -1,0 +1,19 @@
+{
+  "grade": "example_offline",
+  "labels": ["example", "offline"],
+  "coverage_status": "partial",
+  "scene_id": "exampleoffline01",
+  "query_bbox": [0.0, 0.0, 0.01, 0.01],
+  "crs": "EPSG:4326",
+  "pass_allowed": false,
+  "failed_chunks": [
+    {"bbox": [0.005, 0.0, 0.01, 0.01], "status": "failed", "error": "example timeout"}
+  ],
+  "coverage_tiles": [
+    {"bbox": [0.0, 0.0, 0.005, 0.01], "status": "ok", "error": null},
+    {"bbox": [0.005, 0.0, 0.01, 0.01], "status": "failed", "error": "example timeout"}
+  ],
+  "stage_timings_s": {"overpass_request_s": 0.0, "parse_s": 0.0, "chunk_download_s": 0.0},
+  "statement": "合成离线重放，不是一次真实 OSM 观测。空障碍列表不能当作通过。",
+  "source": "example-offline"
+}

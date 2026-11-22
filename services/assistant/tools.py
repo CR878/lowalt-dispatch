@@ -59,6 +59,7 @@ class LandingQuery(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     origin: tuple[float, float]
     destination: tuple[float, float]
+    ledger_id: str | None = Field(default=None, max_length=80)
 
 
 class ProvenanceQuery(BaseModel):
@@ -392,9 +393,9 @@ class Toolset:
             TimeWindowQuery,
         ),
         "check_landing_sites": (
-            "检查航线两侧的备降点几何可达性。无备降点数据时返回 unavailable，"
+            "检查是否已有运营方确认的起降点台账。没有台账时返回 unavailable，"
             "不得据此判断'不能飞'，只能说明'该项未判定'。"
-            "用户问'出问题能落哪''有没有备降'时调用。",
+            "道路和 OSM 标签只是线索。用户问'出问题能落哪''有没有备降'时调用。",
             LandingQuery,
         ),
         "audit_route_provenance": (
@@ -1228,15 +1229,9 @@ class Toolset:
         }
 
     def check_landing_sites(self, args: LandingQuery):
-        return {
-            "status": "unavailable",
-            "verdict": None,
-            "reason": "无备降点数据，该项未判定，不能据此判断不能飞",
-            "origin": list(args.origin),
-            "destination": list(args.destination),
-            "dispatch_enabled": False,
-            "operationally_approved": False,
-        }
+        from services.assistant.landing_sites import assess_landing
+
+        return assess_landing(args.origin, args.destination, args.ledger_id)
 
     def audit_route_provenance(self, args: ProvenanceQuery):
         from services.assistant.environment import get_evidence

@@ -126,8 +126,10 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
         raise ValueError("真实航线总时间预算必须为有限正数")
     start = (body.origin.lng, body.origin.lat)
     goal = (body.destination.lng, body.destination.lat)
-    dataset = fetch_obstacles(start, goal, margin_m=1000)
-    metadata = dataset["metadata"]
+    # Leave the rest of the caller budget for rasterization and search.
+    fetch_budget = min(18.0, max(1.0, budget_total_s * 0.45))
+    dataset = fetch_obstacles(start, goal, margin_m=1000, budget_s=fetch_budget, max_workers=2)
+    metadata = dict(dataset["metadata"])
 
     # Coarse resolutions (20/30 m) carry a larger half-cell margin, so dense
     # urban corridors can be sealed even when a 10 m grid is traversable. That is
@@ -237,6 +239,11 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
         if found
         else None
     )
+    plan_stages = result.get("stage_timings_ms") or {}
+    metadata["plan_stage_timings_ms"] = {
+        "rasterization": plan_stages.get("rasterization"),
+        "astar_search": plan_stages.get("astar_search"),
+    }
     reported_clearance = route_weather.truncate_reported(result["clearance_m"], 1)
     reported_length = route["length_m"] if route is not None else None
     assessment = evaluate_vehicle(body, reported_length)

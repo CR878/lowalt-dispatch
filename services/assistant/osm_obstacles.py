@@ -56,6 +56,10 @@ WARNINGS = [
 class OSMDataUnavailable(RuntimeError):
     """No complete, current real scene is available. Never use demo rectangles."""
 
+    def __init__(self, message: str, *, evidence: dict | None = None):
+        super().__init__(message)
+        self.evidence = evidence
+
 
 def route_bbox(origin: tuple[float, float], destination: tuple[float, float], margin_m: float) -> list[float]:
     for lng, lat in (origin, destination):
@@ -386,7 +390,12 @@ def _is_building(element: dict) -> bool:
 
 
 def _primary_map_payload(
-    active: httpx.Client, bbox: list[float], cache_dir: Path | None = None
+    active: httpx.Client,
+    bbox: list[float],
+    cache_dir: Path | None = None,
+    *,
+    deadline_at: float | None = None,
+    max_workers: int = 2,
 ) -> tuple[dict, list[list[float]]]:
     """Small primary API map requests are a real-source fallback, not fixtures.
 
@@ -407,7 +416,9 @@ def _primary_map_payload(
         for ix in range(nx)
         for iy in range(ny)
     ]
-    deadline = time.monotonic() + 50
+    if not isinstance(max_workers, int) or isinstance(max_workers, bool) or not 1 <= max_workers <= 2:
+        raise ValueError("OSM 主站并发只能是 1 或 2")
+    deadline = time.monotonic() + 50 if deadline_at is None else deadline_at
     tiles_cache = (cache_dir or CACHE_DIR) / ".tiles"
     normalized_id = hashlib.sha256(json.dumps(bbox, separators=(",", ":")).encode()).hexdigest()[:16]
     normalized_path = tiles_cache / f"normalized-{normalized_id}.json"
@@ -481,13 +492,57 @@ def _primary_map_payload(
         raise OSMDataUnavailable(f"OSM 主站两条连接均失败：{type(last_error).__name__}") from last_error
 
     def download(tile):
-        if time.monotonic() >= deadline:
-            raise OSMDataUnavailable("OSM 主站备用下载超过总时限")
-        return get_primary("map", params={"bbox": ",".join(f"{v:.7f}" for v in tile)})
+        started = time.perf_counter()
+        rounded = [round(value, 7) for value in tile]
+        try:
+            if time.monotonic() >= deadline:
+                raise OSMDataUnavailable("OSM 主站备用下载超过总时限")
+            content = get_primary("map", params={"bbox": ",".join(f"{v:.7f}" for v in tile)})
+        except (OSMDataUnavailable, httpx.HTTPError) as exc:
+            return {
+                "bbox": rounded,
+                "status": "failed",
+                "elapsed_s": round(time.perf_counter() - started, 3),
+                "error": f"{type(exc).__name__}: {exc}"[:160],
+                "content": None,
+            }
+        return {
+            "bbox": rounded,
+            "status": "ok",
+            "elapsed_s": round(time.perf_counter() - started, 3),
+            "error": None,
+            "content": content,
+        }
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        documents = list(pool.map(download, tiles))
+    download_started = time.perf_counter()
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        tile_records = list(pool.map(download, tiles))
+    chunk_download_s = round(time.perf_counter() - download_started, 3)
+    public_tiles = [
+        {key: value for key, value in record.items() if key != "content"} for record in tile_records
+    ]
+    failed = [record for record in public_tiles if record["status"] != "ok"]
+    if failed:
+        deadline_hit = time.monotonic() >= deadline
+        if any(record["status"] == "ok" for record in public_tiles):
+            coverage_status = "partial"
+        elif deadline_hit:
+            coverage_status = "timeout"
+        else:
+            coverage_status = "unavailable"
+        raise OSMDataUnavailable(
+            "OSM 主站分块未全部成功，拒绝用部分覆盖或空列表规划",
+            evidence={
+                "coverage_status": coverage_status,
+                "coverage_tiles": public_tiles,
+                "failed_chunks": failed,
+                "stage_timings_s": {"chunk_download_s": chunk_download_s},
+            },
+        )
+    documents = [record["content"] for record in tile_records]
+    parse_started = time.perf_counter()
     elements = _map_elements(documents)
+    map_parse_s = round(time.perf_counter() - parse_started, 3)
     # Parsing is local CPU work, not network waiting. Give relation completion
     # its own small bounded window after the transfer stage.
     deadline = time.monotonic() + 20
@@ -531,14 +586,39 @@ def _primary_map_payload(
                 members.append(member | {"geometry": [{"lon": c["lon"], "lat": c["lat"]} for c in coords]})
             output.append(element | {"members": members})
     earliest = min((r["fetched_at"] for r in source_fetches), default=datetime.now(UTC).isoformat())
-    payload = {"elements": output, "source_fetches": source_fetches, "source_fetched_at": earliest}
+    payload = {
+        "elements": output,
+        "source_fetches": source_fetches,
+        "source_fetched_at": earliest,
+        "stage_timings_s": {"chunk_download_s": chunk_download_s, "map_parse_s": map_parse_s},
+        "coverage_tiles": public_tiles,
+    }
     _atomic_json(normalized_path, {"bbox": bbox, "payload": payload, "tiles": tiles})
     return payload, tiles
+
+
+def _expires_at(fetched_at: str, max_age_hours: float) -> str:
+    fetched = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
+    return (fetched + timedelta(hours=max_age_hours)).isoformat().replace("+00:00", "Z")
+
+
+def _evidence_id(scene_id: str, fetched_at: str, coverage_status: str) -> str:
+    digest = hashlib.sha256(f"{scene_id}|{fetched_at}|{coverage_status}".encode()).hexdigest()
+    return f"obs-{digest[:12]}"
+
+
+def _write_failure(directory: Path, evidence: dict) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    _atomic_json(directory / "failure.json", evidence)
 
 
 def _persist(result: dict, directory: Path, scene_id: str, query: str, max_age_hours: float) -> dict:
     if not result["obstacles"]["features"]:
         result["warnings"].append("该范围 OSM 未返回建筑；这是地图缺失可能性，不能据此认定没有真实障碍物。")
+    fetched_at = result["metadata"]["fetched_at"]
+    coverage_status = result["metadata"].get("coverage_status") or (
+        "queried_empty" if not result["obstacles"]["features"] else "complete"
+    )
     result["metadata"].update(
         {
             "scene_id": scene_id,
@@ -546,8 +626,23 @@ def _persist(result: dict, directory: Path, scene_id: str, query: str, max_age_h
             "cache_hit": False,
             "cache_ttl_hours": max_age_hours,
             "warnings": result["warnings"],
+            "coverage_status": coverage_status,
+            "query_bbox": result["metadata"].get("bbox"),
+            "expires_at": _expires_at(fetched_at, max_age_hours),
+            "evidence_id": _evidence_id(scene_id, fetched_at, coverage_status),
+            "crs": "EPSG:4326",
+            "height_datum": "OSM height 标签按米；ft 已换算。缺失高度保持 null，不用默认高度。",
+            "local_frame": "规划时以航线中点做局部等距圆柱投影到米；缓存坐标保持 WGS84。",
+            "pass_allowed": False,
+            "coverage_note": "覆盖状态只说明本次查询到的 OSM 登记要素，不代表现场障碍已被穷尽。",
+            "failed_chunks": result["metadata"].get("failed_chunks") or [],
+            "coverage_tiles": result["metadata"].get("coverage_tiles") or [],
         }
     )
+    for collection in (result["obstacles"], result["roads"]):
+        collection["coverage_status"] = coverage_status
+        collection["pass_allowed"] = False
+        collection["crs"] = "EPSG:4326"
     directory.mkdir(parents=True, exist_ok=True)
     _atomic_json(directory / "obstacles.geojson", result["obstacles"])
     _atomic_json(directory / "roads.geojson", result["roads"])
@@ -569,7 +664,16 @@ def load_cached_scene(
         )
         age = datetime.now(UTC) - fetched
         if not timedelta(minutes=-5) <= age <= timedelta(hours=max_age_hours):
-            raise OSMDataUnavailable("OSM 缓存已过期，必须重新联网获取；未使用旧数据代替")
+            raise OSMDataUnavailable(
+                "OSM 缓存已过期，必须重新联网获取；未使用旧数据代替",
+                evidence={
+                    "coverage_status": "expired",
+                    "scene_id": scene_id,
+                    "fetched_at": metadata.get("source_fetched_at", metadata.get("fetched_at")),
+                    "expires_at": metadata.get("expires_at"),
+                    "pass_allowed": False,
+                },
+            )
         if metadata.get("scene_id") != scene_id or metadata.get("schema_version") != 1:
             raise OSMDataUnavailable("OSM 缓存版本或标识不一致")
         obstacles = json.loads((directory / "obstacles.geojson").read_text(encoding="utf-8"))
@@ -586,7 +690,12 @@ def load_cached_scene(
         return {
             "obstacles": obstacles,
             "roads": roads,
-            "metadata": metadata | {"cache_hit": True},
+            "metadata": metadata
+            | {
+                "cache_hit": True,
+                "pass_allowed": False,
+                "coverage_note": "缓存命中只说明已有这份数据，不代表现场障碍已被穷尽。",
+            },
             "warnings": warnings,
         }
     except OSMDataUnavailable:
@@ -605,6 +714,8 @@ def fetch_obstacles(
     max_age_hours: float = CACHE_TTL_HOURS,
     force_refresh: bool = False,
     allow_primary_api: bool = True,
+    budget_s: float | None = None,
+    max_workers: int = 2,
 ) -> dict:
     """Download buildings/parts, multipolygons and roads for one complete bbox.
 
@@ -633,8 +744,17 @@ def fetch_obstacles(
         f'relation["type"="multipolygon"]["building:part"]["building:part"!="no"]{bounds};'
         f'way["highway"]{bounds};);out meta geom;'
     )
+    if budget_s is not None and (
+        isinstance(budget_s, bool) or not isinstance(budget_s, (int, float)) or budget_s <= 0
+    ):
+        raise ValueError("障碍查询总截止时间必须为正数秒")
     errors = []
     empty_result = None
+    deadline_hit = False
+    primary_evidence = None
+    overpass_request_s = 0.0
+    parse_s = 0.0
+    started = time.perf_counter()
     own_client = client is None
     proxy = __import__("os").environ.get("AERIS_OSM_PROXY")
     proxy_used = "caller"
@@ -655,13 +775,50 @@ def fetch_obstacles(
     else:
         active = client
     active.aeris_proxy_used = proxy_used
+
+    def remaining():
+        if budget_s is None:
+            return None
+        return budget_s - (time.perf_counter() - started)
+
+    def stamp_attempt(result, *, status, tiles):
+        result["metadata"]["coverage_status"] = status
+        result["metadata"]["coverage_tiles"] = tiles
+        result["metadata"]["failed_chunks"] = []
+        result["metadata"]["proxy_used"] = proxy_used
+        result["metadata"]["stage_timings_s"] = {
+            "overpass_request_s": round(overpass_request_s, 3),
+            "parse_s": round(parse_s, 3),
+        }
+
     try:
         for endpoint in ENDPOINTS:
+            left = remaining()
+            if left is not None and left <= 0:
+                deadline_hit = True
+                errors.append(f"{endpoint}: 超过总截止时间，未再请求")
+                break
+            request_timeout = 18 if left is None else max(0.2, min(18, left))
             try:
-                response = active.post(endpoint, data={"data": query}, timeout=httpx.Timeout(18, connect=5))
+                request_started = time.perf_counter()
+                response = active.post(
+                    endpoint,
+                    data={"data": query},
+                    timeout=httpx.Timeout(request_timeout, connect=min(5, request_timeout)),
+                )
+                overpass_request_s += time.perf_counter() - request_started
                 response.raise_for_status()
                 fetched_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+                parse_started = time.perf_counter()
                 result = _parse(response.json(), bbox, fetched_at, endpoint)
+                parse_s += time.perf_counter() - parse_started
+                tile = {
+                    "bbox": bbox,
+                    "status": "ok",
+                    "endpoint": endpoint,
+                    "elapsed_s": round(overpass_request_s, 3),
+                    "error": None,
+                }
                 if not result["obstacles"]["features"] and not result["roads"]["features"]:
                     # A regional mirror (e.g. overpass.osm.ch) answers 200 but
                     # knows nothing outside its own extract. Try other endpoints
@@ -669,35 +826,80 @@ def fetch_obstacles(
                     empty_result = result
                     errors.append(f"{endpoint}: 空结果，先尝试其他端点")
                     continue
+                stamp_attempt(result, status="complete", tiles=[tile])
                 return _persist(result, directory, scene_id, query, max_age_hours)
             except (httpx.HTTPError, ValueError, OSMDataUnavailable) as exc:
                 errors.append(f"{endpoint}: {type(exc).__name__}: {str(exc)[:160]}")
-        if allow_primary_api:
-            try:
-                payload, tiles = _primary_map_payload(active, bbox, cache_dir)
-                fetched_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-                result = _parse(payload, bbox, fetched_at, MAP_API)
-                for fc in (result["obstacles"], result["roads"]):
-                    fc["source"] = MAP_SOURCE
-                    for feature in fc["features"]:
-                        feature["properties"]["source"] = MAP_SOURCE
-                result["metadata"].update({"source": MAP_SOURCE, "tiles": tiles, "overpass_errors": errors})
-                result["warnings"].append("Overpass 不可达；已改用 OSM 主站真实 map 数据，未使用仿真替代。")
-                return _persist(
-                    result,
-                    directory,
-                    scene_id,
-                    "OSM API 0.6 map tiles + complete building relations",
-                    max_age_hours,
-                )
-            except (httpx.HTTPError, ValueError, ET.ParseError, OSMDataUnavailable) as exc:
-                errors.append(f"{MAP_API}: {type(exc).__name__}: {str(exc)[:160]}")
+        if allow_primary_api and not deadline_hit:
+            left = remaining()
+            if left is not None and left <= 0:
+                deadline_hit = True
+            else:
+                try:
+                    payload, tiles = _primary_map_payload(
+                        active,
+                        bbox,
+                        cache_dir,
+                        deadline_at=None if left is None else time.monotonic() + left,
+                        max_workers=max_workers,
+                    )
+                    fetched_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+                    parse_started = time.perf_counter()
+                    result = _parse(payload, bbox, fetched_at, MAP_API)
+                    parse_s += time.perf_counter() - parse_started
+                    for fc in (result["obstacles"], result["roads"]):
+                        fc["source"] = MAP_SOURCE
+                        for feature in fc["features"]:
+                            feature["properties"]["source"] = MAP_SOURCE
+                    status = (
+                        "queried_empty"
+                        if not result["obstacles"]["features"] and not result["roads"]["features"]
+                        else "complete"
+                    )
+                    result["metadata"].update(
+                        {
+                            "source": MAP_SOURCE,
+                            "tiles": tiles,
+                            "overpass_errors": errors,
+                            "coverage_status": status,
+                            "coverage_tiles": payload.get("coverage_tiles")
+                            or [{"bbox": tile, "status": "ok", "error": None} for tile in tiles],
+                            "failed_chunks": [],
+                            "proxy_used": proxy_used,
+                            "stage_timings_s": {
+                                "overpass_request_s": round(overpass_request_s, 3),
+                                "parse_s": round(parse_s, 3),
+                                **(payload.get("stage_timings_s") or {}),
+                            },
+                        }
+                    )
+                    result["warnings"].append(
+                        "Overpass 不可达；已改用 OSM 主站真实 map 数据，未使用仿真替代。"
+                    )
+                    return _persist(
+                        result,
+                        directory,
+                        scene_id,
+                        "OSM API 0.6 map tiles + complete building relations",
+                        max_age_hours,
+                    )
+                except (httpx.HTTPError, ValueError, ET.ParseError, OSMDataUnavailable) as exc:
+                    errors.append(f"{MAP_API}: {type(exc).__name__}: {str(exc)[:160]}")
+                    primary_evidence = getattr(exc, "evidence", None)
     finally:
         if own_client:
             active.close()
-    if empty_result is not None:
+    primary_partial = (
+        isinstance(primary_evidence, dict) and primary_evidence.get("coverage_status") == "partial"
+    )
+    if empty_result is not None and not deadline_hit and not primary_partial:
         empty_result["warnings"].append(
             "所有数据源在该范围均未返回建筑/道路记录；不代表现实中没有建筑，规划结果必须按“覆盖未知”读。"
+        )
+        stamp_attempt(
+            empty_result,
+            status="queried_empty",
+            tiles=[{"bbox": bbox, "status": "ok", "endpoint": "all-overpass-empty", "error": None}],
         )
         return _persist(
             empty_result,
@@ -706,7 +908,47 @@ def fetch_obstacles(
             "all Overpass endpoints returned empty for this bbox",
             max_age_hours,
         )
-    raise OSMDataUnavailable("真实建筑/道路获取失败；未回退到仿真数据。" + " | ".join(errors))
+    coverage_status = "timeout" if deadline_hit else "unavailable"
+    failed_chunks = []
+    coverage_tiles = []
+    if isinstance(primary_evidence, dict):
+        coverage_status = primary_evidence.get("coverage_status") or coverage_status
+        failed_chunks = primary_evidence.get("failed_chunks") or []
+        coverage_tiles = primary_evidence.get("coverage_tiles") or []
+    evidence = {
+        "coverage_status": coverage_status,
+        "scene_id": scene_id,
+        "query_bbox": bbox,
+        "crs": "EPSG:4326",
+        "errors": errors,
+        "failed_chunks": failed_chunks,
+        "coverage_tiles": coverage_tiles,
+        "stage_timings_s": {
+            "overpass_request_s": round(overpass_request_s, 3),
+            "parse_s": round(parse_s, 3),
+            **((primary_evidence or {}).get("stage_timings_s") or {}),
+        },
+        "proxy_used": proxy_used,
+        "pass_allowed": False,
+        "fetched_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "source": SOURCE,
+        "statement": "查询未形成完整覆盖。空障碍列表不能当作通过。",
+    }
+    _write_failure(directory, evidence)
+    raise OSMDataUnavailable(
+        "真实建筑/道路获取失败；未回退到仿真数据。" + " | ".join(errors), evidence=evidence
+    )
+
+
+def load_replay_snapshot(path: Path) -> dict:
+    """Read a saved coverage record. A partial or failed record is not a pass."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    allowed = {"complete", "queried_empty", "partial", "timeout", "expired", "not_queried", "unavailable"}
+    if data.get("pass_allowed") is not False or data.get("coverage_status") not in allowed:
+        raise OSMDataUnavailable("重放快照不能当作覆盖通过")
+    if data.get("coverage_status") != "complete" and not data.get("statement"):
+        raise OSMDataUnavailable("非完整覆盖的重放快照必须写明不能通过的原因")
+    return data
 
 
 def main() -> None:
