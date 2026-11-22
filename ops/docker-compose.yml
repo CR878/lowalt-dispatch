@@ -1,24 +1,22 @@
-# 云边拓扑（开发 / 断连演示）
+# 本地开发拓扑（不需要任何华为云资源）
 #
-# 设计要点：边缘 agent 同时接入两张网络
+# 这套 compose 只提供**本地替身**，用来替代 RDS / DCS / 云 MQTT：
 #
-#     cloud-api ── cloud_link ── mosquitto ── cloud_link ── edge-agent
-#                                                              │
-#                                                       flight_control
-#                                                              │
-#                                                         sitl / 飞控
+#     postgres   替身 RDS（任务台账 m3_task_runs）
+#     redis      替身 DCS（有 TTL 的状态投影，不持久化）
+#     mosquitto  替身云侧 MQTT Broker（仅开发，匿名 + 不加密）
 #
-# 演示"云端断连"时，只摘掉边缘容器的 cloud_link，flight_control 不动：
+# 它们不是华为云，也不能在材料里写成"已部署华为云"。密码只用于本机开发。
+#
+# 云边断连演示（保留 flight_control，只摘 cloud_link）：
 #
 #     docker network disconnect lowalt_cloud_link lowalt-edge-agent
 #     docker network connect    lowalt_cloud_link lowalt-edge-agent
 #
-# 这样演示的是**真的网络断开**，而边缘对飞控的控制链路仍然在——
-# 正好对应"云端任务链接中断 ≠ GPS/飞控/遥控同时失效"这句话。
+# 不要拿 `docker pause mosquitto` 当"网络物理断开"来宣传：
+# 那只是 Broker 进程被暂停，属于 Broker 故障用例，不是链路断开用例。
 #
-# 不要拿 `docker pause mosquitto` 单独当"网络物理断开"来宣传：
-# 那只是 Broker 进程被暂停，客户端多久判定失效取决于 Keep Alive 和超时，
-# 属于 Broker 故障用例，不是链路断开用例。
+# 端口一律只绑 127.0.0.1：本机之外的机器连不进来，避免匿名 Broker / 弱密码库暴露到局域网。
 
 name: lowalt
 
@@ -28,14 +26,56 @@ networks:
   flight_control:
     name: lowalt_flight_control
 
+volumes:
+  pgdata:
+    name: lowalt_pgdata
+
 services:
+  # ---- 替身 RDS：任务台账 ----
+  postgres:
+    image: postgres:16-alpine
+    container_name: lowalt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lowalt
+      POSTGRES_PASSWORD: lowalt_dev_only
+      POSTGRES_DB: lowalt
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lowalt -d lowalt"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - cloud_link
+
+  # ---- 替身 DCS：状态投影，重启即丢（本来就只有 TTL 语义）----
+  redis:
+    image: redis:7-alpine
+    container_name: lowalt-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - cloud_link
+
+  # ---- 云侧 MQTT Broker（仅开发：匿名 + 不加密）----
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: lowalt-mosquitto
     # 镜像 tag 与可用性在 11/09 的 SWR 预检里实测确认，不默认 Docker Hub 可达
     restart: unless-stopped
     ports:
-      - "1883:1883"
+      - "127.0.0.1:1883:1883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
     networks:
@@ -47,6 +87,10 @@ services:
   #   build: ../services/api
   #   container_name: lowalt-cloud-api
   #   env_file: ../.env
+  #   depends_on:
+  #     postgres: { condition: service_healthy }
+  #     redis: { condition: service_healthy }
+  #     mosquitto: { condition: service_started }
   #   networks: [cloud_link]
   #
   # edge-agent:

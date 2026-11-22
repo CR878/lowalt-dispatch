@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D 视角候选 · lowalt-dispatch</title>
+<style>
+:root{--bg:#0b0d10;--panel:#12151a;--line:#2a2f38;--text:#d9dde3;--dim:#7d8590;--accent:#7fd1bd}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font-family:"Segoe UI","Microsoft YaHei",sans-serif;overflow:hidden}
+.app{height:100vh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+header{padding:11px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{margin:0 0 9px;font-size:15px;font-weight:600}
+h1 small{font-weight:400;color:var(--dim);font-size:12px;margin-left:10px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tab{text-align:left;background:#171b21;border:1px solid var(--line);border-radius:8px;
+  padding:9px 12px;color:var(--text);cursor:pointer;font-family:inherit}
+.tab:hover{border-color:#5b6570}.tab.on{border-color:var(--accent);background:#16201f}
+.tab b{display:block;font-size:13px;font-weight:600;margin-bottom:3px}
+.tab span{display:block;font-size:11px;color:var(--dim);line-height:1.5}
+iframe{width:100%;height:100%;border:0;display:block;background:#030805}
+footer{padding:8px 18px;border-top:1px solid var(--line);background:var(--panel);
+  font-size:11px;color:var(--dim);display:flex;justify-content:space-between;gap:16px}
+footer b{color:var(--accent);font-weight:600}
+@media(max-width:760px){.tabs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>lowalt-dispatch · 3D 无人机视角候选<small>终端皮 + 真 3D 画面；HALOFLUX 节拍/辉光/运镜 + C 的 ASCII 航图，三版都融进去了</small></h1>
+    <div class="tabs">
+      <button class="tab on" data-src="d1-fpv.html">
+        <b>D1 · FPV 座舱视角</b>
+        <span>磷光绿，第一人称穿场；准星 + 姿态线 + 左下 ASCII 战术窗。最有「无人机视角」。</span>
+      </button>
+      <button class="tab" data-src="d2-chase.html">
+        <b>D2 · CHASE 跟拍</b>
+        <span>冷青，后上方跟拍线框四旋翼；右侧整条终端栏。最像成品调度系统。</span>
+      </button>
+      <button class="tab" data-src="d3-tactical.html">
+        <b>D3 · TACTICAL 倾斜俯视</b>
+        <span>琥珀，3D 战术沙盘；左侧大 ASCII 航图 + 余量剖面。答辩最讲得清。</span>
+      </button>
+    </div>
+  </header>
+  <iframe id="view" src="d1-fpv.html" title="3D 视角预览"></iframe>
+  <footer>
+    <span>共用 <b>view3d.js</b>（Canvas 2D 手写透视投影，零依赖）· 文件在 <b>apps/web/designs/</b>，未提交、未改动现有代码</span>
+    <span>选好编号告诉我，或说「把 D1 和 D3 合起来」</span>
+  </footer>
+</div>
+<script>
+var view=document.getElementById('view');
+document.querySelectorAll('.tab').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
+    btn.classList.add('on'); view.src=btn.dataset.src;
+  });
+});
+</script>
+</body>
+</html>

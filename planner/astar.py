@@ -21,6 +21,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from core.console import ensure_utf8_stdout
 from core.geometry import polyline_length
 from planner.grid import DEFAULT_CLEARANCE_M, DEFAULT_RES_M, Grid, build_grid, snap_to_free
 from planner.scene import endpoint_xy, load_scene, load_suite, zones_known_at_t0
@@ -70,7 +71,16 @@ def plan(
     max_expand: int = 500_000,
     initial_g_m: float = 0.0,
     accept_state: AcceptState | None = None,
+    heuristic_weight: float = 1.0,
+    max_seconds: float | None = None,
 ) -> PathResult:
+    # Defaults preserve the frozen simulation baseline. A weight above one is
+    # weighted A*: bounded work for long geographic routes, without a shortest
+    # path claim. Geometry and clearance checks are identical.
+    if not math.isfinite(heuristic_weight) or heuristic_weight < 1:
+        raise ValueError("heuristic_weight 必须为有限数值且 >= 1")
+    if max_expand <= 0 or (max_seconds is not None and (not math.isfinite(max_seconds) or max_seconds <= 0)):
+        raise ValueError("搜索预算必须为正")
     t0 = time.perf_counter()
 
     def done(**kw) -> PathResult:
@@ -125,7 +135,7 @@ def plan(
     counter = itertools.count()
     h0 = _heuristic(g[0] - s[0], g[1] - s[1], grid.res_m)
     open_heap: list[tuple[float, float, int, int, int]] = [
-        (initial_g_m + h0, initial_g_m, next(counter), s[0], s[1])
+        (initial_g_m + heuristic_weight * h0, initial_g_m, next(counter), s[0], s[1])
     ]
     g_score: dict[tuple[int, int], float] = {s: initial_g_m}
     parent: dict[tuple[int, int], tuple[int, int]] = {}
@@ -141,6 +151,9 @@ def plan(
             continue
         closed.add(node)
         expanded += 1
+
+        if max_seconds is not None and expanded % 256 == 0 and time.perf_counter() - t0 > max_seconds:
+            return done(found=False, nodes_expanded=expanded, reason="超出规划时间预算，未返回未经检查的路线")
 
         if node == g:
             cells = [node]
@@ -173,6 +186,12 @@ def plan(
             ny, nx = iy + dy, ix + dx
             if not grid.free(ny, nx):
                 continue
+            if dy and dx:
+                # 禁止切角：对角移动要求两个正交邻格也可用。
+                # 否则两个单元中心之间的直线会擦着障碍拐角过去，
+                # 栅格里看着"没碰"，连续几何里已经侵入净空。
+                if not grid.free(iy + dy, ix) or not grid.free(iy, ix + dx):
+                    continue
             nxt = (ny, nx)
             if nxt in closed:
                 continue
@@ -188,7 +207,7 @@ def plan(
                 continue
             g_score[nxt] = tentative
             parent[nxt] = node
-            f = tentative + _heuristic(g[0] - ny, g[1] - nx, grid.res_m)
+            f = tentative + heuristic_weight * _heuristic(g[0] - ny, g[1] - nx, grid.res_m)
             heapq.heappush(open_heap, (f, tentative, next(counter), ny, nx))
 
     reason = "搜索空间耗尽，无可行路线"
@@ -225,6 +244,7 @@ def plan_scenario(
 # CLI
 # --------------------------------------------------------------------------- #
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     import sys
 
     args = argv if argv is not None else sys.argv[1:]
@@ -259,8 +279,10 @@ def main(argv: list[str] | None = None) -> int:
                 f"{detour * 100:>7.0f}%{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  —"
             )
         else:
-            print(f"{sc['id']:<9}{'否':>6}{'-':>9}{straight:>9.0f}{'-':>8}"
-                  f"{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  {res.reason}")
+            print(
+                f"{sc['id']:<9}{'否':>6}{'-':>9}{straight:>9.0f}{'-':>8}"
+                f"{res.nodes_expanded:>8}{res.elapsed_ms:>8.0f}  {res.reason}"
+            )
 
     print("-" * 78)
     print(f"找到路线 {n_found}/{total}")

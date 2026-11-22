@@ -1,0 +1,706 @@
+{
+    "evidence_id":  "ev_ee45458c938afed10e5ba206ec99a6e266961a55d5959903fb4e6aed23f48599",
+    "subject":  {
+                    "name":  "page-capture.json",
+                    "digest":  {
+                                   "sha256":  "3cc0b6905715d0e721faea09ddd0f589b5c998e3ce7a12ccbeb6390b90aeef05"
+                               },
+                    "local_path":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\page-capture.json",
+                    "format":  "file",
+                    "architecture":  null
+                },
+    "provider":  {
+                     "id":  "rea-web-script-export",
+                     "name":  "REA captured script export",
+                     "version":  "1"
+                 },
+    "analysis_profile":  null,
+    "predicate_type":  "rea.web-script-export",
+    "operation":  "export_web_scripts",
+    "parameters":  {
+                       "capture_path":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\page-capture.json",
+                       "output_directory":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\exported-scripts"
+                   },
+    "raw_result":  null,
+    "normalized_result":  {
+                              "capture_path":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\page-capture.json",
+                              "capture_sha256":  "3cc0b6905715d0e721faea09ddd0f589b5c998e3ce7a12ccbeb6390b90aeef05",
+                              "capture_kind":  "page-inspection",
+                              "source_evidence_id":  "ev_83129fdcfd83ef7ef7ce418f25fe96a5d351c5fc9e80685ec12ff832339056d3",
+                              "capture_completeness":  {
+                                                           "status":  "policy_filtered",
+                                                           "conditions":  [
+                                                                              "attach_limited",
+                                                                              "policy_filtered"
+                                                                          ],
+                                                           "policy_filtered_sections":  [
+                                                                                            "accessibility",
+                                                                                            "console_text",
+                                                                                            "json_body_shapes",
+                                                                                            "metadata",
+                                                                                            "storage_keys",
+                                                                                            "websocket_shapes",
+                                                                                            "workers"
+                                                                                        ],
+                                                           "attach_limited_sections":  [
+                                                                                           "console_events",
+                                                                                           "metadata",
+                                                                                           "network_requests",
+                                                                                           "websocket_connections",
+                                                                                           "websocket_frames"
+                                                                                       ],
+                                                           "truncated_sections":  [
+
+                                                                                  ],
+                                                           "unavailable_sections":  [
+
+                                                                                    ],
+                                                           "excluded":  [
+                                                                            {
+                                                                                "section":  "accessibility",
+                                                                                "reason":  "not_approved",
+                                                                                "count":  141
+                                                                            },
+                                                                            {
+                                                                                "section":  "console_text",
+                                                                                "reason":  "not_approved",
+                                                                                "count":  null
+                                                                            },
+                                                                            {
+                                                                                "section":  "json_body_shapes",
+                                                                                "reason":  "not_approved",
+                                                                                "count":  null
+                                                                            },
+                                                                            {
+                                                                                "section":  "metadata",
+                                                                                "reason":  "disallowed_origin",
+                                                                                "count":  2
+                                                                            },
+                                                                            {
+                                                                                "section":  "storage_keys",
+                                                                                "reason":  "not_approved",
+                                                                                "count":  null
+                                                                            },
+                                                                            {
+                                                                                "section":  "websocket_shapes",
+                                                                                "reason":  "not_approved",
+                                                                                "count":  null
+                                                                            },
+                                                                            {
+                                                                                "section":  "workers",
+                                                                                "reason":  "out_of_target_scope",
+                                                                                "count":  3
+                                                                            }
+                                                                        ],
+                                                           "dropped_events":  {
+                                                                                  "scripts":  0,
+                                                                                  "network_requests":  0,
+                                                                                  "console_events":  0,
+                                                                                  "websocket_connections":  0,
+                                                                                  "websocket_frames":  0,
+                                                                                  "webmcp_tools":  0,
+                                                                                  "timeline_events":  0,
+                                                                                  "total":  0
+                                                                              }
+                                                       },
+                              "output_directory":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\exported-scripts",
+                              "analysis_input":  {
+                                                     "input_path":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\exported-scripts\\files",
+                                                     "format":  "directory"
+                                                 },
+                              "scripts":  [
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_0237ffc78ef99be2dbb2a7a71a872794effe232c58fa69e0bb9d728879302102",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-operations.js?v=city-response-v19",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-1-d59009889e6bec4b8c016f90d4cd655593ac0086ca2502b99794b2a0ad977056.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "603d4f6b15d1744d35d656525bd4c20ad6d863ec4472569faaff7875415b6f08",
+                                                                  "bytes":  15052,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_0944b437015f2cc85b8e7d673cc9f5aaf50f2655c71b3bda0078d1f7132300bb",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  false,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/contact-tools.js?v=1793534846",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-2-596d8840c6422f71df624352264ec09c0584aade95de40372d938da62557429c.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "f6defe7a3164223805e6a05f7c50f6cfa321dc7fc50d8fb5284425db9f0a90a2",
+                                                                  "bytes":  14804,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_0d1c1821907f3aa0191b2e56589379a3c680e429666b1eb8eb10bf99e1825bf3",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  false,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/multimodal-page.js?v=1791743222",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-3-3441aa3e307e0f6883f37295c58d58896c20dc0b85fccfcc0c2f6b814166241a.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "1745efee7abe30aad214e971de00f3230f380e019719646b2f8fbb19748b2577",
+                                                                  "bytes":  1807,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_2dbf1cfb94aa9d6c2e11a1bd504a5f72d7b22c35cad09296bcc8b0d2b4b35411",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-flight.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-4-f6486aacde72f23f0b98d555ac82cbdda6436190588ae533ed276783e6ddfea3.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "f596eb9d01e5e2529eb1a1f1b2ae3693ada4381ab77dca901167d3a81586a0b6",
+                                                                  "bytes":  45013,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_51ffbe755a644082832f57388b2bdb797035b7d1c0b5abcc0ea483fc4c0c6efa",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-layout.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-5-58f97a408685331230a4a86715c8ab02889bbf3d7bece2230bf1c05945df4679.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "e25be95372ef9f094a6d23a6fcb698322ac3f5e3e80e8c8624f813e9844bc05d",
+                                                                  "bytes":  855,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_520f94919e6f1dd9081232b5e17155c61e34c038f42ff81bfd771fcdf8da20fd",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-physics.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-6-04371bfaf0d3f53dc57332b0e88417fa9163b2c9832fb02d4817b17897d2ae87.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "Captured paths collide by content version or file/directory prefix.",
+                                                                  "sha256":  "4628012fce65ba7d57ead303b610c789788b64b642231952da5104e5aed63008",
+                                                                  "bytes":  1477,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_578993d1315994402ee8afa90e926a0f845569b2ea3b9a70b15bd749b99bbf43",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  false,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/airspace-analytics.js?v=1793811063",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-7-513e024f129f680fc2e4a872032c78819c669a7bdaec2befff7a4750e4690835.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "834302016f7a5479c161f518ce6b26962a85db41fea353bd6d8f72b896e03169",
+                                                                  "bytes":  3336,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_65b520e0ba2671937e931ed5e871ad7507e387f6e55e6a129cae2893c53fd4ca",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-atmosphere.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-8-3ab5e9899e52332f2407c1fb29be1a96a5fa77b0c0021610acb62b89f113b05d.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "ad8ebf41122d98ededa8fab1be5f45c153fe75acf3f2bba90f72f70d90973dc2",
+                                                                  "bytes":  4668,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_75873d226bb9605d29de8e6ae26a0ea3b5102dac3bdf6c1fa4b816bee573570c",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-dispatch.js?v=city-response-v18",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-9-44e0e1affe7d17b8f47c1e2b7e1a2aec0f49bb923326023e1b2b1edacb345ebf.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "Captured paths collide by content version or file/directory prefix.",
+                                                                  "sha256":  "ab69b1de0f6696c8b33ffa283598deeeb9d0124e238d3161819c445b1550f88a",
+                                                                  "bytes":  4478,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_866d4dd8921eebd0b6e9eafc5185bda9ba423eab4bdd968e646caaba750358db",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-dispatch.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-10-720dfe8ac20c581bbf56c81d93179ef0ac1025f403c00952e8d031f6e06a16c0.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "Captured paths collide by content version or file/directory prefix.",
+                                                                  "sha256":  "ab69b1de0f6696c8b33ffa283598deeeb9d0124e238d3161819c445b1550f88a",
+                                                                  "bytes":  4478,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_93d6b7ba4b8c9c1fa51d068b0235efb17d7098e0f1ac1d6c147e0e7c7bc1f196",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-world.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-11-3cb48cc787cf2c938dcf7fc0125e8f2fb9fb81c58265ca79b3971a703d9e6771.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "e84736018091ca8ceb0089e32e18119c08e95a4bd27e5d0f27858b6a97587f0c",
+                                                                  "bytes":  11988,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_94f20bc8c011a1d0da58fb81f7d1be9717c88149cd90540a743574cd0ea667a6",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/vendor/utils/BufferGeometryUtils.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/scene/vendor/utils/BufferGeometryUtils.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "fda7e946b8e0b5ab39b779206589e7a1079a22eb24efb89d7223e03fdfb1f751",
+                                                                  "bytes":  35539,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_9a2523d53a42a7d66e0932cf16158dd1f2208ca25aa535b4ba07dc41b5be0062",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-physics.js?v=city-v1",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-13-c7344f69a0ed7b29594908f280e03c502d71332b33421ee1606d4286f70107aa.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "Captured paths collide by content version or file/directory prefix.",
+                                                                  "sha256":  "4628012fce65ba7d57ead303b610c789788b64b642231952da5104e5aed63008",
+                                                                  "bytes":  1477,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_a3d8f1e99b7ac558d4b86eddc6f71e5f2c073390289091894d3a5718624d64b3",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  false,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/contact-solution.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/contact-solution.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "16de5c76ca98fbe11d14c70ae9e79af08846a3415e49f1dd03dea9e55059c526",
+                                                                  "bytes":  2024,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_b47e988af3fb8db051078aaad76d251372232f18bc72a59c91faf0973e86cd42",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-cargo-model.js?v=city-response-v18",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-15-ce40f4a93bac000eb45f8c030ce486aa8c9f1977b927094322cd03779d0410af.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "358fd940adc8ec3ddb1762befac93e5a2a6e76596618ded722ede5cfd61b0d53",
+                                                                  "bytes":  5176,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_b79e853cbdc7ea74decb0a51cb67e1ec560f99add98b89fd2545968821a1bb15",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/vendor/loaders/GLTFLoader.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/scene/vendor/loaders/GLTFLoader.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "67ac5551fdafa6e349bd80c8f8e5e39c136d6b2fb1ad647db9abb21dc86f9e4a",
+                                                                  "bytes":  114739,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_bfe75bfe43e385715f99ff00fc1a40228a5c99e24a08232cf8640498c8d71f5e",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  false,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/low-applications.js?v=1792069831",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-17-ad9b7ad69d773ee89afef5ccd75ba184d90ec68b67f547e022b34a0a2b14dda1.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "5b6767839d7a66311ab6e3098ca01dd40cb2f7b8cdc7e2a1fbf3edf9e0c8c94e",
+                                                                  "bytes":  1557,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_c00350c2ebf3ec554b5b213ba1307b0ba2c665b26a1c3d9b05e4859f13c36fce",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/vendor/three.module.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/scene/vendor/three.module.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "c8211c69345d2e9949dc7a8ac969380497aa0600a5a8ac6a459c8cd02dd9cb8a",
+                                                                  "bytes":  603113,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_c079fb6635ee0a1ea3d5bde10ebdeda1161f0427071d4c6bdbc169cdc3d39416",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-traffic.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/scene/city-traffic.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "19f886ec0c5b1f5233a5e418e4bc8a9d6ade47558388a42c4cac0f04470deb2c",
+                                                                  "bytes":  3663,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_c53db61e5cb65005cd0db7524b81d430d3bc027bdf2b2d08c4e8258dd9dfc7a3",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-activity.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-20-39255acb2045d7f9723ee32b8eae53c61fed0d2c891eafbc89f81f84590efcac.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "5e43257f01565d9be52ea12203d939998fb309340f7b380bd27c8e3b77060bf6",
+                                                                  "bytes":  7182,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_c87bef2a3213266feb7dfc67497f0008d8b47dfd2683245b977134d579bb818b",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-cargo.js?v=city-response-v16",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-21-d4d6a693050b9a8e509220b0705486c7e3b6c9edf10528a32ae10f1b02eb666c.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "Captured paths collide by content version or file/directory prefix.",
+                                                                  "sha256":  "0cad5dcc737bf8cc3ce3136aabe7ce89f813b216278008044dc110154db48597",
+                                                                  "bytes":  2285,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_dc4c30715d50667a35acfb8154af722f7e9fe71b392176b71cd7bd44624708e2",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-patrol.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/scene/city-patrol.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "41a47c224cd24a3f74bcd203a8e5bbfd642211e66591f1d2d634ffae0f69aaf8",
+                                                                  "bytes":  2581,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_e1f3e9043925ebf6b25bdfdd8284542b7219476b39fcec484535bd8bfbbf10e1",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-districts.js?v=city-style-v3",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-23-7571d57b3e8d84366651725683358f313c5c3cf6dfd9ecc24b3bd2005701f6fa.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "URL query, fragment, or credentials cannot select a canonical local module.",
+                                                                  "sha256":  "727f67a57e61b89b3e7de0f5a83699a82ae2d2ea2082f186d2ef7333f3a1f0f1",
+                                                                  "bytes":  16480,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_e49a1781732c38151c30bef2ad0a04467724c4737a93acd48e055bb1fafe997c",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/city-cargo.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "isolated/source-24-cdefdd4bcfd94e2b609b142ca3153094f669fbc86eef7effea631a43a834b1d6.js",
+                                                                  "layout":  "isolated",
+                                                                  "layout_reason":  "Captured paths collide by content version or file/directory prefix.",
+                                                                  "sha256":  "0cad5dcc737bf8cc3ce3136aabe7ce89f813b216278008044dc110154db48597",
+                                                                  "bytes":  2285,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              },
+                                              {
+                                                  "source":  {
+                                                                 "kind":  "page-script",
+                                                                 "script_key":  "scr_f8689e4e80cd79a5d5b275f52d941e3a4abaa64b8a01d4866ac918a6686c7db7",
+                                                                 "frame_id":  "55C2B4B7B32EFEA051315357C8A194A8",
+                                                                 "is_module":  true,
+                                                                 "language":  "JavaScript",
+                                                                 "source_map_url":  null
+                                                             },
+                                                  "url":  "https://www.kdji.cn/scene/vendor/three.core.js",
+                                                  "content":  {
+                                                                  "state":  "exported",
+                                                                  "relative_path":  "origins/db934aef64c28d4c3ec9f600a28ddcd902da3dcaf82e18ccb22071da0d3c432c/scene/vendor/three.core.js",
+                                                                  "layout":  "url-path",
+                                                                  "layout_reason":  null,
+                                                                  "sha256":  "eb077d2417f61d3e6d9264c317cabc4ea35769ed6b0ab533067292a550784c20",
+                                                                  "bytes":  1403455,
+                                                                  "media_type":  "text/javascript",
+                                                                  "redacted":  null,
+                                                                  "representation":  "debugger-source-utf8"
+                                                              }
+                                              }
+                                          ],
+                              "limitations":  [
+                                                  "Observation starts when REA attaches; prior network and console activity is unavailable.",
+                                                  "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+                                                  "Source maps are reported only as declarative URLs and are not fetched.",
+                                                  "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+                                                  "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+                                                  "Only script bytes retained in this capture are exported. Sources are not refetched or executed, and a response or Debugger source does not prove execution.",
+                                                  "Ordinary unambiguous URL paths preserve relative module layouts by origin, including case-distinct spellings. Query variants, exact path collisions, file/directory prefixes, inline sources, and unrepresentable paths are isolated. A case-distinct pair is isolated only when the destination filesystem cannot store both spellings; the record names that pair. Browser module relationships of isolated paths remain unknown.",
+                                                  "Local JavaScript analysis does not implement browser import maps, root-relative URL resolution, remote URL loading, or browser runtime behavior. It may strip import queries and fragments; isolated variants are not canonical targets.",
+                                                  "Source-map declarations are retained as metadata. No source maps or missing dependencies are fetched or reconstructed.",
+                                                  "Scenario response bytes preserve the output of Playwright\u0027s Response.body() API; any source-body provenance caveat from the capture is retained in this manifest. Debugger sources are the exposed text encoded as UTF-8. Redacted bytes are exported exactly as retained, and may no longer parse as JavaScript."
+                                              ],
+                              "manifest":  {
+                                               "path":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\exported-scripts\\manifest.json",
+                                               "sha256":  "38555d2b26653fbf18a2f73d8e2dd3eb26b38a486b8a8435a0a76410fc3fee2f",
+                                               "bytes":  26487
+                                           }
+                          },
+    "confidence":  "derived",
+    "authority":  "historical-reference",
+    "environment":  null,
+    "limitations":  [
+                        "Observation starts when REA attaches; prior network and console activity is unavailable.",
+                        "Raw network headers, bodies, cookies, storage values, console objects, and WebSocket payloads are never retained; explicitly requested primitive console text is retained verbatim, while payload captures retain value-free shapes.",
+                        "Source maps are reported only as declarative URLs and are not fetched.",
+                        "URL-less scripts and console events without an allowed source URL are excluded because their origin cannot be proven.",
+                        "CDP discovery omitted the target attachment state; attached is reported as unknown.",
+                        "Only script bytes retained in this capture are exported. Sources are not refetched or executed, and a response or Debugger source does not prove execution.",
+                        "Ordinary unambiguous URL paths preserve relative module layouts by origin, including case-distinct spellings. Query variants, exact path collisions, file/directory prefixes, inline sources, and unrepresentable paths are isolated. A case-distinct pair is isolated only when the destination filesystem cannot store both spellings; the record names that pair. Browser module relationships of isolated paths remain unknown.",
+                        "Local JavaScript analysis does not implement browser import maps, root-relative URL resolution, remote URL loading, or browser runtime behavior. It may strip import queries and fragments; isolated variants are not canonical targets.",
+                        "Source-map declarations are retained as metadata. No source maps or missing dependencies are fetched or reconstructed.",
+                        "Scenario response bytes preserve the output of Playwright\u0027s Response.body() API; any source-body provenance caveat from the capture is retained in this manifest. Debugger sources are the exposed text encoded as UTF-8. Redacted bytes are exported exactly as retained, and may no longer parse as JavaScript."
+                    ],
+    "relationship_coverage":  null,
+    "locations":  [
+                      {
+                          "kind":  "artifact-path",
+                          "path":  "E:\\REA\\.cache\\web-recover\\www-kdji-cn-scene-city-flight-html\\exported-scripts\\manifest.json"
+                      }
+                  ],
+    "evidence_links":  [
+                           "ev_83129fdcfd83ef7ef7ce418f25fe96a5d351c5fc9e80685ec12ff832339056d3"
+                       ]
+}

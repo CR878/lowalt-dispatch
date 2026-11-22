@@ -1,0 +1,143 @@
+.dispatch-panel {
+  display: grid;
+  gap: 16px;
+}
+.dispatch-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 16px;
+  color: light-dark(#379587, #a7ddd5);
+  border: 1px solid #d2e4e4;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #f4f9f8, #f4f7f9);
+}
+.dispatch-banner p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: light-dark(#51727b, #b3cad0);
+}
+.dispatch-chain {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dispatch-chain span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: light-dark(#456e87, #aec7d6);
+}
+.dispatch-chain b {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: #f2f6f8;
+  border-radius: 50%;
+}
+.dispatch-muted {
+  color: light-dark(#516a7b, #b3c5d0);
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.dispatch-field {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+  color: light-dark(#51697b, #b3c4d0);
+}
+.dispatch-field select {
+  width: 100%;
+  padding: 10px;
+  color: light-dark(#3d708f, #aac8da);
+  background: #f4f7f9;
+  border: 1px solid #d2dde4;
+  border-radius: 8px;
+}
+.dispatch-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #d2dde4;
+  border-radius: 12px;
+  background: #f5f7f9;
+}
+.dispatch-card h3 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  font-size: 13px;
+  color: light-dark(#3c7990, #a9cdda);
+}
+.dispatch-card h3 > span {
+  margin-left: auto;
+  font-size: 11px;
+}
+.dispatch-card dl {
+  display: grid;
+  grid-template-columns: 115px 1fr;
+  gap: 10px;
+  margin: 0;
+  font-size: 12px;
+}
+.dispatch-card dt {
+  color: light-dark(#516a7b, #b3c5d0);
+}
+.dispatch-card dd {
+  margin: 0;
+  color: light-dark(#3c7990, #a9cdda);
+  overflow-wrap: anywhere;
+}
+.dispatch-id {
+  font-size: 11px;
+  color: light-dark(#52697a, #b4c4d0);
+  overflow-wrap: anywhere;
+}
+.dispatch-consent {
+  display: flex;
+  align-items: start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.dispatch-online {
+  color: light-dark(#379576, #a7ddcb);
+}
+.dispatch-error {
+  padding: 12px;
+  color: light-dark(#955037, #ddb5a7);
+  background: #f7f4f4;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.dispatch-card summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: light-dark(#487084, #afc8d4);
+}
+.dispatch-events {
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px 0;
+  margin: 0;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.dispatch-events li {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 11px;
+  border-bottom: 1px solid #d2dce4;
+  color: light-dark(#456b87, #aec5d6);
+}
+.dispatch-events time {
+  color: light-dark(#52697a, #b4c4d0);
+  flex-shrink: 0;
+}

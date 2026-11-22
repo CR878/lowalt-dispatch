@@ -1,0 +1,176 @@
+{
+  "schema_version": 1,
+  "vehicles": [
+    {
+      "id": "dji-flycart-30",
+      "display_name": "DJI FlyCart 30",
+      "manufacturer": "DJI 大疆",
+      "airframe": "八旋翼",
+      "category": "中型货运",
+      "configuration": "双电池 · 30 kg 载荷规格",
+      "summary": "面向山区、工地与物资配送的多旋翼运载平台。",
+      "max_payload_kg": 30,
+      "max_speed_mps": 20,
+      "reference_speed_mps": 15,
+      "max_range_km": 16,
+      "range_payload_kg": 30,
+      "range_note": "16 km 为双电、30 kg 满载、零海拔无风实验值；空载为 28 km。单电 40 kg 配置未混入本档案。",
+      "speed_note": "15 m/s 是官网续航测试速度；20 m/s 为最大水平速度，不等同于经济巡航速度。",
+      "battery_capacity_wh": 3968.8,
+      "battery_note": "2 × DB2000；每块官网标称 1984.4 Wh。仅为标称总能量，非可用电量。",
+      "max_wind_mps": 12,
+      "min_temperature_c": -20,
+      "max_temperature_c": 45,
+      "mtow_kg": 95,
+      "sources": [
+        {
+          "url": "https://www.dji.com/cn/flycart-30/specs",
+          "status": 200,
+          "sha256": "5b6982a54b008791f6eeba2ac799af1932706c7fcf887864cb34c58fcea6e56a",
+          "fetched_at": "2026-11-17T08:49:55.645692+00:00",
+          "title": "DJI FlyCart 30 官方技术参数",
+          "excerpts": [
+            "双电（载重 30 千克）：16 千米",
+            "20 米/秒（载重 30 千克",
+            "能量 1984.4 瓦时",
+            "最大抗风速度 12 米/秒"
+          ]
+        }
+      ],
+      "field_sources": {
+        "max_payload_kg": 0,
+        "max_speed_mps": 0,
+        "reference_speed_mps": 0,
+        "max_range_km": 0,
+        "battery_capacity_wh": 0,
+        "max_wind_mps": 0,
+        "temperature": 0
+      },
+      "limitations": [
+        "货箱与空吊配置、海拔和风会影响实际载荷及续航。",
+        "厂家未公开本项目所需的实测 Wh/m 与可用电池量，不能用标称电量除以航程冒充标定。"
+      ],
+      "data_status": "manufacturer_spec",
+      "energy_per_meter_wh": null,
+      "usable_battery_wh": null,
+      "reserve_policy_wh": null,
+      "calibrated_at": null
+    },
+    {
+      "id": "dji-flycart-100",
+      "display_name": "DJI FlyCart 100",
+      "manufacturer": "DJI 大疆",
+      "airframe": "八旋翼",
+      "category": "重型货运",
+      "configuration": "官网公开规格 · 按配置核对",
+      "summary": "重载吊运平台，适用于大件物资与复杂地形运输。",
+      "max_payload_kg": 80,
+      "max_speed_mps": 20,
+      "reference_speed_mps": 15,
+      "max_range_km": 12,
+      "range_payload_kg": null,
+      "range_note": "12 km 为最大起飞重量下双电实验航程，海平面 25°C、无风、15 m/s。80 kg 是产品页载荷上限，不能假定与双电 12 km 同时成立；配置须另核对。",
+      "speed_note": "15 m/s 为官方航程测试速度；最大水平速度 20 m/s。",
+      "battery_capacity_wh": 4264,
+      "battery_note": "双电标称量：2 × 41 Ah × 52 V = 4264 Wh（由官网电压/容量换算）。非可用电量；未与 80 kg 载荷配对。",
+      "max_wind_mps": 12,
+      "min_temperature_c": -20,
+      "max_temperature_c": 40,
+      "mtow_kg": 149.9,
+      "sources": [
+        {
+          "url": "https://www.dji.com/cn/flycart-100/specs",
+          "status": 200,
+          "sha256": "b3f853705d84fc280f8bed6df3e7f79bf13513a2cfeec77fe771decdcc3b4759",
+          "fetched_at": "2026-11-17T08:49:55.635702+00:00",
+          "title": "DJI FlyCart 100 官方技术参数",
+          "excerpts": [
+            "最大起飞重量下：双电 12 千米、单电 6 千米",
+            "容量 41Ah 标称电压 52V",
+            "最大水平飞行速度 20 米/秒",
+            "最大抗风速度 12 米/秒"
+          ]
+        },
+        {
+          "url": "https://www.dji.com/cn/flycart-100",
+          "status": 200,
+          "sha256": "19174b236a94ce0819fd5a083cc2d83278955847cc35480fa3c795566cedeef6",
+          "fetched_at": "2026-11-17T08:50:24.518445+00:00",
+          "title": "DJI FlyCart 100 官方产品页",
+          "excerpts": [
+            "80 千克旗舰级载重",
+            "空载最大航程 26 千米"
+          ]
+        }
+      ],
+      "field_sources": {
+        "max_payload_kg": 1,
+        "max_speed_mps": 0,
+        "reference_speed_mps": 0,
+        "max_range_km": 0,
+        "battery_capacity_wh": 0,
+        "max_wind_mps": 0,
+        "temperature": 0
+      },
+      "limitations": [
+        "官网说明单电模式用于应急；本档案不将单电能力作为普通双电配送能力。",
+        "最大载荷、最大航程是不同条件下的边界，不能组合为任务承诺。"
+      ],
+      "data_status": "manufacturer_spec",
+      "energy_per_meter_wh": null,
+      "usable_battery_wh": null,
+      "reserve_policy_wh": null,
+      "calibrated_at": null
+    },
+    {
+      "id": "wingcopter-198",
+      "display_name": "Wingcopter 198",
+      "manufacturer": "Wingcopter",
+      "airframe": "倾转旋翼 VTOL",
+      "category": "轻载长航程",
+      "configuration": "官方公开产品规格",
+      "summary": "面向医疗物资与小包裹配送的垂直起降固定翼平台。",
+      "max_payload_kg": 4.7,
+      "max_speed_mps": null,
+      "reference_speed_mps": 25,
+      "max_range_km": 94,
+      "range_payload_kg": null,
+      "range_note": "官网公布 Maximum Range 94 km，未在该页给出对应载重/风/电池条件，不作为 4.7 kg 满载航程。",
+      "speed_note": "官网公布 Speed 90 km/h，换算为 25 m/s；该页未将其明确标为最大速度。",
+      "battery_capacity_wh": null,
+      "battery_note": "官网说明双电池，未在已核实页面公开电池 Wh 或可用电量。",
+      "max_wind_mps": null,
+      "min_temperature_c": null,
+      "max_temperature_c": null,
+      "mtow_kg": 25,
+      "sources": [
+        {
+          "url": "https://wingcopter.com/wingcopter-198",
+          "status": 200,
+          "sha256": "ed091b8dd6d63f04c836593ebeba9549bd17e34b3e9051236b197dce8803b4de",
+          "fetched_at": "2026-11-17T08:50:00.481841+00:00",
+          "title": "Wingcopter 198 官方产品页",
+          "excerpts": [
+            "Maximum Range: 94 km Speed: 90 km/h Payload: 4.7 kg",
+            "Maximum Take-Off Weight: 25 kg"
+          ]
+        }
+      ],
+      "field_sources": {
+        "max_payload_kg": 0,
+        "reference_speed_mps": 0,
+        "max_range_km": 0,
+        "mtow_kg": 0
+      },
+      "limitations": [
+        "倾转过渡、固定翼转弯半径和垂直起降能耗尚未建模；几何折线不代表可执行固定翼航迹。",
+        "页面未公开的抗风、温度、能耗值保留为空。"
+      ],
+      "data_status": "manufacturer_spec",
+      "energy_per_meter_wh": null,
+      "usable_battery_wh": null,
+      "reserve_policy_wh": null,
+      "calibrated_at": null
+    }
+  ]
+}

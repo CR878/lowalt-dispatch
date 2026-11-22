@@ -158,7 +158,9 @@ def _waypoints(
             limitations.append("规划器返回的端点与任务坐标不一致。该点高度沿用起点，不是测得的飞行高度。")
 
     if copied_altitude and len(xy) > 2:
-        note = "中间航点的 alt_m 与 alt_ref 复制起点，只为满足 Position 的必填字段，不是规划器算出的高度剖面。"
+        note = (
+            "中间航点的 alt_m 与 alt_ref 复制起点，只为满足 Position 的必填字段，不是规划器算出的高度剖面。"
+        )
     elif copied_altitude:
         note = "有航点的高度沿用起点。A* 基线不规划高度。"
     else:

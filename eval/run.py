@@ -32,12 +32,14 @@ import json
 import platform
 import subprocess
 import sys
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import yaml
 
+from core.console import ensure_utf8_stdout
 from eval import planners
 from planner.diversion import APPROXIMATION_NOTE, ScenarioPlan, profile_record
 from planner.scene import SCENARIO_DIR
@@ -168,7 +170,7 @@ def _base_meta(suite_path: Path, suite: dict[str, Any], seeds: list[int], algo_n
         "run_mode": "mock" if mock else "real",
         "eval_scope": "planning_only_not_flight",
         "is_simulated": True,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "suite_path": str(suite_path).replace("\\", "/"),
         "suite_sha256": _sha256_of(suite_path),
         "scenario_count": len(suite["scenarios"]),
@@ -245,6 +247,7 @@ def _run_planners(
 
 
 def main(argv: list[str] | None = None) -> int:
+    ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
         prog="python -m eval.run",
         description="低空项目评测 harness（真算法与 mock 分开落盘）",

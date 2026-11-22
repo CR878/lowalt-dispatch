@@ -180,6 +180,10 @@ class SqliteStore:
             ).fetchall()
         return [_load(RouteRecord, row["body"]) for row in rows]
 
+    def close(self) -> None:
+        with self._lock:
+            self._conn.close()
+
 
 def build_store(settings: Settings) -> SqliteStore:
     if settings.storage_backend == "memory":

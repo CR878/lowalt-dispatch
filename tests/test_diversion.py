@@ -16,6 +16,7 @@ from planner.diversion import (
     UNREACHABLE_MARGIN_WH,
     active_landing_sites,
     build_diversion_field,
+    nfz_active_at,
     plan_baseline_annotated,
     plan_scenario_with_diversion,
     profile_along_route,
@@ -133,7 +134,11 @@ def test_no_landing_site_is_a_negative_sentinel_not_zero_margin() -> None:
 
 def test_pruning_rejects_route_that_baseline_still_returns() -> None:
     """能量只够单程、不够再飞回唯一备降点时，约束搜索必须无解，基线仍给出几何路线。"""
-    scene = Scene(obstacles=[], zones={}, sites={"L": LandingSite("L", 100.0, 100.0, radius_m=30.0, compatible_vehicle_types=("toy",))})
+    scene = Scene(
+        obstacles=[],
+        zones={},
+        sites={"L": LandingSite("L", 100.0, 100.0, radius_m=30.0, compatible_vehicle_types=("toy",))},
+    )
     scenario = {
         "id": "toy-far",
         "origin": {"x_m": 100.0, "y_m": 100.0, "alt_m": 0.0},
@@ -185,7 +190,9 @@ def test_short_hop_profile_stays_non_negative_and_matches_formula() -> None:
     assert start.margin_wh == pytest.approx(100.0 - (start.energy_need_wh or 0.0), abs=0.5)
     end = diversion.profile.samples[-1]
     assert end.energy_need_wh is not None
-    assert end.margin_wh == pytest.approx(100.0 - vehicle.energy_per_meter_wh * end.s_m - end.energy_need_wh, abs=1.0)
+    assert end.margin_wh == pytest.approx(
+        100.0 - vehicle.energy_per_meter_wh * end.s_m - end.energy_need_wh, abs=1.0
+    )
 
 
 def test_profile_samples_cover_the_polyline() -> None:
@@ -378,3 +385,98 @@ def test_real_planners_ignore_seed_and_eval_splits_mock(tmp_path: Path) -> None:
         mock_rows = list(csv.DictReader(fh))
     assert {r["algorithm"] for r in mock_rows} == {"astar_dynamic"}
     assert {r["run_mode"] for r in mock_rows} == {"mock"}
+
+
+# --------------------------------------------------------------------------- #
+# 飞行中关闭的备降点（2026-11-15 修掉的余量高估）
+# --------------------------------------------------------------------------- #
+def test_site_closure_during_flight_enters_search_and_profile() -> None:
+    """S3-04 的 L2 在 45 s 关闭、飞行 204 s，不能全程把它算作有效退出路径。"""
+    from planner.diversion import (
+        blockers_at_t0,
+        cached_grid,
+        climb_delta_m,
+        resolve_energy,
+        shared_scene,
+        site_closure_schedule,
+        sites_available_at,
+    )
+    from planner.scene import load_suite
+
+    vehicle = load_vehicle(EXAMPLE)
+    scene = shared_scene()
+    sc = next(s for s in load_suite()["scenarios"] if s["id"] == "S3-04")
+    schedule = site_closure_schedule(sc)
+    assert schedule == ((45.0, "L2"),)
+
+    sites, _ = active_landing_sites(scene, sc, vehicle)
+    assert any(s.site_id == "L2" for s in sites_available_at(sites, schedule, 10.0))
+    assert all(s.site_id != "L2" for s in sites_available_at(sites, schedule, 60.0))
+
+    base = plan_baseline_annotated(sc, scene, vehicle)
+    constrained = plan_scenario_with_diversion(sc, scene, vehicle)
+    assert base.profile is not None and constrained.profile is not None
+    late = [s for s in constrained.profile.samples if s.t_s > 45.0]
+    assert late, "飞行时间应明显超过 45 s"
+    assert all(s.nearest_site_id != "L2" for s in late), "L2 关闭后不得再作为最近备降点"
+
+    # 静态口径（全程把 L2 当有效）会高估余量；时变口径必须更保守
+    grid = cached_grid(blockers_at_t0(sc, scene))
+    static_field = build_diversion_field(grid, sites)
+    initial, reserve = resolve_energy(sc, vehicle)
+    static_profile = profile_along_route(
+        route_id="static",
+        waypoints=base.waypoints,
+        grid=grid,
+        field_=static_field,
+        vehicle=vehicle,
+        initial_energy_wh=initial,
+        reserve_wh=reserve,
+        climb_delta=climb_delta_m(sc),
+    )
+    assert constrained.profile.min_margin_wh < static_profile.min_margin_wh
+    assert constrained.profile.is_feasible
+    # 基线与约束两条剖面用同一套时变口径，对照才公平
+    assert abs(base.profile.min_margin_wh - constrained.profile.min_margin_wh) < 1e-6
+
+
+def test_blockers_at_t0_excludes_at_s_positive_nfz() -> None:
+    # 几何基线网格只含 at_s==0 的限制区；飞行中才生效（at_s>0）的由搜索期精确判断，
+    # 不再被当全程障碍永久绕开。
+    scene = load_scene()
+    suite = load_suite()
+    sc = next(s for s in suite["scenarios"] if s["id"] == "S2-01")
+    from planner.diversion import blockers_at_t0
+
+    blocked = blockers_at_t0(sc, scene)
+    r01_poly = scene.zones["R01"].polygon
+    assert r01_poly not in blocked, "at_s>0 的 R01 不应进入几何基线网格（精确时变交给搜索期）"
+
+
+def test_nfz_active_at_predicate() -> None:
+    # 精确时变：禁飞区在 at_s 之后才激活；航线在激活前穿过它不算挡路。
+    poly = rect_polygon(0.0, 0.0, 100.0, 100.0)  # 100x100 方块
+    # 永久激活（duration=None）
+    windows = ((poly, 50.0, None),)
+    assert nfz_active_at(windows, 50.0, 50.0, 30.0) is False  # 激活前落在区内 -> 不挡
+    assert nfz_active_at(windows, 50.0, 50.0, 60.0) is True  # 激活后落在区内 -> 挡
+    assert nfz_active_at(windows, 500.0, 500.0, 60.0) is False  # 激活后落在区外 -> 不挡
+    # 带 duration 的窗口 [50, 80]
+    windows2 = ((poly, 50.0, 30.0),)
+    assert nfz_active_at(windows2, 50.0, 50.0, 80.0) is True  # 边界 t==at_s+duration 含
+    assert nfz_active_at(windows2, 50.0, 50.0, 81.0) is False  # 窗口外不挡
+    # 多个窗口：第一个已激活就挡
+    windows3 = ((poly, 50.0, None), (poly, 100.0, None))
+    assert nfz_active_at(windows3, 50.0, 50.0, 60.0) is True
+
+
+def test_s2_01_diversion_infeasible_due_to_active_nfz() -> None:
+    # S2-01 的 R01 在 at_s=40s 激活；几何路线在 ~118s 才穿过它，此时已激活。
+    # 精确搜索必须据此判无解，而不是像旧版那样把 at_s>0 当全程障碍（保守绕路导致能量不可行）。
+    scene = load_scene()
+    suite = load_suite()
+    sc = next(s for s in suite["scenarios"] if s["id"] == "S2-01")
+    vehicle = load_vehicle(EXAMPLE)
+    res = plan_scenario_with_diversion(sc, scene, vehicle)
+    assert res.found is False
+    assert "已激活的飞行中限制区" in (res.reason or ""), res.reason
