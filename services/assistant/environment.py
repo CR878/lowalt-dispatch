@@ -136,7 +136,9 @@ def decide_verdict(factors, coverage, *, thresholds_all_null=True, weather_unava
         return "degraded", "关键项未判定: " + ", ".join(critical)
     if any(factor.get("status") == "unavailable" for factor in factors):
         return "degraded", "存在不可用因素，不能判通过"
-    if thresholds_all_null or any(factor.get("threshold") is None and factor.get("effect") == "hard" for factor in factors):
+    if thresholds_all_null or any(
+        factor.get("threshold") is None and factor.get("effect") == "hard" for factor in factors
+    ):
         return "degraded", "没有来源明确的阈值，只能列出风险项，不能判通过"
     return "pass", "已评估因素未触发硬约束，且阈值来自已登记来源"
 
@@ -156,7 +158,21 @@ def _extreme(samples, field, how):
     return how(values)
 
 
-def _factor(factor_id, name, effect, critical, *, status, value=None, unit="", threshold=None, threshold_source=None, reason="", hard_failed=False, segment_index=None):
+def _factor(
+    factor_id,
+    name,
+    effect,
+    critical,
+    *,
+    status,
+    value=None,
+    unit="",
+    threshold=None,
+    threshold_source=None,
+    reason="",
+    hard_failed=False,
+    segment_index=None,
+):
     return {
         "id": factor_id,
         "name": name,
@@ -183,7 +199,9 @@ def _catalog_limit(vehicle_key, field):
             continue
         value = vehicle.get(field)
         sources = vehicle.get("sources") or []
-        index = (vehicle.get("field_sources") or {}).get(field if field != "max_payload_kg" else "max_payload_kg")
+        index = (vehicle.get("field_sources") or {}).get(
+            field if field != "max_payload_kg" else "max_payload_kg"
+        )
         if field == "max_wind_mps":
             index = (vehicle.get("field_sources") or {}).get("max_wind_mps")
         if not _finite(value) or value <= 0:
@@ -213,10 +231,7 @@ def _build_factors(weather, query: EnvQuery, thresholds):
     precip = envelope.get("precip_max")
     if precip is None:
         precip = _extreme(samples, "precipitation", max)
-    interior = [
-        (sample.get("values") or {}).get("precipitation")
-        for sample in samples[1:-1]
-    ]
+    interior = [(sample.get("values") or {}).get("precipitation") for sample in samples[1:-1]]
     interior_values = [float(value) for value in interior if _finite(value)]
     ends = []
     if len(samples) >= 2:
@@ -234,14 +249,32 @@ def _build_factors(weather, query: EnvQuery, thresholds):
         unit="mm",
         threshold=precip_threshold,
         threshold_source=precip_source,
-        reason="中段降水高于两端，且没有来源明确的降水阈值" if mid_rain else ("" if precip is not None else "降水缺测"),
+        reason="中段降水高于两端，且没有来源明确的降水阈值"
+        if mid_rain
+        else ("" if precip is not None else "降水缺测"),
         hard_failed=bool(precip_threshold is not None and precip is not None and precip > precip_threshold),
-        segment_index=next((sample.get("index") for sample in samples[1:-1] if _finite((sample.get("values") or {}).get("precipitation")) and (sample.get("values") or {}).get("precipitation") == max(interior_values)), None) if mid_rain else None,
+        segment_index=next(
+            (
+                sample.get("index")
+                for sample in samples[1:-1]
+                if _finite((sample.get("values") or {}).get("precipitation"))
+                and (sample.get("values") or {}).get("precipitation") == max(interior_values)
+            ),
+            None,
+        )
+        if mid_rain
+        else None,
     )
     probability = envelope.get("precip_probability_max")
     if probability is None:
         probability = _extreme(samples, "precipitation_probability", max)
-    add("precipitation_probability_max", status="modeled" if probability is not None else "unavailable", value=probability, unit="%", reason="" if probability is not None else "降水概率缺测")
+    add(
+        "precipitation_probability_max",
+        status="modeled" if probability is not None else "unavailable",
+        value=probability,
+        unit="%",
+        reason="" if probability is not None else "降水概率缺测",
+    )
     visibility = envelope.get("visibility_min")
     if visibility is None:
         visibility = _extreme(samples, "visibility", min)
@@ -260,11 +293,25 @@ def _build_factors(weather, query: EnvQuery, thresholds):
     gust = envelope.get("gust_max")
     if gust is None:
         gust = _extreme(samples, "wind_gusts_10m", max)
-    add("wind_gust_10m_max", status="modeled" if gust is not None else "unavailable", value=gust, unit="m/s", threshold=(thresholds.get("wind_gust_10m_max_mps") or {}).get("value"), threshold_source=(thresholds.get("wind_gust_10m_max_mps") or {}).get("source_ref"), reason="" if gust is not None else "阵风缺测")
+    add(
+        "wind_gust_10m_max",
+        status="modeled" if gust is not None else "unavailable",
+        value=gust,
+        unit="m/s",
+        threshold=(thresholds.get("wind_gust_10m_max_mps") or {}).get("value"),
+        threshold_source=(thresholds.get("wind_gust_10m_max_mps") or {}).get("source_ref"),
+        reason="" if gust is not None else "阵风缺测",
+    )
     wind10 = envelope.get("wind_speed_10m_max")
     if wind10 is None:
         wind10 = _extreme(samples, "wind_speed_10m", max)
-    add("wind_speed_10m_max", status="modeled" if wind10 is not None else "unavailable", value=wind10, unit="m/s", reason="" if wind10 is not None else "10米风速缺测")
+    add(
+        "wind_speed_10m_max",
+        status="modeled" if wind10 is not None else "unavailable",
+        value=wind10,
+        unit="m/s",
+        reason="" if wind10 is not None else "10米风速缺测",
+    )
     wind120 = _extreme(samples, "wind_speed_120m", max)
     add(
         "wind_speed_120m_max",
@@ -284,11 +331,26 @@ def _build_factors(weather, query: EnvQuery, thresholds):
         cross_status = "modeled"
         cross_failed = cross >= float(speed)
         cross_reason = f"侧风 {cross} m/s 与空速 {speed} m/s 比较" if cross_failed else ""
-    add("wind_cross", status=cross_status, value=cross, unit="m/s", threshold=speed, threshold_source=provenance.get("speed_source"), reason=cross_reason, hard_failed=cross_failed)
+    add(
+        "wind_cross",
+        status=cross_status,
+        value=cross,
+        unit="m/s",
+        threshold=speed,
+        threshold_source=provenance.get("speed_source"),
+        reason=cross_reason,
+        hard_failed=cross_failed,
+    )
     cloud = envelope.get("cloud_cover_max")
     if cloud is None:
         cloud = _extreme(samples, "cloud_cover", max)
-    add("cloud_cover_max", status="modeled" if cloud is not None else "unavailable", value=cloud, unit="%", reason="" if cloud is not None else "云量缺测")
+    add(
+        "cloud_cover_max",
+        status="modeled" if cloud is not None else "unavailable",
+        value=cloud,
+        unit="%",
+        reason="" if cloud is not None else "云量缺测",
+    )
     codes = []
     for sample in samples:
         code = (sample.get("values") or {}).get("weather_code")
@@ -301,7 +363,9 @@ def _build_factors(weather, query: EnvQuery, thresholds):
         value=storm if storm is not None else (max(codes) if codes else None),
         unit="WMO",
         threshold_source=WMO_SOURCE if storm is not None else None,
-        reason="Open-Meteo 天气代码表将 95/96/99 标为雷暴" if storm is not None else ("" if codes else "天气代码缺测"),
+        reason="Open-Meteo 天气代码表将 95/96/99 标为雷暴"
+        if storm is not None
+        else ("" if codes else "天气代码缺测"),
         hard_failed=storm is not None,
     )
     for factor_id, field, how, unit in (
@@ -313,27 +377,61 @@ def _build_factors(weather, query: EnvQuery, thresholds):
         ("freezing_level_height_min", "freezing_level_height", min, "m"),
     ):
         value = _extreme(samples, field, how)
-        add(factor_id, status="modeled" if value is not None else "unavailable", value=value, unit=unit, reason="" if value is not None else "该字段缺测")
+        add(
+            factor_id,
+            status="modeled" if value is not None else "unavailable",
+            value=value,
+            unit=unit,
+            reason="" if value is not None else "该字段缺测",
+        )
     add("cloud_base_height", status="not_evaluated", reason="已请求的 hourly 字段没有云底高，不能用云量代替")
     wind_limit = _catalog_limit(query.vehicle_key, "max_wind_mps")
     if wind_limit and gust is not None:
         limit, url = wind_limit
-        add("vehicle_wind_limit", status="modeled", value=gust, unit="m/s", threshold=limit, threshold_source=url, reason="阵风高于厂家公布抗风" if gust > limit else "", hard_failed=gust > limit)
+        add(
+            "vehicle_wind_limit",
+            status="modeled",
+            value=gust,
+            unit="m/s",
+            threshold=limit,
+            threshold_source=url,
+            reason="阵风高于厂家公布抗风" if gust > limit else "",
+            hard_failed=gust > limit,
+        )
     else:
         add("vehicle_wind_limit", status="not_evaluated", reason="没有同时具备的厂家抗风来源和阵风值")
     payload_limit = _catalog_limit(query.vehicle_key, "max_payload_kg")
     if query.payload_kg is not None and payload_limit:
         limit, url = payload_limit
-        add("payload_limit", status="modeled", value=query.payload_kg, unit="kg", threshold=limit, threshold_source=url, reason="载荷高于厂家公布上限" if query.payload_kg > limit else "", hard_failed=query.payload_kg > limit)
+        add(
+            "payload_limit",
+            status="modeled",
+            value=query.payload_kg,
+            unit="kg",
+            threshold=limit,
+            threshold_source=url,
+            reason="载荷高于厂家公布上限" if query.payload_kg > limit else "",
+            hard_failed=query.payload_kg > limit,
+        )
     else:
-        add("payload_limit", status="not_evaluated", reason="未同时提供载荷和有来源的厂家上限，不默认 0 或最大载荷")
+        add(
+            "payload_limit",
+            status="not_evaluated",
+            reason="未同时提供载荷和有来源的厂家上限，不默认 0 或最大载荷",
+        )
     add("vertical_clearance", status="not_evaluated", reason="垂直净空未判定")
     add("diversion_reachability", status="not_evaluated", reason="无备降几何数据，不能据此判不能飞")
     add("airspace_notam", status="not_evaluated", reason="未接入 NOTAM/UOM，需人工核对")
     add("terrain_clearance", status="not_evaluated", reason="地形净空未判定")
     energy = weather.get("energy") or {}
     if _finite(energy.get("energy_wh")):
-        add("energy_wh", status="modeled", value=energy.get("energy_wh"), unit="Wh", reason=energy.get("status") or "")
+        add(
+            "energy_wh",
+            status="modeled",
+            value=energy.get("energy_wh"),
+            unit="Wh",
+            reason=energy.get("status") or "",
+        )
     else:
         add("energy_wh", status="unavailable", reason=energy.get("reason") or "没有标定 Wh/m，未计算能耗")
     ordered = []
@@ -346,7 +444,9 @@ def _build_factors(weather, query: EnvQuery, thresholds):
 def _gaps(factors):
     gaps = []
     for factor in factors:
-        if factor["status"] in {"not_evaluated", "unavailable"} or (factor["effect"] == "hard" and factor["threshold"] is None and factor["status"] == "modeled"):
+        if factor["status"] in {"not_evaluated", "unavailable"} or (
+            factor["effect"] == "hard" and factor["threshold"] is None and factor["status"] == "modeled"
+        ):
             closable = factor["id"] in {"vehicle_wind_limit", "payload_limit", "energy_wh"}
             gaps.append(
                 {
@@ -425,7 +525,14 @@ def assess_route_environment(query: EnvQuery, *, client=None, weather=None, turn
         status = "ok"
     gaps = _gaps(factors)
     if mid_rain and not any(gap["factor"] == "precipitation_max" for gap in gaps):
-        gaps.append({"factor": "precipitation_max", "why": "中段降水高于两端，阈值未登记", "to_close": "补有来源的降水阈值", "closable_in_project": True})
+        gaps.append(
+            {
+                "factor": "precipitation_max",
+                "why": "中段降水高于两端，阈值未登记",
+                "to_close": "补有来源的降水阈值",
+                "closable_in_project": True,
+            }
+        )
     honesty = {
         "checked": len(factors),
         "modeled": sum(factor["status"] == "modeled" for factor in factors),
@@ -439,8 +546,13 @@ def assess_route_environment(query: EnvQuery, *, client=None, weather=None, turn
         "algo": ALGO_VERSION,
         "request": query.model_dump(),
         "verdict": verdict,
-        "factors": [{key: factor[key] for key in ("id", "status", "value", "hard_failed")} for factor in factors],
-        "coverage": {"sample_count": coverage.get("sample_count"), "independent_cells": coverage.get("independent_cells")},
+        "factors": [
+            {key: factor[key] for key in ("id", "status", "value", "hard_failed")} for factor in factors
+        ],
+        "coverage": {
+            "sample_count": coverage.get("sample_count"),
+            "independent_cells": coverage.get("independent_cells"),
+        },
     }
     evidence_id = _evidence_id(digest_body)
     result = {
@@ -465,7 +577,8 @@ def assess_route_environment(query: EnvQuery, *, client=None, weather=None, turn
             "evidence_id": evidence_id,
             "turn_id": turn_id,
             "request": query.model_dump(),
-            "result_digest": "sha256:" + hashlib.sha256(json.dumps(digest_body, default=str, sort_keys=True).encode()).hexdigest(),
+            "result_digest": "sha256:"
+            + hashlib.sha256(json.dumps(digest_body, default=str, sort_keys=True).encode()).hexdigest(),
             "factor_count": len(factors),
             "honesty": honesty,
             "provenance": result["provenance"],
@@ -483,16 +596,25 @@ def get_evidence(evidence_id: str):
 def explain_verdict(evidence_id: str):
     found = get_evidence(evidence_id)
     if found is None:
-        return {"status": "unavailable", "reason": "没有这份 evidence_id，不能重新计算", "evidence_id": evidence_id}
+        return {
+            "status": "unavailable",
+            "reason": "没有这份 evidence_id，不能重新计算",
+            "evidence_id": evidence_id,
+        }
     drivers = [
-        factor for factor in found["factors"] if factor.get("hard_failed") or factor["id"] == "precipitation_max" and found["constraints"].get("mid_route_precipitation")
+        factor
+        for factor in found["factors"]
+        if factor.get("hard_failed")
+        or factor["id"] == "precipitation_max"
+        and found["constraints"].get("mid_route_precipitation")
     ]
     if not drivers:
         drivers = [factor for factor in found["factors"] if factor["status"] != "modeled"][:3]
     not_reason = [
         factor["id"]
         for factor in found["factors"]
-        if factor["id"] not in {item["id"] for item in drivers} and factor["id"] in {"wind_cross", "visibility_min", "wind_gust_10m_max"}
+        if factor["id"] not in {item["id"] for item in drivers}
+        and factor["id"] in {"wind_cross", "visibility_min", "wind_gust_10m_max"}
     ]
     return {
         "status": "ok",
@@ -513,7 +635,12 @@ def list_environment_gaps(evidence_id: str | None = None):
         return {"status": "unavailable", "reason": "没有可解释的环境判定", "gaps": []}
     counts = {"data_missing": 0, "no_model": 0, "manual_required": 0}
     for gap in gaps:
-        if gap["factor"] in {"airspace_notam", "terrain_clearance", "vertical_clearance", "diversion_reachability"}:
+        if gap["factor"] in {
+            "airspace_notam",
+            "terrain_clearance",
+            "vertical_clearance",
+            "diversion_reachability",
+        }:
             counts["manual_required"] += 1
         elif gap["factor"] in {"cloud_base_height"}:
             counts["no_model"] += 1

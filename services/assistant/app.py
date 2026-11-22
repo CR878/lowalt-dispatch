@@ -377,9 +377,14 @@ async def turn(request: Request):
                 }
             )
             telemetry_path = os.environ.get("AERIS_TELEMETRY_FILE")
-            result = engine.run(value, emit, read_dispatch_task=read_dispatch_task,
-                                actor_id=request.state.actor_id, cancelled=stopped.is_set,
-                                read_live_telemetry=lambda: read_latest(Path(telemetry_path)) if telemetry_path else None)
+            result = engine.run(
+                value,
+                emit,
+                read_dispatch_task=read_dispatch_task,
+                actor_id=request.state.actor_id,
+                cancelled=stopped.is_set,
+                read_live_telemetry=lambda: read_latest(Path(telemetry_path)) if telemetry_path else None,
+            )
             write_audit(
                 {
                     "turn_id": str(value.request_id),

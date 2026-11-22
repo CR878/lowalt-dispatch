@@ -67,8 +67,7 @@ def forced_disclosure(results: dict) -> str:
     gaps = env.get("gaps") if isinstance(env, dict) else []
     count = len(gaps or [])
     first = (gaps or [{}])[0].get("factor", "未列出")
-    word = {"unknown": "未知", "blocked": "blocked", "degraded": "degraded", "pass": "pass"}.get(verdict, verdict)
-    return (
-        f"补充：本轮环境判定为 `{word}`，另有 {count} 项未完全判定（首项 {first}）。"
-        "本回复不构成飞行批准。"
+    word = {"unknown": "未知", "blocked": "blocked", "degraded": "degraded", "pass": "pass"}.get(
+        verdict, verdict
     )
+    return f"补充：本轮环境判定为 `{word}`，另有 {count} 项未完全判定（首项 {first}）。本回复不构成飞行批准。"

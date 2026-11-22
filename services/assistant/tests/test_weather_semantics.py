@@ -13,7 +13,8 @@ def _series(start="2026-11-18T12:00:00+00:00", hours=4):
     instant = datetime.fromisoformat(start)
     hourly = {field: [0.0] * hours for field in evidence.HOURLY_FIELDS}
     hourly["time"] = [
-        (instant + timedelta(hours=i)).replace(tzinfo=None).isoformat(timespec="minutes") for i in range(hours)
+        (instant + timedelta(hours=i)).replace(tzinfo=None).isoformat(timespec="minutes")
+        for i in range(hours)
     ]
     hourly.update(
         {
@@ -99,7 +100,9 @@ def test_t15_interval_quantities_are_not_split_across_the_hour():
     missing = _series(hours=2)
     missing["hourly"]["precipitation"] = [0.0, None]
     missing["hourly"]["wind_speed_80m"] = [None, None]
-    unresolved = evidence.interpolate_forecast({"hourly": missing["hourly"], "utc_offset_seconds": 0}, _at(12, 30))
+    unresolved = evidence.interpolate_forecast(
+        {"hourly": missing["hourly"], "utc_offset_seconds": 0}, _at(12, 30)
+    )
     assert unresolved["precipitation"] is None
     assert unresolved["wind_speed_80m"] is None
     assert unresolved["wind_speed_10m"] == 0.0
@@ -162,7 +165,9 @@ def test_batch_uses_two_forecast_days_and_rejects_a_length_mismatch():
         return httpx.Response(200, json=[_series()])
 
     with httpx.Client(transport=httpx.MockTransport(short_count)) as client:
-        mismatched = evidence.fetch_weather_batch([31.2, 31.3], [121.4, 121.5], "2026-11-18T12:30:00Z", client=client)
+        mismatched = evidence.fetch_weather_batch(
+            [31.2, 31.3], [121.4, 121.5], "2026-11-18T12:30:00Z", client=client
+        )
     assert all(item["status"] == "unavailable" for item in mismatched)
 
 

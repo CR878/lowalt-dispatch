@@ -40,7 +40,9 @@ PRECISION_NOTE = (
 )
 MAX_ETA_ITERATIONS = 5
 ETA_CONVERGENCE_S = 5.0
-SENSITIVITY_NOTE = "wind_sensitivity 固定航向 90° 只是演示假设，不是本航线各段真实 bearing，不作为航线判定输入。"
+SENSITIVITY_NOTE = (
+    "wind_sensitivity 固定航向 90° 只是演示假设，不是本航线各段真实 bearing，不作为航线判定输入。"
+)
 
 
 def _distance(a, b):
@@ -356,7 +358,12 @@ def _select_wind(values):
     if not isinstance(values, dict):
         return None
     if _valid_wind_pair(values.get("wind_speed_120m"), values.get("wind_direction_120m")):
-        return float(values["wind_speed_120m"]), float(values["wind_direction_120m"]), "wind_speed_120m", False
+        return (
+            float(values["wind_speed_120m"]),
+            float(values["wind_direction_120m"]),
+            "wind_speed_120m",
+            False,
+        )
     if _valid_wind_pair(values.get("wind_speed_10m"), values.get("wind_direction_10m")):
         return float(values["wind_speed_10m"]), float(values["wind_direction_10m"]), "surface_10m", True
     return None
@@ -417,7 +424,11 @@ def _resolve_speed(vehicle_key, custom_vehicle, assumed_airspeed_mps, profile):
                 "speed_source": "caller:custom_vehicle.cruise_speed_mps",
                 "reason": "调用方给出了测试空速，不是标定空速，也不是厂家参考速度。",
             }
-    if profile is not None and isinstance(profile.cruise_speed_mps, (int, float)) and profile.cruise_speed_mps > 0:
+    if (
+        profile is not None
+        and isinstance(profile.cruise_speed_mps, (int, float))
+        and profile.cruise_speed_mps > 0
+    ):
         return {
             "speed_mps": float(profile.cruise_speed_mps),
             "time_basis": "calibrated_airspeed",
@@ -501,7 +512,9 @@ def estimate_arrival_times(samples, forecasts, departure, speed_mps):
                 {
                     "index": index,
                     "wind_adjusted": True,
-                    "vertical_wind_source": "surface_10m" if any(item[3] for item in selected) else "wind_speed_120m",
+                    "vertical_wind_source": "surface_10m"
+                    if any(item[3] for item in selected)
+                    else "wind_speed_120m",
                     "crosswind_mps": max(_crosswind_mps(item[0], item[1], bearing) for item in selected),
                 }
             )
@@ -538,13 +551,21 @@ def leg_envelopes(samples, point_values, forecasts, etas):
         observed = []
         if etas[index] is not None and etas[index + 1] is not None:
             observed.extend(_leg_observed(forecasts[index : index + 2], etas[index], etas[index + 1]))
-        observed.extend(row for row in (point_values[index], point_values[index + 1]) if isinstance(row, dict))
+        observed.extend(
+            row for row in (point_values[index], point_values[index + 1]) if isinstance(row, dict)
+        )
         envelope = safety_envelope(observed)
-        selected = [item for item in (_select_wind(point_values[index]), _select_wind(point_values[index + 1])) if item]
+        selected = [
+            item
+            for item in (_select_wind(point_values[index]), _select_wind(point_values[index + 1]))
+            if item
+        ]
         envelope["crosswind_max"] = (
             max(_crosswind_mps(item[0], item[1], bearing) for item in selected) if selected else None
         )
-        envelope["weather_codes"] = [row["weather_code"] for row in observed if _finite(row.get("weather_code"))]
+        envelope["weather_codes"] = [
+            row["weather_code"] for row in observed if _finite(row.get("weather_code"))
+        ]
         envelope["weather_code_worst"] = None
         envelope["weather_code_worst_reason"] = "没有来源支持的天气代码严重度排序，不把代码编成最不利等级"
         clouds = [float(row["cloud_cover"]) for row in observed if _finite(row.get("cloud_cover"))]
@@ -560,7 +581,9 @@ def leg_envelopes(samples, point_values, forecasts, etas):
             efficiency.update(
                 wind_vector_mean_mps=speed,
                 wind_from_deg=direction,
-                vertical_wind_source="surface_10m" if any(item[3] for item in selected) else "wind_speed_120m",
+                vertical_wind_source="surface_10m"
+                if any(item[3] for item in selected)
+                else "wind_speed_120m",
                 degraded=any(item[3] for item in selected),
             )
         ends = [point_values[index], point_values[index + 1]]
@@ -593,7 +616,9 @@ def _valid_model_point(point) -> bool:
 
 
 def _coverage(samples, length_m):
-    present = [sample.get("model_point") for sample in samples if _valid_model_point(sample.get("model_point"))]
+    present = [
+        sample.get("model_point") for sample in samples if _valid_model_point(sample.get("model_point"))
+    ]
     if not present:
         cells = None
         spacing_km = None
@@ -724,7 +749,9 @@ def assess_route_weather(
         ]
     if len(forecasts) != len(arc_samples):
         forecasts = [
-            evidence.unavailable_weather("气象批量结果数量与采样点不一致，未填任何数值", departure.isoformat())
+            evidence.unavailable_weather(
+                "气象批量结果数量与采样点不一致，未填任何数值", departure.isoformat()
+            )
             for _ in arc_samples
         ]
     profile, profile_reason = _load_real_profile(vehicle_key)
@@ -751,7 +778,13 @@ def assess_route_weather(
         selected = _select_wind(values)
         covered = selected is not None
         over, over_reason = _over_building(sample["point"], obstacles)
-        role = "origin" if sample["index"] == 0 else "destination" if sample["index"] == len(arc_samples) - 1 else "along_track"
+        role = (
+            "origin"
+            if sample["index"] == 0
+            else "destination"
+            if sample["index"] == len(arc_samples) - 1
+            else "along_track"
+        )
         reason = ""
         if eta is None:
             reason = "无可用空速，未估算到达时刻，未用起飞时刻代替"
@@ -766,7 +799,9 @@ def assess_route_weather(
                 "s_m": truncate_reported(sample["s_m"], 1),
                 "eta": eta.isoformat() if eta is not None else None,
                 "point": [sample["point"][0], sample["point"][1]],
-                "model_point": forecast.get("model_point") if _valid_model_point(forecast.get("model_point")) else None,
+                "model_point": forecast.get("model_point")
+                if _valid_model_point(forecast.get("model_point"))
+                else None,
                 "model": forecast.get("model"),
                 "over_building": over,
                 "over_building_reason": over_reason,
@@ -844,21 +879,32 @@ def assess_route_weather(
         "honesty": {
             "factor_matrix": "not_evaluated",
             "environment_verdict": "not_evaluated",
-            "eta": "evaluated" if speed_info is not None and eta_meta["infeasible"] is None else "unavailable",
+            "eta": "evaluated"
+            if speed_info is not None and eta_meta["infeasible"] is None
+            else "unavailable",
             "note": "P2 因素矩阵和 verdict 引擎未实现，因此不会给出 pass。",
         },
         "gaps": [],
         "route_legs": legs,
     }
     if speed_info is None:
-        result["gaps"].append({"item": "eta", "reason": "没有标定空速、有来源的厂家参考速度，也没有调用方显式给出的假设空速。不编造空速。"})
+        result["gaps"].append(
+            {
+                "item": "eta",
+                "reason": "没有标定空速、有来源的厂家参考速度，也没有调用方显式给出的假设空速。不编造空速。",
+            }
+        )
         result["reason"] = result["gaps"][0]["reason"]
         warnings.append(profile_reason)
     elif speed_info["degraded"]:
         result["gaps"].append({"item": "time_basis", "reason": speed_info["reason"]})
         warnings.append(speed_info["reason"])
     if eta_meta["infeasible"]:
-        status = "infeasible" if ("侧风" in eta_meta["infeasible"] or "逆风" in eta_meta["infeasible"]) else "unavailable"
+        status = (
+            "infeasible"
+            if ("侧风" in eta_meta["infeasible"] or "逆风" in eta_meta["infeasible"])
+            else "unavailable"
+        )
         result["energy"] = result["flight_feasibility"] = {"status": status, "reason": eta_meta["infeasible"]}
         result["constraints_evaluated"] = "wind_triangle_only"
         warnings.append(eta_meta["infeasible"])
@@ -867,7 +913,11 @@ def assess_route_weather(
         warnings.append("部分采样点没有覆盖其到达时刻的预报；未外推，未把缺测填成 0。")
         result["reason"] = "至少一个采样点的到达时刻预报不可用。"
     if speed_info is None or profile is None or not _finite(getattr(profile, "energy_per_meter_wh", None)):
-        reason = profile_reason if speed_info is None or profile is None else "有到达时刻可用的速度，但没有标定或调用方给出的 Wh/m，未计算能耗。"
+        reason = (
+            profile_reason
+            if speed_info is None or profile is None
+            else "有到达时刻可用的速度，但没有标定或调用方给出的 Wh/m，未计算能耗。"
+        )
         if speed_info is not None and profile is None:
             reason = profile_reason or speed_info["reason"]
         result["energy"] = {"status": "unavailable", "reason": reason}
@@ -875,14 +925,25 @@ def assess_route_weather(
         if reason:
             warnings.append(reason)
         return result
-    if not weather_ok or any(not note.get("wind_adjusted") for note in eta_meta["segment_notes"] if note.get("reason") != "零长度段"):
-        result["energy"] = {"status": "unavailable", "reason": "有采样点缺少可用于风三角的风，未用零风计算能耗。"}
+    if not weather_ok or any(
+        not note.get("wind_adjusted")
+        for note in eta_meta["segment_notes"]
+        if note.get("reason") != "零长度段"
+    ):
+        result["energy"] = {
+            "status": "unavailable",
+            "reason": "有采样点缺少可用于风三角的风，未用零风计算能耗。",
+        }
         result["flight_feasibility"] = result["energy"]
         return result
     try:
         duration = energy = 0.0
         timed_legs = []
-        for leg, _note in zip(legs, (item for item in eta_meta["segment_notes"] if item.get("reason") != "零长度段"), strict=True):
+        for leg, _note in zip(
+            legs,
+            (item for item in eta_meta["segment_notes"] if item.get("reason") != "零长度段"),
+            strict=True,
+        ):
             distance = arc_samples[leg["index"] + 1]["s_m"] - arc_samples[leg["index"]]["s_m"]
             metrics = wind_leg_energy_wh(
                 profile,

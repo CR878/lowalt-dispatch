@@ -25,12 +25,30 @@ def test_property_sample_count_does_not_shrink_when_length_grows(monkeypatch):
 
 def test_property_worse_or_equal_verdict_rank():
     base, _ = decide_verdict(
-        [{"id": "cloud", "status": "modeled", "effect": "info", "critical": False, "hard_failed": False, "threshold": None}],
+        [
+            {
+                "id": "cloud",
+                "status": "modeled",
+                "effect": "info",
+                "critical": False,
+                "hard_failed": False,
+                "threshold": None,
+            }
+        ],
         {"independent_cells": 5},
         thresholds_all_null=True,
     )
     worse, _ = decide_verdict(
-        [{"id": "wind_cross", "status": "modeled", "effect": "hard", "critical": True, "hard_failed": True, "threshold": 1}],
+        [
+            {
+                "id": "wind_cross",
+                "status": "modeled",
+                "effect": "hard",
+                "critical": True,
+                "hard_failed": True,
+                "threshold": 1,
+            }
+        ],
         {"independent_cells": 5},
         thresholds_all_null=True,
     )
@@ -40,7 +58,16 @@ def test_property_worse_or_equal_verdict_rank():
 
 def test_property_hard_failed_is_blocked():
     verdict, _reason = decide_verdict(
-        [{"id": "weather_code_max", "status": "modeled", "effect": "hard", "critical": True, "hard_failed": True, "threshold": None}],
+        [
+            {
+                "id": "weather_code_max",
+                "status": "modeled",
+                "effect": "hard",
+                "critical": True,
+                "hard_failed": True,
+                "threshold": None,
+            }
+        ],
         {"independent_cells": 5},
         thresholds_all_null=False,
     )

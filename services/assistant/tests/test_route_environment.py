@@ -88,7 +88,11 @@ def _weather(precips, codes=None, cells=4, cross=2.0, speed=12.0, statuses=None)
 
 
 def _query(**kwargs):
-    base = {"origin": (121.30, 31.20), "destination": (121.36, 31.20), "scheduled_for": "2026-11-22T08:00:00+00:00"}
+    base = {
+        "origin": (121.30, 31.20),
+        "destination": (121.36, 31.20),
+        "scheduled_for": "2026-11-22T08:00:00+00:00",
+    }
     base.update(kwargs)
     return EnvQuery(**base)
 
@@ -190,10 +194,24 @@ def test_landing_sites_unavailable_does_not_block():
 
 
 def test_honesty_catches_forbidden_phrase_and_unsourced_number():
-    results = {"assess_route_environment": {"verdict": "degraded", "gaps": [{"factor": "cloud_base_height"}], "factors": []}}
+    results = {
+        "assess_route_environment": {
+            "verdict": "degraded",
+            "gaps": [{"factor": "cloud_base_height"}],
+            "factors": [],
+        }
+    }
     assert verify_response_honesty("已充分考虑，可以飞", results, asked_flight_feasibility=True)
-    assert any(item.startswith("unsourced_number") for item in verify_response_honesty("风速 12 m/s", results, asked_flight_feasibility=False))
-    assert verify_response_honesty("环境判定为 degraded，另有 1 项未判定。", results, asked_flight_feasibility=False) == []
+    assert any(
+        item.startswith("unsourced_number")
+        for item in verify_response_honesty("风速 12 m/s", results, asked_flight_feasibility=False)
+    )
+    assert (
+        verify_response_honesty(
+            "环境判定为 degraded，另有 1 项未判定。", results, asked_flight_feasibility=False
+        )
+        == []
+    )
 
 
 def test_query_rejects_nan_far_and_dateline():
@@ -207,11 +225,22 @@ def test_query_rejects_nan_far_and_dateline():
 
 def test_pass_is_unreachable_without_a_sourced_threshold():
     factors = [
-        {"id": "precipitation_max", "status": "modeled", "effect": "info", "critical": False, "hard_failed": False, "threshold": None}
+        {
+            "id": "precipitation_max",
+            "status": "modeled",
+            "effect": "info",
+            "critical": False,
+            "hard_failed": False,
+            "threshold": None,
+        }
     ]
-    verdict, _reason = decide_verdict(factors, {"independent_cells": 5}, thresholds_all_null=True, weather_unavailable=False)
+    verdict, _reason = decide_verdict(
+        factors, {"independent_cells": 5}, thresholds_all_null=True, weather_unavailable=False
+    )
     assert verdict == "degraded"
-    allowed, _reason = decide_verdict(factors, {"independent_cells": 5}, thresholds_all_null=False, weather_unavailable=False)
+    allowed, _reason = decide_verdict(
+        factors, {"independent_cells": 5}, thresholds_all_null=False, weather_unavailable=False
+    )
     assert allowed == "pass"
 
 
@@ -231,13 +260,49 @@ def test_pass_is_unreachable_without_a_sourced_threshold():
 def test_verdict_matrix_rows(label, kwargs, expect):
     factors = []
     if kwargs.get("hard"):
-        factors.append({"id": "wind_cross", "status": "modeled", "effect": "hard", "critical": True, "hard_failed": True, "threshold": 1})
+        factors.append(
+            {
+                "id": "wind_cross",
+                "status": "modeled",
+                "effect": "hard",
+                "critical": True,
+                "hard_failed": True,
+                "threshold": 1,
+            }
+        )
     if kwargs.get("critical"):
-        factors.append({"id": "visibility_min", "status": "not_evaluated", "effect": "hard", "critical": True, "hard_failed": False, "threshold": None})
+        factors.append(
+            {
+                "id": "visibility_min",
+                "status": "not_evaluated",
+                "effect": "hard",
+                "critical": True,
+                "hard_failed": False,
+                "threshold": None,
+            }
+        )
     if kwargs.get("unavailable"):
-        factors.append({"id": "energy_wh", "status": "unavailable", "effect": "info", "critical": False, "hard_failed": False, "threshold": None})
+        factors.append(
+            {
+                "id": "energy_wh",
+                "status": "unavailable",
+                "effect": "info",
+                "critical": False,
+                "hard_failed": False,
+                "threshold": None,
+            }
+        )
     if not factors:
-        factors.append({"id": "cloud_cover_max", "status": "modeled", "effect": "info", "critical": False, "hard_failed": False, "threshold": 1})
+        factors.append(
+            {
+                "id": "cloud_cover_max",
+                "status": "modeled",
+                "effect": "info",
+                "critical": False,
+                "hard_failed": False,
+                "threshold": 1,
+            }
+        )
     verdict, _reason = decide_verdict(
         factors,
         {"independent_cells": kwargs.get("cells", 4)},

@@ -118,7 +118,14 @@ class TimeWindowBlock(Block):
 
 
 UIBlock = Annotated[
-    MetricsBlock | ChartBlock | TableBlock | TimelineBlock | RouteBlock | EnvMatrixBlock | GapsBlock | TimeWindowBlock,
+    MetricsBlock
+    | ChartBlock
+    | TableBlock
+    | TimelineBlock
+    | RouteBlock
+    | EnvMatrixBlock
+    | GapsBlock
+    | TimeWindowBlock,
     Field(discriminator="type"),
 ]
 
@@ -266,9 +273,13 @@ def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
                         id=factor["id"],
                         name=factor["name"],
                         status=factor["status"],
-                        value=factor.get("value") if isinstance(factor.get("value"), (int, float, str)) or factor.get("value") is None else str(factor.get("value")),
+                        value=factor.get("value")
+                        if isinstance(factor.get("value"), (int, float, str)) or factor.get("value") is None
+                        else str(factor.get("value")),
                         unit=factor.get("unit") or "",
-                        threshold=factor.get("threshold") if isinstance(factor.get("threshold"), (int, float)) else None,
+                        threshold=factor.get("threshold")
+                        if isinstance(factor.get("threshold"), (int, float))
+                        else None,
                         threshold_source=factor.get("threshold_source"),
                         effect=factor.get("effect") or "info",
                         segment_index=factor.get("segment_index"),
@@ -276,7 +287,9 @@ def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
                     )
                     for factor in env["factors"][:40]
                 ],
-                coverage_statement=(env.get("coverage") or {}).get("statement") or env.get("verdict_reason") or "",
+                coverage_statement=(env.get("coverage") or {}).get("statement")
+                or env.get("verdict_reason")
+                or "",
                 evidence_id=env["evidence_id"],
                 note="unknown、not_evaluated、unavailable 不是通过。",
             )
@@ -313,6 +326,9 @@ def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
                 note="不推荐最佳起飞时间。",
             )
         )
-    ordered = [*priority, *[block for block in blocks if block.type not in {"env_matrix", "gaps", "time_window"}]]
+    ordered = [
+        *priority,
+        *[block for block in blocks if block.type not in {"env_matrix", "gaps", "time_window"}],
+    ]
     version = 2 if any(block.type in {"env_matrix", "gaps", "time_window"} for block in ordered) else 1
     return Presentation(version=version, blocks=ordered[:6])

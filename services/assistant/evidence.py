@@ -75,9 +75,13 @@ WEEKDAYS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6
 
 def _clock(text: str) -> tuple[int, int] | None:
     number = r"[零一二三四五六七八九十两\d]{1,3}"
-    match = re.search(rf"(凌晨|早上|上午|中午|下午|晚上)?\s*({number})(?:[:：](\d{{2}})|[点时](?:({number})分?)?(半)?)", text)
+    match = re.search(
+        rf"(凌晨|早上|上午|中午|下午|晚上)?\s*({number})(?:[:：](\d{{2}})|[点时](?:({number})分?)?(半)?)",
+        text,
+    )
     if not match:
         return None
+
     def integer(token):
         if not token:
             return 0
@@ -89,6 +93,7 @@ def _clock(text: str) -> tuple[int, int] | None:
             tens, ones = token.split("十", 1)
             return (digits.get(tens, 1) * 10) + digits.get(ones, 0)
         return digits[token]
+
     hour = integer(match[2])
     minute = 30 if match[5] else integer(match[3] or match[4])
     period = match[1]
@@ -242,7 +247,11 @@ def forecast_times(forecast: dict) -> list[datetime]:
         raise ValueError("hourly must be an object")
     offset = timezone(timedelta(seconds=float(forecast.get("utc_offset_seconds", 0))))
     raw_times = hourly.get("time")
-    if not isinstance(raw_times, list) or not raw_times or not all(isinstance(item, str) for item in raw_times):
+    if (
+        not isinstance(raw_times, list)
+        or not raw_times
+        or not all(isinstance(item, str) for item in raw_times)
+    ):
         raise ValueError("hourly timestamps must be a nonempty list of ISO strings")
     times = []
     for raw in raw_times:
@@ -348,13 +357,21 @@ def _hourly_arrays_match(hourly: dict) -> bool:
 
 
 def _aware_target(scheduled_for: str | None) -> datetime:
-    target = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00")) if scheduled_for else datetime.now(LOCAL_TZ)
+    target = (
+        datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
+        if scheduled_for
+        else datetime.now(LOCAL_TZ)
+    )
     target = target.replace(tzinfo=LOCAL_TZ) if target.tzinfo is None else target
     return target
 
 
 def _valid_point(latitude: float, longitude: float) -> bool:
-    return all(math.isfinite(value) for value in (latitude, longitude)) and -90 <= latitude <= 90 and -180 <= longitude <= 180
+    return (
+        all(math.isfinite(value) for value in (latitude, longitude))
+        and -90 <= latitude <= 90
+        and -180 <= longitude <= 180
+    )
 
 
 def _forecast_note() -> str:
@@ -365,7 +382,16 @@ def _forecast_note() -> str:
     )
 
 
-def _result_from_payload(payload: dict, latitude: float, longitude: float, target: datetime, scheduled_for, *, include_hourly: bool, forecast_days: int) -> dict:
+def _result_from_payload(
+    payload: dict,
+    latitude: float,
+    longitude: float,
+    target: datetime,
+    scheduled_for,
+    *,
+    include_hourly: bool,
+    forecast_days: int,
+) -> dict:
     hourly = payload.get("hourly") or {}
     if not isinstance(payload, dict) or not isinstance(hourly, dict) or not _hourly_arrays_match(hourly):
         return unavailable_weather("气象服务逐时数组长度不一致或格式无效，整段结果不可用", scheduled_for)
@@ -373,7 +399,9 @@ def _result_from_payload(payload: dict, latitude: float, longitude: float, targe
     try:
         values = values_at(forecast, target)
     except (ValueError, TypeError, OverflowError):
-        return unavailable_weather(f"预报窗口（最多{forecast_days}天）不覆盖该时刻或逐时数据无效", scheduled_for)
+        return unavailable_weather(
+            f"预报窗口（最多{forecast_days}天）不覆盖该时刻或逐时数据无效", scheduled_for
+        )
     omitted = _omitted_fields(hourly)
     note = _forecast_note()
     if omitted:
@@ -505,7 +533,11 @@ def fetch_weather_forecast(
 def _chunk_payloads(payload, count: int) -> list[dict] | None:
     if count == 1 and isinstance(payload, dict):
         return [payload]
-    if not isinstance(payload, list) or len(payload) != count or not all(isinstance(item, dict) for item in payload):
+    if (
+        not isinstance(payload, list)
+        or len(payload) != count
+        or not all(isinstance(item, dict) for item in payload)
+    ):
         return None
     return payload
 
@@ -644,10 +676,16 @@ def fetch_weather_batch(
     latitudes = list(latitudes)
     longitudes = list(longitudes)
     count = max(len(latitudes), len(longitudes))
-    if not isinstance(batch_size, int) or isinstance(batch_size, bool) or not 1 <= batch_size <= BATCH_POINT_LIMIT:
+    if (
+        not isinstance(batch_size, int)
+        or isinstance(batch_size, bool)
+        or not 1 <= batch_size <= BATCH_POINT_LIMIT
+    ):
         batch_size = BATCH_POINT_LIMIT
     if len(latitudes) != len(longitudes) or count == 0:
-        return [unavailable_weather("批量坐标数量不一致，未请求气象", scheduled_for) for _ in range(count or 1)]
+        return [
+            unavailable_weather("批量坐标数量不一致，未请求气象", scheduled_for) for _ in range(count or 1)
+        ]
     try:
         target = _aware_target(scheduled_for)
         if not isinstance(forecast_days, int) or isinstance(forecast_days, bool) or forecast_days < 1:

@@ -477,9 +477,7 @@ def test_background_route_fills_the_intake_after_creation(tmp_path, monkeypatch)
         time.sleep(0.05)
         return {"status": "ok", "waypoints": [], "length_m": 12345.0, "reason": None}
 
-    toolset = tools.Toolset(
-        make_turn(), real_route_provider=slow_provider, route_background=True
-    )
+    toolset = tools.Toolset(make_turn(), real_route_provider=slow_provider, route_background=True)
     result = toolset.execute(
         "create_task_intake",
         {
@@ -540,9 +538,15 @@ def test_maas_mode_requires_the_confirmation_card_before_writing(tmp_path, monke
     assert first["draft_values"]["payload_kg"] == 3.0
 
     from services.assistant.intake import IntakeConfirmation
-    toolset.turn.confirmation = IntakeConfirmation.model_validate(args | {
-        "confirmation_id": str(uuid4()), "origin_point": [115.83, 28.76], "destination_point": [115.82, 28.65],
-    })
+
+    toolset.turn.confirmation = IntakeConfirmation.model_validate(
+        args
+        | {
+            "confirmation_id": str(uuid4()),
+            "origin_point": [115.83, 28.76],
+            "destination_point": [115.82, 28.65],
+        }
+    )
     confirmed = toolset.execute(
         "create_task_intake",
         args | {"text": "确认建单：起点 江西农业大学，终点 南昌航空大学，按这些建任务"},
@@ -577,7 +581,9 @@ def test_intake_overview_returns_real_chart_series(tmp_path, monkeypatch):
     pending = TaskIntake.build(
         IntakeCreate(text="C→D", origin="C", destination="D", payload_kg=1.5),
         origin=PlaceEvidence(name="C", point=[115.8, 28.7], crs="EPSG:4326", source="t", is_simulated=False),
-        destination=PlaceEvidence(name="D", point=[115.81, 28.69], crs="EPSG:4326", source="t", is_simulated=False),
+        destination=PlaceEvidence(
+            name="D", point=[115.81, 28.69], crs="EPSG:4326", source="t", is_simulated=False
+        ),
         weather=WeatherEvidence(),
         airspace={"status": "draft"},
         route_preview=None,

@@ -21,9 +21,18 @@ def _blocked(factors):
 
 
 def main() -> int:
-    original = _blocked([
-        {"id": "wind_cross", "status": "modeled", "effect": "hard", "critical": True, "hard_failed": True, "threshold": 1}
-    ])
+    original = _blocked(
+        [
+            {
+                "id": "wind_cross",
+                "status": "modeled",
+                "effect": "hard",
+                "critical": True,
+                "hard_failed": True,
+                "threshold": 1,
+            }
+        ]
+    )
     killed = []
     survived = []
     # M3: a blocked decision must not be reported as pass.

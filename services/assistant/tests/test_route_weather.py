@@ -98,9 +98,7 @@ def test_unscheduled_forecast_uses_now_not_midnight():
     start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
     payload = forecast_payload(start.isoformat())
     payload["hourly"]["temperature_2m"] = list(range(12))
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(payload))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(payload))) as client:
         result = evidence.fetch_weather_forecast(31.2, 121.4, client=client)
     assert result["status"] == "ok"
     assert abs((datetime.fromisoformat(result["valid_for"]) - now).total_seconds()) < 5
@@ -119,9 +117,7 @@ def test_unscheduled_forecast_uses_now_not_midnight():
     ],
 )
 def test_malformed_forecast_is_unavailable(payload):
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(payload))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(payload))) as client:
         result = evidence.fetch_weather_forecast(31.2, 121.4, "2026-11-18T00:00:00Z", client=client)
     assert result["status"] == "unavailable"
     assert result["values"] == {}
@@ -129,9 +125,7 @@ def test_malformed_forecast_is_unavailable(payload):
 
 @pytest.mark.parametrize("when", ["2026-11-17T23:59:00Z", "2026-12-30T08:00:00+08:00", "bad-date"])
 def test_forecast_never_extrapolates(when):
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(forecast_payload()))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(forecast_payload()))) as client:
         result = evidence.fetch_weather_forecast(31.2, 121.4, when, client=client)
     assert result["status"] == "unavailable"
     assert result["values"] == {}
@@ -173,9 +167,7 @@ def test_temperature_and_humidity_change_density_and_induced_power():
 
 
 def test_weather_without_real_vehicle_never_invents_eta_or_power():
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(forecast_payload()))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(forecast_payload()))) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)], "2026-11-18T08:00:00+08:00", client=client
         )
@@ -195,9 +187,7 @@ def test_missing_forecast_wind_never_assumes_calm(monkeypatch):
     payload = forecast_payload()
     for field in ("wind_speed_10m", "wind_direction_10m", "wind_speed_120m", "wind_direction_120m"):
         payload["hourly"][field] = [None] * 12
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(payload))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(payload))) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)],
             "2026-11-18T08:00:00+08:00",
@@ -217,9 +207,7 @@ def test_invalid_wind_is_not_normalized_into_valid_evidence(field, invalid, monk
     payload["hourly"][field] = [invalid] * 12
     paired = "wind_speed_120m" if "speed" in field else "wind_direction_120m"
     payload["hourly"][paired] = [invalid] * 12
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(payload))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(payload))) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)],
             "2026-11-18T08:00:00+08:00",
@@ -232,9 +220,7 @@ def test_invalid_wind_is_not_normalized_into_valid_evidence(field, invalid, monk
 
 def test_calibrated_profile_interpolates_leg_times_and_returns_sensitivity(monkeypatch):
     monkeypatch.setattr(route_weather, "_load_real_profile", lambda key: (calibrated_test_profile(), ""))
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(forecast_payload()))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(forecast_payload()))) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)],
             "2026-11-18T08:00:00+08:00",
@@ -254,9 +240,7 @@ def test_calibrated_profile_interpolates_leg_times_and_returns_sensitivity(monke
 def test_wind_prevents_flight_with_calibrated_profile(monkeypatch):
     monkeypatch.setattr(route_weather, "_load_real_profile", lambda key: (calibrated_test_profile(), ""))
     with httpx.Client(
-        transport=httpx.MockTransport(
-            as_batch(forecast_payload(speed=20, direction=90))
-        )
+        transport=httpx.MockTransport(as_batch(forecast_payload(speed=20, direction=90)))
     ) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)],
@@ -286,9 +270,7 @@ def test_manual_energy_with_real_forecast_is_labeled_user_test():
         usable_battery_wh=100,
         reserve_policy_wh=20,
     )
-    with httpx.Client(
-        transport=httpx.MockTransport(as_batch(forecast_payload()))
-    ) as client:
+    with httpx.Client(transport=httpx.MockTransport(as_batch(forecast_payload()))) as client:
         result = route_weather.assess_route_weather(
             [(121.3, 31.2), (121.6, 31.2)], "2026-11-18T08:00:00+08:00", custom_vehicle=profile, client=client
         )

@@ -17,20 +17,38 @@ def _run(command: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the acceptance gate that does not pretend network success")
+    parser = argparse.ArgumentParser(
+        description="Run the acceptance gate that does not pretend network success"
+    )
     parser.add_argument("--level", choices=("fast", "default", "all"), default="default")
     parser.add_argument("--scope", choices=("all", "env"), default="all")
     args = parser.parse_args(argv)
     code = _run([sys.executable, "-m", "compileall", "-q", "services/assistant", "tools"])
     if code:
         return 1
-    target = ["services/assistant/tests/test_route_environment.py"] if args.scope == "env" else ["services/assistant/tests"]
+    target = (
+        ["services/assistant/tests/test_route_environment.py"]
+        if args.scope == "env"
+        else ["services/assistant/tests"]
+    )
     marker = "fast and not live" if args.level == "fast" else "not live and not soak"
     code = _run([sys.executable, "-m", "pytest", *target, "-m", marker, "-q", "--tb=line", "-o", "addopts="])
     if code:
         return 1
     if args.level == "all":
-        live = _run([sys.executable, "-m", "pytest", "services/assistant/tests/test_route_environment.py", "-m", "live", "-q", "-o", "addopts="])
+        live = _run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "services/assistant/tests/test_route_environment.py",
+                "-m",
+                "live",
+                "-q",
+                "-o",
+                "addopts=",
+            ]
+        )
         if live:
             print("RESULT: BLOCKED (network). Live checks did not pass; this is not a partial pass.")
             return 3

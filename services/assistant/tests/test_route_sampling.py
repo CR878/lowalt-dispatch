@@ -16,7 +16,8 @@ def _hours(start="2026-11-18T12:00:00+00:00", hours=8, *, speed=4.0, direction=2
 
     hourly = {field: [0.0] * hours for field in evidence.HOURLY_FIELDS}
     hourly["time"] = [
-        (instant + timedelta(hours=i)).replace(tzinfo=None).isoformat(timespec="minutes") for i in range(hours)
+        (instant + timedelta(hours=i)).replace(tzinfo=None).isoformat(timespec="minutes")
+        for i in range(hours)
     ]
     hourly.update(
         {
@@ -99,7 +100,9 @@ def test_t2_three_middle_points_stay_unavailable_and_do_not_pass(monkeypatch):
         row = _hours()
         if index in {10, 11, 12}:
             row["hourly"]["time"] = [
-                (datetime(1990, 1, 1, tzinfo=UTC) + timedelta(hours=i)).replace(tzinfo=None).isoformat(timespec="minutes")
+                (datetime(1990, 1, 1, tzinfo=UTC) + timedelta(hours=i))
+                .replace(tzinfo=None)
+                .isoformat(timespec="minutes")
                 for i in range(8)
             ]
         return row
@@ -138,7 +141,10 @@ def test_t3_missing_120m_wind_is_labeled_surface_10m_and_not_copied(monkeypatch)
     assert result["vertical_wind_degraded"] is True
     assert all(sample["values"].get("wind_speed_120m") is None for sample in result["samples"])
     assert all(sample["values"].get("wind_speed_10m") == 6.0 for sample in result["samples"])
-    assert all(sample["values"]["wind_speed_120m"] != sample["values"]["wind_speed_10m"] for sample in result["samples"])
+    assert all(
+        sample["values"]["wind_speed_120m"] != sample["values"]["wind_speed_10m"]
+        for sample in result["samples"]
+    )
 
 
 def test_t4_crosswind_above_airspeed_is_infeasible_without_raising(monkeypatch):
