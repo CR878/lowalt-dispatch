@@ -213,3 +213,21 @@
 .motion-reduced .assistant-response-block {
   animation: none;
 }
+.env-verdict-unknown,
+.env-factor-not_evaluated,
+.env-factor-unavailable,
+.env-verdict-blocked,
+.env-verdict-degraded {
+  background: #e7e5e4;
+  color: #44403c;
+}
+.env-factor-not_evaluated {
+  color: #92400e;
+}
+.env-factor-unavailable {
+  color: #57534e;
+}
+.env-verdict-pass {
+  background: #e7e5e4;
+  color: #1c1917;
+}

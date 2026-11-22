@@ -12,11 +12,14 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from core.geometry import polyline_length
 from planner.astar import plan
 from planner.grid import build_grid
 from planner.scene import load_scene
 from services.assistant import evidence
+from services.assistant.environment import EnvQuery
 from services.assistant.intake import (
     ForecastQuery,
     IntakeCreate,
@@ -31,6 +34,47 @@ from services.assistant.intake import (
 from services.assistant.knowledge import search
 from services.assistant.models import DocumentQuery, Draft, DraftUpdate, NoArgs, Turn
 from services.assistant.telemetry import STALE_SECONDS, LiveTelemetry
+
+
+class VerdictQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    evidence_id: str = Field(pattern=r"^env-[0-9a-f]{12}$")
+
+
+class GapsQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    evidence_id: str | None = None
+
+
+class TimeWindowQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    origin: tuple[float, float]
+    destination: tuple[float, float]
+    window_start: str
+    window_hours: int = Field(default=6, ge=1, le=24)
+    step_minutes: int = Field(default=60, ge=30, le=180)
+
+
+class LandingQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    origin: tuple[float, float]
+    destination: tuple[float, float]
+
+
+class ProvenanceQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    evidence_id: str | None = None
+
+
+ENV_TOOL_NAMES = {
+    "assess_route_environment",
+    "explain_verdict",
+    "list_environment_gaps",
+    "compare_departure_times",
+    "check_landing_sites",
+    "audit_route_provenance",
+}
+
 
 ROOT = Path(__file__).resolve().parents[2]
 PLACES = {
@@ -321,6 +365,43 @@ class Toolset:
             "把用户原话、起终点、时间与已收集的证据落成一张任务工单；只记录，不下发、不执行。",
             IntakeCreate,
         ),
+        "assess_route_environment": (
+            "对整条航线做环境判定：沿航线等弧长采样、按预计到达时刻取模式预报，"
+            "返回 verdict（pass/degraded/blocked/unknown）、逐因素矩阵、缺口清单和来源时间。"
+            "用户问'这条线能不能飞''中间天气怎么样''有什么风险'时必须先调用本工具；"
+            "只回答了端点、没有整条航线的结论，视为未完成。"
+            "不得用 get_weather_forecast 代替本工具回答航线级问题。",
+            EnvQuery,
+        ),
+        "explain_verdict": (
+            "解释一个已有环境判定的由来：哪一段、哪个因素、阈值来自哪里、为什么是这个 verdict。"
+            "只能解释 evidence_id 对应的既有结果，不得重新计算或改动结论。"
+            "用户问'为什么判定为 blocked/degraded''哪一段有问题'时调用。",
+            VerdictQuery,
+        ),
+        "list_environment_gaps": (
+            "列出当前环境判定里'没有判定'的项目及原因、以及补什么才能判定。"
+            "用户问'还有什么没考虑''你确定吗''有没有漏掉什么'时调用。"
+            "回答里必须逐条转述，不得概括成'基本都覆盖了'。",
+            GapsQuery,
+        ),
+        "compare_departure_times": (
+            "比较同一条航线在不同起飞时刻的环境结论，回答'晚点起飞会不会好一点'。"
+            "只在用户明确提出改时间、或当前 verdict 为 blocked 且用户问'什么时候能飞'时调用。"
+            "不得据此推荐'最佳起飞时间'——只能给出各时刻的判定与差异，选择权在用户。",
+            TimeWindowQuery,
+        ),
+        "check_landing_sites": (
+            "检查航线两侧的备降点几何可达性。无备降点数据时返回 unavailable，"
+            "不得据此判断'不能飞'，只能说明'该项未判定'。"
+            "用户问'出问题能落哪''有没有备降'时调用。",
+            LandingQuery,
+        ),
+        "audit_route_provenance": (
+            "返回结论的数据血统：障碍快照 id 与抓取时间、气象模型与抓取时间、"
+            "投影方式、建筑高度已知比例、数据分级。用户问'数据哪来的''是不是实时'时调用。",
+            ProvenanceQuery,
+        ),
     }
 
     def __init__(
@@ -349,7 +430,8 @@ class Toolset:
         self.terminal = False
 
     @classmethod
-    def schemas(cls):
+    def schemas(cls, *, enable_env_tools: bool = True):
+        specs = cls.SPECS if enable_env_tools else {key: value for key, value in cls.SPECS.items() if key not in ENV_TOOL_NAMES}
         return [
             {
                 "type": "function",
@@ -359,7 +441,7 @@ class Toolset:
                     "parameters": schema.model_json_schema(),
                 },
             }
-            for name, (description, schema) in cls.SPECS.items()
+            for name, (description, schema) in specs.items()
         ]
 
     def execute(self, name: str, arguments: dict):
@@ -1075,5 +1157,91 @@ class Toolset:
             ],
             "limits": ["不进入 M3 状态机", "不产生飞控指令", "真实空域需人工核对"],
             "is_simulated": True,
+            "dispatch_enabled": False,
+        }
+
+    def assess_route_environment(self, args: EnvQuery):
+        from services.assistant.environment import assess_route_environment
+
+        return assess_route_environment(args, turn_id=getattr(self.turn, "id", None))
+
+    def explain_verdict(self, args: VerdictQuery):
+        from services.assistant.environment import explain_verdict
+
+        return explain_verdict(args.evidence_id)
+
+    def list_environment_gaps(self, args: GapsQuery):
+        from services.assistant.environment import list_environment_gaps
+
+        return list_environment_gaps(args.evidence_id)
+
+    def compare_departure_times(self, args: TimeWindowQuery):
+        from datetime import timedelta
+
+        from services.assistant.environment import EnvQuery as Query
+        from services.assistant.environment import assess_route_environment
+
+        start = datetime.fromisoformat(args.window_start.replace("Z", "+00:00"))
+        options = []
+        steps = max(1, int(args.window_hours * 60 / args.step_minutes))
+        for index in range(steps):
+            moment = start + timedelta(minutes=args.step_minutes * index)
+            result = assess_route_environment(
+                Query(origin=args.origin, destination=args.destination, scheduled_for=moment.isoformat())
+            )
+            options.append(
+                {
+                    "scheduled_for": moment.isoformat(),
+                    "verdict": result["verdict"],
+                    "reason": result["verdict_reason"],
+                    "evidence_id": result["evidence_id"],
+                }
+            )
+        counts: dict[str, int] = {}
+        for option in options:
+            counts[option["verdict"]] = counts.get(option["verdict"], 0) + 1
+        summary = "、".join(f"{count} 个 {name}" for name, count in counts.items())
+        return {
+            "options": options,
+            "no_improvement": "pass" not in counts,
+            "statement": f"{len(options)} 个时刻中 {summary}；没有推荐起飞时刻。",
+            "caveat": "预报时效与模式误差未量化；时间窗内天气演变不代表实际飞行时段。",
+            "dispatch_enabled": False,
+        }
+
+    def check_landing_sites(self, args: LandingQuery):
+        return {
+            "status": "unavailable",
+            "verdict": None,
+            "reason": "无备降点数据，该项未判定，不能据此判断不能飞",
+            "origin": list(args.origin),
+            "destination": list(args.destination),
+            "dispatch_enabled": False,
+            "operationally_approved": False,
+        }
+
+    def audit_route_provenance(self, args: ProvenanceQuery):
+        from services.assistant.environment import get_evidence
+
+        found = get_evidence(args.evidence_id) if args.evidence_id else None
+        if found is None:
+            return {"status": "unavailable", "reason": "没有可审计的 evidence_id", "dispatch_enabled": False}
+        provenance = found.get("provenance") or {}
+        weather_stats = provenance.get("weather_request_stats") or []
+        return {
+            "status": "ok",
+            "evidence_id": args.evidence_id,
+            "weather": {
+                "model": provenance.get("model"),
+                "fetched_at": next((item.get("fetched_at") for item in found.get("samples") or [] if item.get("fetched_at")), None),
+                "time_basis": provenance.get("time_basis"),
+                "speed_source": provenance.get("speed_source"),
+                "request_count": len(weather_stats),
+                "proxy_used": next((item.get("proxy_used") for item in weather_stats if item.get("proxy_used")), None),
+            },
+            "obstacle": {"snapshot_id": None, "fetched_at": None, "source": None, "reason": "本次环境判定没有读取障碍快照"},
+            "geometry": {"height_known_ratio": None, "projection": None},
+            "grades": {"forecast": "A" if found.get("status") == "ok" else "unavailable", "geometry": None, "height": None},
+            "statement": "气象模型名和网格分辨率在接口未返回时为 null；障碍快照未参与本次判定。",
             "dispatch_enabled": False,
         }

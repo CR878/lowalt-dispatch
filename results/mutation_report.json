@@ -1,0 +1,12 @@
+{
+  "total": 2,
+  "killed": 2,
+  "survived": 0,
+  "kill_rate": 1.0,
+  "killed_ids": [
+    "M3@decide_verdict",
+    "M4@weather_unavailable"
+  ],
+  "survivors": [],
+  "note": "This check executes the real function against the blocked and unknown contracts. It does not rewrite environment.py."
+}

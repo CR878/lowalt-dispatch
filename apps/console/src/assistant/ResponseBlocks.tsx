@@ -177,6 +177,38 @@ export function ResponseBlocks({
           {block.type === "route" && (
             <RoutePreview block={block} onRoute={onRoute} />
           )}
+          {block.type === "env_matrix" && (
+            <div className={`env-verdict env-verdict-${block.verdict}`} data-verdict={block.verdict}>
+              <strong>{block.verdict}</strong>
+              <p>{block.verdict_reason}</p>
+              <ul>
+                {block.factors.map((factor) => (
+                  <li key={factor.id} className={`env-factor env-factor-${factor.status}`} data-status={factor.status}>
+                    {factor.name} · {factor.status}
+                    {factor.value === null || factor.value === undefined ? "" : ` ${factor.value}${factor.unit}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {block.type === "gaps" && (
+            <ol className="env-gaps">
+              {block.items.map((item) => (
+                <li key={item.factor}>
+                  <strong>{item.factor}</strong> {item.why}
+                </li>
+              ))}
+            </ol>
+          )}
+          {block.type === "time_window" && (
+            <ul className="env-time-window">
+              {block.options.map((option) => (
+                <li key={option.scheduled_for} data-verdict={option.verdict}>
+                  {option.scheduled_for} · {option.verdict}
+                </li>
+              ))}
+            </ul>
+          )}
           <Source block={block} />
         </section>
       ))}

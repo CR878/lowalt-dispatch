@@ -506,8 +506,18 @@ def fetch_obstacles(
     errors = []
     empty_result = None
     own_client = client is None
-    active = client or httpx.Client(timeout=httpx.Timeout(18, connect=5), trust_env=False,
-                                    headers={"User-Agent": USER_AGENT})
+    proxy = __import__("os").environ.get("AERIS_OSM_PROXY")
+    proxy_used = "caller"
+    if client is None:
+        if proxy is None or proxy == "":
+            active = httpx.Client(timeout=httpx.Timeout(18, connect=5), trust_env=False, headers={"User-Agent": USER_AGENT})
+            proxy_used = "direct"
+        else:
+            active = httpx.Client(timeout=httpx.Timeout(18, connect=5), trust_env=False, proxy=proxy, headers={"User-Agent": USER_AGENT})
+            proxy_used = "configured"
+    else:
+        active = client
+    active.aeris_proxy_used = proxy_used
     try:
         for endpoint in ENDPOINTS:
             try:

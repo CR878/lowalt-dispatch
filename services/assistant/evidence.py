@@ -436,7 +436,8 @@ def _fetch_weather_forecast(
     }
     try:
         if client is None:
-            with httpx.Client(timeout=8, trust_env=True) as created:
+            created, _proxy_used = _meteo_client(8)
+            with created:
                 response = created.get(OPEN_METEO, params=params)
         else:
             response = client.get(OPEN_METEO, params=params)
@@ -527,6 +528,21 @@ def _forecast_window(target: datetime, forecast_days: int) -> dict:
     return {"forecast_days": forecast_days, "timezone": "UTC", "wind_speed_unit": "ms"}
 
 
+def _meteo_client(timeout):
+    """Honor AERIS_METEO_PROXY. Empty string forces a direct connection.
+
+    The proxy URL is never returned. Callers only see direct/configured/trust_env.
+    """
+    import os
+
+    proxy = os.environ.get("AERIS_METEO_PROXY")
+    if proxy is None:
+        return httpx.Client(timeout=timeout, trust_env=True), "trust_env"
+    if proxy == "":
+        return httpx.Client(timeout=timeout, trust_env=False), "direct"
+    return httpx.Client(timeout=timeout, trust_env=False, proxy=proxy), "configured"
+
+
 def _read_response(client, params):
     """One request, plus a single 2 s retry when the server returns HTTP 429."""
     started = time.perf_counter()
@@ -572,10 +588,13 @@ def _fetch_chunk(
     }
     try:
         if client is None:
-            with httpx.Client(timeout=timeout_s, trust_env=True) as created:
+            created, proxy_used = _meteo_client(timeout_s)
+            with created:
                 response, elapsed, nbytes = _read_response(created, params)
         else:
+            proxy_used = "caller"
             response, elapsed, nbytes = _read_response(client, params)
+        stats["proxy_used"] = proxy_used
         stats["elapsed_s"] = elapsed
         stats["response_bytes"] = nbytes
         response.raise_for_status()

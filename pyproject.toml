@@ -5,6 +5,12 @@
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+markers = [
+    "fast: 无网络、无文件系统副作用，目标小于 1 秒一条",
+    "live: 需要真实外网（Open-Meteo / OSM），无 AERIS_REAL_DATA_CHECK 时 skip",
+    "slow: 超过 5 秒或大内存",
+    "soak: 长跑压测，默认不跑",
+]
 
 [tool.ruff]
 line-length = 110
