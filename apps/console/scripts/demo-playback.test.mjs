@@ -7,6 +7,25 @@ import {
   timeLabel,
 } from "../src/demo/playback.ts";
 
+import { landmarks, makeCityLots } from "../src/demo/city-layout.ts";
+
+test("fictional city has stable districts and unobstructed visual landmark labels", () => {
+  const lots = makeCityLots();
+  assert.deepEqual(lots, makeCityLots());
+  assert.equal(lots.length, 51);
+  assert.deepEqual(
+    [...new Set(lots.map((lot) => lot.style))].sort(),
+    ["office", "residential", "warehouse"],
+  );
+  for (const lot of lots) {
+    assert.ok(lot.width > 0 && lot.depth > 0 && lot.height > 0);
+    assert.ok(Math.abs(lot.x) - lot.width / 2 > 14);
+    for (const point of landmarks) {
+      assert.ok(Math.hypot(lot.x - point.x, lot.z - point.z) >= 15);
+    }
+  }
+});
+
 test("confirmation and chapter boundaries are deterministic", () => {
   assert.equal(frameAt(0, false).status, "等待确认");
   assert.equal(frameAt(0, true).confirmed, true);
