@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
+import { defineConfig, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
 
 const proxy = {
@@ -12,7 +13,20 @@ const proxy = {
 
 export default defineConfig({
   plugins: [react()],
-  server: { proxy },
+  server: {
+    proxy,
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(process.cwd()),
+        fileURLToPath(
+          new URL(
+            "../../references/rea-city-flight/asset/out/",
+            import.meta.url,
+          ),
+        ),
+      ],
+    },
+  },
   preview: { proxy },
   build: {
     rollupOptions: {

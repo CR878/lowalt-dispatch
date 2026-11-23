@@ -407,9 +407,9 @@ export default function LandingPage({
                   创建第一个任务
                   <ArrowRight size={19} />
                 </button>
-                <a href="#workflow">
+                <a href="/demo">
                   <Play size={14} />
-                  了解工作方式
+                  观看竞赛演示
                 </a>
               </div>
               <div className="l-hero-trust">

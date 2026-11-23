@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test",
+    "test:demo": "node --experimental-strip-types --test scripts/demo-playback.test.mjs",
     "format": "prettier --write src tests public/theme-init.js scripts/*.mjs *.ts *.json index.html README.md",
     "format:check": "prettier --check src tests public/theme-init.js scripts/*.mjs *.ts *.json index.html README.md"
   },
