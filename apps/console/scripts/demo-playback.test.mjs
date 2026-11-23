@@ -13,10 +13,11 @@ test("fictional city has stable districts and unobstructed visual landmark label
   const lots = makeCityLots();
   assert.deepEqual(lots, makeCityLots());
   assert.equal(lots.length, 51);
-  assert.deepEqual(
-    [...new Set(lots.map((lot) => lot.style))].sort(),
-    ["office", "residential", "warehouse"],
-  );
+  assert.deepEqual([...new Set(lots.map((lot) => lot.style))].sort(), [
+    "office",
+    "residential",
+    "warehouse",
+  ]);
   for (const lot of lots) {
     assert.ok(lot.width > 0 && lot.depth > 0 && lot.height > 0);
     assert.ok(Math.abs(lot.x) - lot.width / 2 > 14);

@@ -216,9 +216,7 @@ export function createCity() {
       const occupied = lots.some(
         (lot) => Math.abs(lot.x - x) < 13 && Math.abs(lot.z - z) < 16,
       );
-      const reserved = landmarks.some(
-        (p) => Math.hypot(p.x - x, p.z - z) < 17,
-      );
+      const reserved = landmarks.some((p) => Math.hypot(p.x - x, p.z - z) < 17);
       if (occupied || reserved) continue;
       box("ground", x, 0.04, z, 15, 0.2, 19, "#456459");
       box("ground", x, 0.16, z, 1.25, 0.05, 19, "#8a9690");
