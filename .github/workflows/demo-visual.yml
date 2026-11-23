@@ -1,0 +1,41 @@
+name: AERIS offline city visual
+
+on:
+  push:
+    paths:
+      - "apps/console/**"
+      - "references/rea-city-flight/asset/out/*.glb"
+      - ".github/workflows/demo-visual.yml"
+  pull_request:
+    paths:
+      - "apps/console/**"
+      - "references/rea-city-flight/asset/out/*.glb"
+      - ".github/workflows/demo-visual.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-demo:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/console/package-lock.json
+      - run: npm ci
+      - run: npm run test:demo
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.demo.config.ts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-city-visual
+          path: apps/console/test-results/
+          retention-days: 7
