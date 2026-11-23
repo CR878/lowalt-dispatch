@@ -657,15 +657,11 @@ class Toolset:
         for item in items:
             route = item.get("real_route") or {}
             status = route.get("status")
-            counts[
-                "航线已生成" if status == "ok" else "后台计算中" if status == "pending" else "未生成"
-            ] += 1
+            counts["航线已生成" if status == "ok" else "后台计算中" if status == "pending" else "未生成"] += 1
             if item.get("payload_kg") is not None and len(payloads) < 8:
                 origin = (item.get("origin") or {}).get("name", "起点")[:8]
                 destination = (item.get("destination") or {}).get("name", "终点")[:8]
-                payloads.append(
-                    {"label": f"{origin}→{destination}", "value": float(item["payload_kg"])}
-                )
+                payloads.append({"label": f"{origin}→{destination}", "value": float(item["payload_kg"])})
             if latest_route is None and status == "ok":
                 waypoints = route.get("waypoints") or []
                 if len(waypoints) >= 2:
@@ -696,9 +692,7 @@ class Toolset:
             "source": "logs/intakes 本机工单文件",
             "count": len(items),
             "scope": "最近 12 张工单",
-            "status_counts": [
-                {"label": label, "value": value} for label, value in counts.items()
-            ],
+            "status_counts": [{"label": label, "value": value} for label, value in counts.items()],
             "payloads": payloads,
             "latest_route": latest_route,
             "note": "航线为 OSM 建筑足迹的几何避障结果，非飞行实测；可直接用于 chart 代码块。",
@@ -728,15 +722,25 @@ class Toolset:
                 }
             )
         else:
-            merged_note = "；".join(
-                part for part in (args.schedule_note, normalization_note) if part
-            )
-            args = args.model_copy(
-                update={"scheduled_for": normalized, "schedule_note": merged_note}
-            )
-        fingerprint = hashlib.sha256(json.dumps(args.model_dump(include={
-            "origin", "destination", "origin_point", "destination_point", "scheduled_for", "payload_kg", "priority",
-        }), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+            merged_note = "；".join(part for part in (args.schedule_note, normalization_note) if part)
+            args = args.model_copy(update={"scheduled_for": normalized, "schedule_note": merged_note})
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                args.model_dump(
+                    include={
+                        "origin",
+                        "destination",
+                        "origin_point",
+                        "destination_point",
+                        "scheduled_for",
+                        "payload_kg",
+                        "priority",
+                    }
+                ),
+                sort_keys=True,
+                ensure_ascii=False,
+            ).encode()
+        ).hexdigest()
         operation_id = confirmation.confirmation_id if confirmation else self.turn.request_id
         request_key = f"{self.actor_id}:{operation_id}"
         if explicit_confirm:
@@ -746,11 +750,19 @@ class Toolset:
                 self.terminal = True
                 return self._created_result(saved)
         places = {item["name"]: item for item in self.place_results}
+
         def locate(name, point):
             if confirmation is not None:
-                return {"name": name, "point": point, "crs": "EPSG:4326", "status": "ok",
-                        "source": "用户确认卡", "is_simulated": False}
+                return {
+                    "name": name,
+                    "point": point,
+                    "crs": "EPSG:4326",
+                    "status": "ok",
+                    "source": "用户确认卡",
+                    "is_simulated": False,
+                }
             return places.get(name) or evidence.resolve_place(name, local_places=PLACES, aliases=ALIASES)
+
         origin = locate(args.origin, args.origin_point)
         destination = locate(args.destination, args.destination_point)
         # A map pin that is hundreds of km away from the named place is a stale
@@ -936,7 +948,9 @@ class Toolset:
             valid_time = weather.get("valid_for")
             same_time = False
             try:
-                same_time = datetime.fromisoformat(valid_time.replace("Z", "+00:00")) == datetime.fromisoformat(args.scheduled_for)
+                same_time = datetime.fromisoformat(
+                    valid_time.replace("Z", "+00:00")
+                ) == datetime.fromisoformat(args.scheduled_for)
             except (AttributeError, ValueError, TypeError):
                 pass
             if weather.get("requested_point") != origin.get("point") or not same_time:

@@ -39,9 +39,13 @@ WEEKDAYS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6
 
 def _clock(text: str) -> tuple[int, int] | None:
     number = r"[零一二三四五六七八九十两\d]{1,3}"
-    match = re.search(rf"(凌晨|早上|上午|中午|下午|晚上)?\s*({number})(?:[:：](\d{{2}})|[点时](?:({number})分?)?(半)?)", text)
+    match = re.search(
+        rf"(凌晨|早上|上午|中午|下午|晚上)?\s*({number})(?:[:：](\d{{2}})|[点时](?:({number})分?)?(半)?)",
+        text,
+    )
     if not match:
         return None
+
     def integer(token):
         if not token:
             return 0
@@ -53,6 +57,7 @@ def _clock(text: str) -> tuple[int, int] | None:
             tens, ones = token.split("十", 1)
             return (digits.get(tens, 1) * 10) + digits.get(ones, 0)
         return digits[token]
+
     hour = integer(match[2])
     minute = 30 if match[5] else integer(match[3] or match[4])
     period = match[1]
@@ -152,9 +157,15 @@ def _fetch_weather_forecast(
     real-route assessment and keeps the existing intake evidence schema intact.
     """
     try:
-        target = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00")) if scheduled_for else datetime.now(LOCAL_TZ)
+        target = (
+            datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
+            if scheduled_for
+            else datetime.now(LOCAL_TZ)
+        )
         target = target.replace(tzinfo=LOCAL_TZ) if target.tzinfo is None else target
-        if not all(math.isfinite(v) for v in (latitude, longitude)) or not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        if not all(math.isfinite(v) for v in (latitude, longitude)) or not (
+            -90 <= latitude <= 90 and -180 <= longitude <= 180
+        ):
             raise ValueError("invalid coordinates")
     except (ValueError, TypeError, AttributeError):
         return unavailable_weather("气象查询的坐标或日期无效", scheduled_for)
@@ -215,7 +226,6 @@ def _fetch_weather_forecast(
     return result
 
 
-
 def fetch_weather_forecast(
     latitude: float,
     longitude: float,
@@ -266,7 +276,11 @@ def interpolate_forecast(forecast: dict, when: datetime) -> dict[str, float | No
         raise ValueError("hourly must be an object")
     offset = timezone(timedelta(seconds=float(forecast.get("utc_offset_seconds", 0))))
     raw_times = hourly.get("time")
-    if not isinstance(raw_times, list) or not raw_times or not all(isinstance(item, str) for item in raw_times):
+    if (
+        not isinstance(raw_times, list)
+        or not raw_times
+        or not all(isinstance(item, str) for item in raw_times)
+    ):
         raise ValueError("hourly timestamps must be a nonempty list of ISO strings")
     times = []
     for raw in raw_times:
@@ -276,7 +290,11 @@ def interpolate_forecast(forecast: dict, when: datetime) -> dict[str, float | No
         raise ValueError("forecast does not cover instant")
     right = next(i for i, value in enumerate(times) if value >= when)
     left = max(0, right - 1) if times[right] != when else right
-    ratio = 0.0 if left == right else (when - times[left]).total_seconds() / (times[right] - times[left]).total_seconds()
+    ratio = (
+        0.0
+        if left == right
+        else (when - times[left]).total_seconds() / (times[right] - times[left]).total_seconds()
+    )
 
     def at(field, index):
         series = hourly.get(field) or []
@@ -294,7 +312,9 @@ def interpolate_forecast(forecast: dict, when: datetime) -> dict[str, float | No
     values = {}
     for field in HOURLY_FIELDS:
         a, b = at(field, left), at(field, right)
-        values[field] = None if a is None or b is None else (a if field == "weather_code" else a + ratio * (b - a))
+        values[field] = (
+            None if a is None or b is None else (a if field == "weather_code" else a + ratio * (b - a))
+        )
     speeds = [at("wind_speed_10m", i) for i in (left, right)]
     directions = [at("wind_direction_10m", i) for i in (left, right)]
     if all(v is not None for v in speeds + directions):
