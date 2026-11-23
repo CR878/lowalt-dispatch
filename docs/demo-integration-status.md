@@ -38,9 +38,9 @@
 - 城市由固定的艺术布局生成 51 栋建筑，包含办公、住宅和仓储三类轮廓，以及河岸、公园、桥梁、街道路口、屋顶设施和绿化。
 - 建筑与附属细节按材质批量实例化；固定灯光的阴影仅更新一次。无需额外在线贴图或地图服务。
 - 摄影机通过已有回放时间轴选择视觉机位，暂停和跳章具有确定性。三维场景的建筑与位置均为虚构美术元素，未接入真实规划、坐标或飞控。
-- 新增城市布局回归用例，以及浏览器中的城市资产加载断言。布局生成逻辑已检验为 51 栋可重复生成的多类建筑；当前工作环境未能启动本地完整构建与浏览器，因此最终视觉与性能需以 CI 和实际录屏机验收为准。上方测试结果属于先前整合版。
+- 新增城市布局回归用例，以及浏览器中的城市资产加载断言。布局生成逻辑已检验为 51 栋可重复生成的多类建筑；本地工作环境未能启动完整构建与浏览器，改由独立 GitHub Actions 完成验收。回放测试、TypeScript/Vite 构建、Chromium 场景加载和交互测试均通过，并已生成实际渲染截图；性能帧率仍需在录屏机实测。上方测试结果属于先前整合版。
 
-独立视觉验收工作流：[AERIS offline city visual](https://github.com/Gindama713/lowalt-dispatch/actions/workflows/demo-visual.yml)。无需启动 Python 服务，单独执行回放测试、前端构建、Chromium 浏览器断言和画面截图。原控制台工作流的后端格式检查与此验收独立。
+独立视觉验收工作流：[AERIS offline city visual](https://github.com/Gindama713/lowalt-dispatch/actions/workflows/demo-visual.yml)。无需启动 Python 服务，单独执行回放测试、前端构建、Chromium 浏览器断言和画面截图。原控制台工作流的后端格式检查与此验收独立。本次独立验收 [运行记录](https://github.com/Gindama713/lowalt-dispatch/actions/runs/45114946283) 通过，[截图产物](https://github.com/Gindama713/lowalt-dispatch/actions/runs/45114946283/artifacts/14790679743) 可供复查。
 
 ## 模型资源来源
 
