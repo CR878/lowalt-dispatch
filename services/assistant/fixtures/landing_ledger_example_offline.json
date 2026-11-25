@@ -1,0 +1,46 @@
+{
+  "ledger_id": "example-offline-medical-desk",
+  "grade": "example_offline",
+  "labels": ["example", "offline"],
+  "market_note": "桌面推演样例。没有真实运营台账或现场授权，市场假设未证实。",
+  "dispatch_enabled": false,
+  "operationally_approved": false,
+  "pass_allowed": false,
+  "sites": [
+    {
+      "site_id": "example-desk-a",
+      "name": "样例医疗转运点A（非真实场点）",
+      "point": [0.01, 0.01],
+      "extent": [0.0, 0.0, 0.02, 0.02],
+      "allowed_use": "仅用于接口演示的样例停放，不是运行许可",
+      "responsible_party": "样例责任单位（非真实）",
+      "verified_at": "2026-01-01T00:00:00Z",
+      "valid_until": "2026-01-02T00:00:00Z",
+      "occupancy_status": "unknown",
+      "open_status": "unknown",
+      "authorization_evidence": "example-offline-no-real-authorization",
+      "restrictions": "仅接口演示"
+    },
+    {
+      "site_id": "example-desk-b",
+      "name": "样例缺项点B（非真实场点）",
+      "point": [0.03, 0.03],
+      "extent": null,
+      "allowed_use": null,
+      "responsible_party": null,
+      "verified_at": "2026-02-01T00:00:00Z",
+      "valid_until": "2026-01-01T00:00:00Z",
+      "occupancy_status": "clear",
+      "open_status": "closed",
+      "authorization_evidence": null,
+      "restrictions": null
+    }
+  ],
+  "clues": [
+    {
+      "kind": "osm_highway",
+      "name": "样例道路",
+      "statement": "道路、空地、OSM 标签和视觉空闲只是线索，不是场点。"
+    }
+  ]
+}

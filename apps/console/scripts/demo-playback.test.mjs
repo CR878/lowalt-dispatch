@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { readTaskEvidence } from "../src/assistant/taskEvidence.ts";
+import { readPresentation } from "../src/assistant/presentation.ts";
 import { RoutePolyline } from "../src/routeGeometry.ts";
 import { Vector3 } from "three";
 import { sampleWind, windRegionFor } from "../src/weather.ts";
@@ -14,6 +15,55 @@ import {
 } from "../src/demo/playback.ts";
 
 import { landmarks, makeCityLots } from "../src/demo/city-layout.ts";
+
+test("environment UI v2 accepts evidence and rejects malformed nested blocks", () => {
+  const base = { title: "environment", source: "test", as_of: null, note: "" };
+  const factor = {
+    id: "wind",
+    name: "wind",
+    status: "unavailable",
+    value: null,
+    unit: "m/s",
+    threshold: null,
+    threshold_source: null,
+    effect: "hard",
+    segment_index: null,
+    reason: "no data",
+  };
+  const block = {
+    ...base,
+    type: "env_matrix",
+    verdict: "unknown",
+    verdict_reason: "missing data",
+    factors: [factor],
+    coverage_statement: "not continuous",
+    evidence_id: "env-123456789abc",
+  };
+  assert.equal(
+    readPresentation({ version: 2, blocks: [block] }).blocks[0].type,
+    "env_matrix",
+  );
+  assert.equal(
+    readPresentation({ version: 2, blocks: [{ ...block, factors: [null] }] }),
+    undefined,
+  );
+  assert.equal(
+    readPresentation({
+      version: 2,
+      blocks: [{ ...base, type: "gaps", total: 1, items: [null] }],
+    }),
+    undefined,
+  );
+  assert.equal(
+    readPresentation({
+      version: 2,
+      blocks: [
+        { ...base, type: "time_window", caveat: "test", options: [null, null] },
+      ],
+    }),
+    undefined,
+  );
+});
 
 test("frozen task contracts accept both cases and reject contradictory or malformed data", () => {
   const bundle = JSON.parse(

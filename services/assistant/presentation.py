@@ -77,14 +77,68 @@ class TaskEvidenceBlock(Block):
     evidence: TaskEvidence
 
 
+class EnvFactor(Contract):
+    id: str = Field(max_length=64)
+    name: str = Field(max_length=40)
+    status: Literal["modeled", "threshold_only", "not_evaluated", "unavailable"]
+    value: float | str | None = None
+    unit: str = Field(default="", max_length=16)
+    threshold: float | None = None
+    threshold_source: str | None = Field(default=None, max_length=200)
+    effect: Literal["hard", "soft", "info"] = "info"
+    segment_index: int | None = Field(default=None, ge=0)
+    reason: str = Field(default="", max_length=300)
+
+
+class EnvMatrixBlock(Block):
+    type: Literal["env_matrix"] = "env_matrix"
+    verdict: Literal["pass", "degraded", "blocked", "unknown"]
+    verdict_reason: str = Field(max_length=400)
+    factors: list[EnvFactor] = Field(min_length=1, max_length=40)
+    coverage_statement: str = Field(max_length=400)
+    evidence_id: str = Field(max_length=32)
+
+
+class GapItem(Contract):
+    factor: str = Field(max_length=64)
+    why: str = Field(max_length=300)
+    to_close: str = Field(max_length=300)
+
+
+class GapsBlock(Block):
+    type: Literal["gaps"] = "gaps"
+    items: list[GapItem] = Field(min_length=1, max_length=20)
+    total: int = Field(ge=0)
+
+
+class TimeWindowOption(Contract):
+    scheduled_for: str = Field(max_length=64)
+    verdict: Literal["pass", "degraded", "blocked", "unknown"]
+    reason: str = Field(default="", max_length=200)
+
+
+class TimeWindowBlock(Block):
+    type: Literal["time_window"] = "time_window"
+    options: list[TimeWindowOption] = Field(min_length=2, max_length=24)
+    caveat: str = Field(max_length=400)
+
+
 UIBlock = Annotated[
-    MetricsBlock | ChartBlock | TableBlock | TimelineBlock | RouteBlock | TaskEvidenceBlock,
+    MetricsBlock
+    | ChartBlock
+    | TableBlock
+    | TimelineBlock
+    | RouteBlock
+    | TaskEvidenceBlock
+    | EnvMatrixBlock
+    | GapsBlock
+    | TimeWindowBlock,
     Field(discriminator="type"),
 ]
 
 
 class Presentation(Contract):
-    version: Literal[1] = 1
+    version: Literal[1, 2] = 1
     blocks: list[UIBlock] = Field(max_length=6)
 
 
@@ -238,4 +292,76 @@ def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
                 note="本地 ENU 坐标下的几何预览，完整校验见任务流程。",
             )
         )
-    return Presentation(blocks=blocks[:6])
+    env = results.get("assess_route_environment")
+    priority: list[UIBlock] = []
+    if isinstance(env, dict) and env.get("factors"):
+        priority.append(
+            EnvMatrixBlock(
+                title="航线环境",
+                source="assess_route_environment",
+                verdict=env["verdict"],
+                verdict_reason=env.get("verdict_reason") or "",
+                factors=[
+                    EnvFactor(
+                        id=factor["id"],
+                        name=factor["name"],
+                        status=factor["status"],
+                        value=factor.get("value")
+                        if isinstance(factor.get("value"), (int, float, str)) or factor.get("value") is None
+                        else str(factor.get("value")),
+                        unit=factor.get("unit") or "",
+                        threshold=factor.get("threshold")
+                        if isinstance(factor.get("threshold"), (int, float))
+                        else None,
+                        threshold_source=factor.get("threshold_source"),
+                        effect=factor.get("effect") or "info",
+                        segment_index=factor.get("segment_index"),
+                        reason=factor.get("reason") or "",
+                    )
+                    for factor in env["factors"][:40]
+                ],
+                coverage_statement=(env.get("coverage") or {}).get("statement")
+                or env.get("verdict_reason")
+                or "",
+                evidence_id=env["evidence_id"],
+                note=(env.get("geometry_note") or "") + "；unknown、not_evaluated、unavailable 不是通过。",
+            )
+        )
+        gap_items = [
+            GapItem(factor=gap["factor"], why=gap.get("why") or "", to_close=gap.get("to_close") or "")
+            for gap in (env.get("gaps") or [])[:20]
+        ]
+        if gap_items:
+            priority.append(
+                GapsBlock(
+                    title="未判定项",
+                    source="assess_route_environment",
+                    items=gap_items,
+                    total=len(env.get("gaps") or []),
+                    note="缺口不是通过。",
+                )
+            )
+    window = results.get("compare_departure_times")
+    if isinstance(window, dict) and len(window.get("options") or []) >= 2:
+        priority.append(
+            TimeWindowBlock(
+                title="起飞时刻对比",
+                source="compare_departure_times",
+                options=[
+                    TimeWindowOption(
+                        scheduled_for=option["scheduled_for"],
+                        verdict=option["verdict"],
+                        reason=option.get("reason") or "",
+                    )
+                    for option in window["options"][:24]
+                ],
+                caveat=window.get("caveat") or "",
+                note="不推荐最佳起飞时间。",
+            )
+        )
+    ordered = [
+        *priority,
+        *[block for block in blocks if block.type not in {"env_matrix", "gaps", "time_window"}],
+    ]
+    version = 2 if any(block.type in {"env_matrix", "gaps", "time_window"} for block in ordered) else 1
+    return Presentation(version=version, blocks=ordered[:6])

@@ -170,6 +170,91 @@ test("structured replies support chart tables, sorting, CSV, timeline and route 
   await expect(page.locator(".assistant-preview-label")).toBeVisible();
 });
 
+test("environment v2 renders factor evidence and drops malformed nested blocks", async ({
+  page,
+}) => {
+  const base = {
+    title: "航线环境",
+    source: "fixture",
+    as_of: null,
+    note: "起终点直线走廊，未绑定实际航线",
+  };
+  await page.route("**/api/assistant/turn", (r) =>
+    r.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        JSON.stringify({
+          type: "result",
+          result: {
+            turn_id: r.request().postDataJSON().request_id,
+            provider: "local",
+            text: "环境判定 unknown",
+            traces: [],
+            draft: null,
+            draft_digest: null,
+            dispatch_enabled: false,
+            is_simulated: true,
+            created_at: new Date().toISOString(),
+            presentation: {
+              version: 2,
+              blocks: [
+                {
+                  ...base,
+                  type: "env_matrix",
+                  verdict: "unknown",
+                  verdict_reason: "缺少核验数据",
+                  coverage_statement: "模式预报并非连续观测",
+                  evidence_id: "env-123456789abc",
+                  factors: [
+                    {
+                      id: "wind",
+                      name: "侧风",
+                      status: "unavailable",
+                      value: null,
+                      unit: "m/s",
+                      threshold: null,
+                      threshold_source: null,
+                      effect: "hard",
+                      segment_index: 2,
+                      reason: "没有风场数据",
+                    },
+                  ],
+                },
+                {
+                  ...base,
+                  type: "gaps",
+                  items: [
+                    {
+                      factor: "wind",
+                      why: "缺少数据",
+                      to_close: "补充有来源的风场",
+                    },
+                  ],
+                  total: 1,
+                },
+                { ...base, type: "gaps", items: [null], total: 1 },
+              ],
+            },
+          },
+        }) + "\n",
+    }),
+  );
+  await page.goto("/airspace");
+  await page.getByRole("button", { name: "打开调度助手", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "向调度助手提问" })
+    .fill("查询航线环境");
+  await page.getByRole("button", { name: "发送给调度助手" }).click();
+  await expect(page.locator(".response-env_matrix")).toContainText("航段 3");
+  await expect(page.locator(".response-env_matrix")).toContainText(
+    "未绑定实际航线",
+  );
+  await expect(page.locator(".response-gaps")).toHaveCount(1);
+  await expect(page.locator(".response-gaps")).toContainText(
+    "补充有来源的风场",
+  );
+});
+
 test("unknown presentation versions fall back to the text reply", async ({
   page,
 }) => {

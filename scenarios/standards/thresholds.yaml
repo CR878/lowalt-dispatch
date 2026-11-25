@@ -1,0 +1,19 @@
+# Unsoursed limits stay null. Do not fill these with industry guesses.
+# A non-null value needs source_ref pointing at a document this repository actually holds.
+schema_version: 1
+thresholds:
+  precipitation_max_mm:
+    value: null
+    source_ref: null
+  visibility_min_m:
+    value: null
+    source_ref: null
+  wind_gust_10m_max_mps:
+    value: null
+    source_ref: null
+  wind_cross_mps:
+    value: null
+    source_ref: null
+  cloud_cover_max_pct:
+    value: null
+    source_ref: null

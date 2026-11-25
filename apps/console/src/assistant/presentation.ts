@@ -1,5 +1,5 @@
 import type { ChartSpec } from "./ChartBlock";
-import { readTaskEvidence, type TaskEvidence } from "./taskEvidence";
+import { readTaskEvidence, type TaskEvidence } from "./taskEvidence.ts";
 
 type BlockBase = {
   title: string;
@@ -32,8 +32,45 @@ export type ResponseBlock = BlockBase &
         length_m: number;
         waypoints: [number, number][];
       }
+    | {
+        type: "env_matrix";
+        verdict: "pass" | "degraded" | "blocked" | "unknown";
+        verdict_reason: string;
+        factors: {
+          id: string;
+          name: string;
+          status:
+            | "modeled"
+            | "threshold_only"
+            | "not_evaluated"
+            | "unavailable";
+          value: number | string | null;
+          unit: string;
+          threshold: number | null;
+          threshold_source: string | null;
+          effect: "hard" | "soft" | "info";
+          segment_index: number | null;
+          reason: string;
+        }[];
+        coverage_statement: string;
+        evidence_id: string;
+      }
+    | {
+        type: "gaps";
+        items: { factor: string; why: string; to_close: string }[];
+        total: number;
+      }
+    | {
+        type: "time_window";
+        options: {
+          scheduled_for: string;
+          verdict: "pass" | "degraded" | "blocked" | "unknown";
+          reason: string;
+        }[];
+        caveat: string;
+      }
   );
-export type Presentation = { version: 1; blocks: ResponseBlock[] };
+export type Presentation = { version: 1 | 2; blocks: ResponseBlock[] };
 
 const object = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === "object" && !Array.isArray(v);
@@ -131,6 +168,72 @@ function validBlock(value: unknown): value is ResponseBlock {
             p.every((v) => finite(v) && v >= 0 && v <= 3000),
         )
       );
+    case "env_matrix":
+      return (
+        ["pass", "degraded", "blocked", "unknown"].includes(
+          String(value.verdict),
+        ) &&
+        text(value.verdict_reason, 400) &&
+        text(value.coverage_statement, 400) &&
+        text(value.evidence_id, 32) &&
+        Array.isArray(value.factors) &&
+        value.factors.length > 0 &&
+        value.factors.length <= 40 &&
+        value.factors.every(
+          (f) =>
+            object(f) &&
+            text(f.id, 64) &&
+            text(f.name, 40) &&
+            [
+              "modeled",
+              "threshold_only",
+              "not_evaluated",
+              "unavailable",
+            ].includes(String(f.status)) &&
+            (f.value === null || finite(f.value) || text(f.value, 300)) &&
+            text(f.unit, 16) &&
+            (f.threshold === null || finite(f.threshold)) &&
+            (f.threshold_source === null || text(f.threshold_source, 200)) &&
+            ["hard", "soft", "info"].includes(String(f.effect)) &&
+            (f.segment_index === null ||
+              (finite(f.segment_index) &&
+                Number.isInteger(f.segment_index) &&
+                f.segment_index >= 0)) &&
+            text(f.reason, 300),
+        )
+      );
+    case "gaps":
+      return (
+        Array.isArray(value.items) &&
+        value.items.length > 0 &&
+        value.items.length <= 20 &&
+        finite(value.total) &&
+        Number.isInteger(value.total) &&
+        value.total >= value.items.length &&
+        value.items.every(
+          (i) =>
+            object(i) &&
+            text(i.factor, 64) &&
+            text(i.why, 300) &&
+            text(i.to_close, 300),
+        )
+      );
+    case "time_window":
+      return (
+        Array.isArray(value.options) &&
+        value.options.length >= 2 &&
+        value.options.length <= 24 &&
+        value.options.every(
+          (o) =>
+            object(o) &&
+            text(o.scheduled_for, 64) &&
+            ["pass", "degraded", "blocked", "unknown"].includes(
+              String(o.verdict),
+            ) &&
+            text(o.reason, 200),
+        ) &&
+        text(value.caveat, 400)
+      );
     default:
       return false;
   }
@@ -138,8 +241,14 @@ function validBlock(value: unknown): value is ResponseBlock {
 
 /** An unsupported UI block falls back to the existing text reply. */
 export function readPresentation(value: unknown): Presentation | undefined {
-  if (!object(value) || value.version !== 1 || !Array.isArray(value.blocks))
+  if (
+    !object(value) ||
+    (value.version !== 1 && value.version !== 2) ||
+    !Array.isArray(value.blocks)
+  )
     return undefined;
   const blocks = value.blocks.slice(0, 6).filter(validBlock);
-  return blocks.length ? { version: 1, blocks } : undefined;
+  return blocks.length
+    ? { version: value.version === 2 ? 2 : 1, blocks }
+    : undefined;
 }

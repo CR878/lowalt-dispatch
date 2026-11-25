@@ -213,3 +213,52 @@
 .motion-reduced .assistant-response-block {
   animation: none;
 }
+.env-verdict-unknown,
+.env-factor-not_evaluated,
+.env-factor-unavailable,
+.env-verdict-blocked,
+.env-verdict-degraded {
+  background: #e7e5e4;
+  color: #44403c;
+}
+.env-factor-not_evaluated {
+  color: #92400e;
+}
+.env-factor-unavailable {
+  color: #57534e;
+}
+.env-verdict-pass {
+  background: #e7e5e4;
+  color: #1c1917;
+}
+.env-verdict {
+  padding: 12px;
+  border-radius: 8px;
+  background: light-dark(#f1f5f8, #182632);
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.env-verdict ul,
+.env-gaps,
+.env-time-window {
+  padding-left: 18px;
+  font-size: 11px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.env-verdict li,
+.env-gaps li,
+.env-time-window li {
+  margin-block: 8px;
+}
+.env-verdict li {
+  background: transparent;
+  color: inherit;
+}
+.env-verdict small,
+.env-gaps small,
+.env-time-window small {
+  display: block;
+  color: light-dark(#60788c, #a1b3c2);
+}

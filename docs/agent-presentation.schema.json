@@ -112,6 +112,198 @@
       "title": "Datum",
       "type": "object"
     },
+    "EnvFactor": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 64,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 40,
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "modeled",
+            "threshold_only",
+            "not_evaluated",
+            "unavailable"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "unit": {
+          "default": "",
+          "maxLength": 16,
+          "title": "Unit",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "threshold_source": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold Source"
+        },
+        "effect": {
+          "default": "info",
+          "enum": [
+            "hard",
+            "soft",
+            "info"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "segment_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segment Index"
+        },
+        "reason": {
+          "default": "",
+          "maxLength": 300,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "status"
+      ],
+      "title": "EnvFactor",
+      "type": "object"
+    },
+    "EnvMatrixBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "env_matrix",
+          "default": "env_matrix",
+          "title": "Type",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "degraded",
+            "blocked",
+            "unknown"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "verdict_reason": {
+          "maxLength": 400,
+          "title": "Verdict Reason",
+          "type": "string"
+        },
+        "factors": {
+          "items": {
+            "$ref": "#/$defs/EnvFactor"
+          },
+          "maxItems": 40,
+          "minItems": 1,
+          "title": "Factors",
+          "type": "array"
+        },
+        "coverage_statement": {
+          "maxLength": 400,
+          "title": "Coverage Statement",
+          "type": "string"
+        },
+        "evidence_id": {
+          "maxLength": 32,
+          "title": "Evidence Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "verdict",
+        "verdict_reason",
+        "factors",
+        "coverage_statement",
+        "evidence_id"
+      ],
+      "title": "EnvMatrixBlock",
+      "type": "object"
+    },
     "EvidenceCandidate": {
       "additionalProperties": false,
       "properties": {
@@ -263,6 +455,95 @@
         "point"
       ],
       "title": "EvidenceSite",
+      "type": "object"
+    },
+    "GapItem": {
+      "additionalProperties": false,
+      "properties": {
+        "factor": {
+          "maxLength": 64,
+          "title": "Factor",
+          "type": "string"
+        },
+        "why": {
+          "maxLength": 300,
+          "title": "Why",
+          "type": "string"
+        },
+        "to_close": {
+          "maxLength": 300,
+          "title": "To Close",
+          "type": "string"
+        }
+      },
+      "required": [
+        "factor",
+        "why",
+        "to_close"
+      ],
+      "title": "GapItem",
+      "type": "object"
+    },
+    "GapsBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "gaps",
+          "default": "gaps",
+          "title": "Type",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/GapItem"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "total": {
+          "minimum": 0,
+          "title": "Total",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "items",
+        "total"
+      ],
+      "title": "GapsBlock",
       "type": "object"
     },
     "Metric": {
@@ -786,6 +1067,100 @@
       "title": "TaskEvidenceBlock",
       "type": "object"
     },
+    "TimeWindowBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "time_window",
+          "default": "time_window",
+          "title": "Type",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/TimeWindowOption"
+          },
+          "maxItems": 24,
+          "minItems": 2,
+          "title": "Options",
+          "type": "array"
+        },
+        "caveat": {
+          "maxLength": 400,
+          "title": "Caveat",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "options",
+        "caveat"
+      ],
+      "title": "TimeWindowBlock",
+      "type": "object"
+    },
+    "TimeWindowOption": {
+      "additionalProperties": false,
+      "properties": {
+        "scheduled_for": {
+          "maxLength": 64,
+          "title": "Scheduled For",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "pass",
+            "degraded",
+            "blocked",
+            "unknown"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "reason": {
+          "default": "",
+          "maxLength": 200,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "scheduled_for",
+        "verdict"
+      ],
+      "title": "TimeWindowOption",
+      "type": "object"
+    },
     "TimelineBlock": {
       "additionalProperties": false,
       "properties": {
@@ -882,8 +1257,11 @@
   "additionalProperties": false,
   "properties": {
     "version": {
-      "const": 1,
       "default": 1,
+      "enum": [
+        1,
+        2
+      ],
       "title": "Version",
       "type": "integer"
     },
@@ -892,10 +1270,13 @@
         "discriminator": {
           "mapping": {
             "chart": "#/$defs/ChartBlock",
+            "env_matrix": "#/$defs/EnvMatrixBlock",
+            "gaps": "#/$defs/GapsBlock",
             "metrics": "#/$defs/MetricsBlock",
             "route": "#/$defs/RouteBlock",
             "table": "#/$defs/TableBlock",
             "task_evidence": "#/$defs/TaskEvidenceBlock",
+            "time_window": "#/$defs/TimeWindowBlock",
             "timeline": "#/$defs/TimelineBlock"
           },
           "propertyName": "type"
@@ -918,6 +1299,15 @@
           },
           {
             "$ref": "#/$defs/TaskEvidenceBlock"
+          },
+          {
+            "$ref": "#/$defs/EnvMatrixBlock"
+          },
+          {
+            "$ref": "#/$defs/GapsBlock"
+          },
+          {
+            "$ref": "#/$defs/TimeWindowBlock"
           }
         ]
       },

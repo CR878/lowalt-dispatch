@@ -51,6 +51,35 @@ def planning_turn():
     return turn
 
 
+def test_environment_tool_samples_the_visible_route_not_an_endpoint_chord(monkeypatch, tmp_path):
+    from services.assistant import environment
+    from services.assistant.engine import allowed_tools
+    from services.assistant.tools import ENV_TOOL_NAMES
+
+    environment.clear_environment_cache()
+    monkeypatch.setattr(environment, "AUDIT_ROOT", tmp_path)
+    seen = []
+
+    def forecast(points, *args, **kwargs):
+        seen.append(points)
+        return {"samples": [], "coverage": {}}
+
+    monkeypatch.setattr(environment, "assess_route_weather", forecast)
+    turn = planning_turn()
+    turn.context.active_route.waypoints.insert(1, (120.005, 30.005))
+    result = Toolset(turn).assess_route_environment(
+        environment.EnvQuery(origin=(120, 30), destination=(120.01, 30))
+    )
+    assert seen[0] == turn.context.active_route.waypoints
+    assert result["geometry_scope"] == "provided_route"
+    other = Toolset(turn).assess_route_environment(
+        environment.EnvQuery(origin=(121, 31), destination=(121.01, 31))
+    )
+    assert other["geometry_scope"] == "endpoint_corridor"
+    assert len(seen[1]) == 2 and "未绑定" in other["geometry_note"]
+    assert not (allowed_tools(make_turn("ACK 代表什么？")) & ENV_TOOL_NAMES)
+
+
 def test_planning_does_not_borrow_demo_flight_or_terrain():
     turn = planning_turn()
     result = Engine(Settings()).run(turn, lambda _: None)
@@ -60,6 +89,25 @@ def test_planning_does_not_borrow_demo_flight_or_terrain():
     assert flight["route"]["route_id"] == "real-123"
     assert "83.4" not in result["text"]
     assert "未借用" in Toolset(turn).inspect_terrain_risk({})["reason"]
+
+
+def test_unsafe_model_environment_claim_is_replaced_not_appended(monkeypatch):
+    from services.assistant.tests.test_assistant import FakeModel, tool_call
+
+    monkeypatch.setattr(
+        Toolset,
+        "assess_route_environment",
+        lambda *a: {"status": "ok", "verdict": "degraded", "gaps": [{"factor": "airspace"}], "factors": []},
+    )
+    model = FakeModel(
+        [
+            tool_call("assess_route_environment", {"origin": [120, 30], "destination": [120.01, 30]}),
+            {"content": "这条航线可以放心飞"},
+        ]
+    )
+    result = Engine(Settings(provider="maas"), model).run(make_turn("这条航线能不能飞？"), lambda _: None)
+    assert "可以放心飞" not in result["text"]
+    assert "degraded" in result["text"] and "1 项" in result["text"]
 
 
 def test_saved_intake_keeps_route_contract_and_scene(monkeypatch):

@@ -196,6 +196,57 @@ export function ResponseBlocks({
               }
             />
           )}
+          {block.type === "env_matrix" && (
+            <div
+              className={`env-verdict env-verdict-${block.verdict}`}
+              data-verdict={block.verdict}
+            >
+              <strong>{block.verdict}</strong>
+              <p>{block.verdict_reason}</p>
+              <p>{block.coverage_statement}</p>
+              <ul>
+                {block.factors.map((factor) => (
+                  <li
+                    key={factor.id}
+                    className={`env-factor env-factor-${factor.status}`}
+                    data-status={factor.status}
+                  >
+                    {factor.name} · {factor.status}
+                    {factor.value === null || factor.value === undefined
+                      ? ""
+                      : ` ${factor.value}${factor.unit}`}
+                    <small>
+                      {factor.segment_index == null
+                        ? ""
+                        : `航段 ${factor.segment_index + 1} · `}
+                      {factor.reason}
+                    </small>
+                  </li>
+                ))}
+              </ul>
+              <code>{block.evidence_id}</code>
+            </div>
+          )}
+          {block.type === "gaps" && (
+            <ol className="env-gaps">
+              {block.items.map((item) => (
+                <li key={item.factor}>
+                  <strong>{item.factor}</strong> {item.why}
+                  <small>{item.to_close}</small>
+                </li>
+              ))}
+            </ol>
+          )}
+          {block.type === "time_window" && (
+            <ul className="env-time-window">
+              {block.options.map((option) => (
+                <li key={option.scheduled_for} data-verdict={option.verdict}>
+                  {option.scheduled_for} · {option.verdict}
+                  <small>{option.reason}</small>
+                </li>
+              ))}
+            </ul>
+          )}
           <Source block={block} />
         </section>
       ))}

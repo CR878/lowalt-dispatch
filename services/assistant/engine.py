@@ -17,7 +17,7 @@ from services.assistant.evidence import LOCAL_TZ, parse_schedule
 from services.assistant.models import Turn
 from services.assistant.presentation import build_presentation
 from services.assistant.telemetry import LiveTelemetry
-from services.assistant.tools import ALIASES, PLACES, Toolset, draft_digest
+from services.assistant.tools import ALIASES, ENV_TOOL_NAMES, PLACES, Toolset, draft_digest
 
 DOCUMENT_QUESTION = re.compile(
     r"竞赛.*(?:目标|交付|视频|现状)|演示视频|/demo|"
@@ -33,7 +33,7 @@ NO_DOCUMENT_EVIDENCE = "项目文档里没有找到能回答这个问题的依�
 GEO_INTENT = re.compile(
     r"送|配送|运送|寄|任务|工单|航线|路线|起飞|降落|返航|地点|定位|地图|"
     r"从.{0,24}到|公斤|千克|kg|载荷|机场|大学|校区|园区|天气|风速|阵风|预报|"
-    r"能耗|航时|海拔|高度",
+    r"能耗|航时|海拔|高度|能不能飞|能飞|风险|未判定|缺口|判定|备降|起降|台账",
     re.I,
 )
 
@@ -50,6 +50,7 @@ def allowed_tools(turn: Turn) -> set[str]:
         DOCUMENT_QUESTION.search(turn.text) or (not turn.draft and not _needs_geo_tools(context))
     ):
         names -= {
+            *ENV_TOOL_NAMES,
             "resolve_real_place",
             "get_weather_forecast",
             "create_task_intake",
@@ -553,10 +554,24 @@ class Engine:
 创建工单须由用户点击结构化确认卡，模型填写的 text 或 confirmed 标记不能替代确认。确认卡请求由服务端直接处理，无需模型重新解释。
 建单成功后只回复工具返回的 summary 一句话（可补一句航线在后台计算），不要把 warnings 数组逐条抄给用户；提示只在用户问起时再展开。
 天气预报是模式预报而非实测，限制区是仿真草稿而非实测空域，路线只能是几何预览；这些限制必须如实说明。工单只做记录，不下发、不执行。
-只提取用户在对话中明确给出的字段，不自行补坐标、能量或载荷。只调用提供的工具，每次最多调用3个。
+只提取用户在对话中明确给出的字段，不自行补坐标、能量或载荷。只调用提供的工具，每次最多调用5个。
 地形分析只能给出包围框平面交叠，缺垂向净空/备降校验时必须说明；模拟数据须标注。
 不提供起飞/降落/返航/绕过校验/下发能力，不输出飞行成功。没有完整M3审计时只解释本页事件。
 不要输出隐藏思考过程。最终回答说明结果、数据来源、限制和下一步，图表使用指定的 chart 代码块。
+【环境判定规则 · 必须遵守】
+涉及"航线能不能飞 / 有没有风险 / 中间天气"时，必须先调 assess_route_environment。
+只查了端点天气就回答航线问题，视为未完成。
+回答环境类问题必须同时给出三样：verdict（原词，不要翻译成"可以/不可以"）、
+触发它的具体因素与航段、以及 gaps 的数量与首条内容。
+没有 gaps 字段就说明工具没返回，此时不得自行断言"已充分考虑"。
+用户问"能不能飞"时，禁止回答"可以飞/没问题/安全"；正确表述是
+"几何可行；环境判定为 degraded；另有未判定项，见缺口清单；不构成飞行批准"。
+工具返回 status=unavailable 时，直接说明"该项数据不可用"，不得用常识补充。
+用户改了起飞时刻、载荷、机型或起终点后，之前的判定作废，必须重新调用工具。
+compare_departure_times 只能给各时刻的判定对比，不得推荐"最佳起飞时间"。
+explain_verdict 只能解释已有的 evidence_id，不得重新计算。
+涉及法规/空域时，明确"未接入 NOTAM/UOM，需人工核对"，不得引用记忆中的条款号。
+每次最多调用 5 个工具；同一工具同一参数不要重复调用。
 """
         prompt += f"\n服务器当前时刻为 {datetime.now(LOCAL_TZ).isoformat()}，日期推断使用此时刻。确认参数以用户确认卡为准。"
         prompt += (
@@ -591,9 +606,18 @@ class Engine:
                 if not tools.results and not turn.web_search:
                     call("get_capabilities")
                     return "模型未查询业务证据，本轮仅提供能力说明。请明确需要查询的状态、任务或风险。"
+                from services.assistant.honesty import forced_disclosure, verify_response_honesty
+
+                asked = any(token in turn.text for token in ("能飞", "能不能飞", "有没有风险", "可不可以飞"))
+                violations = verify_response_honesty(content, tools.results, asked_flight_feasibility=asked)
+                if violations:
+                    content = forced_disclosure(tools.results)
                 return content[:6000]
-            if not isinstance(calls, list) or len(calls) > 3:
-                raise ModelUnavailable("本轮工具调用超过上限，请缩小问题范围。")
+            if not isinstance(calls, list):
+                raise ModelUnavailable("本轮工具调用格式无效，请缩小问题范围。")
+            if len(calls) > 5:
+                calls = calls[:5]
+                tools.results["tool_budget"] = {"status": "truncated", "reason": "工具预算用尽"}
             if count + len(calls) > 8:
                 return self._partial_answer(tools)
             messages.append({"role": "assistant", "content": message.get("content"), "tool_calls": calls})

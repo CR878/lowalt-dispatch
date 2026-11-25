@@ -211,12 +211,15 @@ def plan_real_route(
         ):
             raise ValueError("限制区必须为 FeatureCollection")
         features = [*features, *exclusions_fc["features"]]
+    coverage_status = obstacles_fc.get("coverage_status")
     warnings = [
         "全部建筑按足迹保守绕行；高度标签和估算高度均不用于允许越顶。",
         "局部等距圆柱投影为近似米制坐标；加权 A* 不保证最短路线。",
         "仅避让已获取的 OSM 建筑；OSM 覆盖完整性、地形、线缆及官方空域未验证。",
     ]
-    if not features:
+    if coverage_status == "queried_empty":
+        warnings.append("本次查询成功但范围内没有 OSM 已登记建筑；这不是现场无障碍，也不能作为运营通过。")
+    elif not features:
         warnings.append("该覆盖范围未返回建筑记录；不代表现实中没有建筑。")
     base = {
         "found": False,
@@ -243,6 +246,10 @@ def plan_real_route(
                 "stage_timings_ms": stage_timings | {stage_name: (now - stage_started) * 1000},
             }
         )
+
+    if coverage_status in {"partial", "timeout", "expired", "not_queried"}:
+        warnings.append("局部失效、超时、过期或未查询不能以空障碍列表产生通过结果。")
+        return done(reason="障碍覆盖不完整、过期、超时或未查询，拒绝以空列表发布可通过结果")
 
     polygons = []
     for index, feature in enumerate(features):
