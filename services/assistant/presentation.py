@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from services.assistant.models import Contract
+from services.assistant.task_evidence import TaskEvidence
 
 
 class Block(Contract):
@@ -71,8 +72,14 @@ class RouteBlock(Block):
     waypoints: list[tuple[float, float]] = Field(min_length=2, max_length=5000)
 
 
+class TaskEvidenceBlock(Block):
+    type: Literal["task_evidence"] = "task_evidence"
+    evidence: TaskEvidence
+
+
 UIBlock = Annotated[
-    MetricsBlock | ChartBlock | TableBlock | TimelineBlock | RouteBlock, Field(discriminator="type")
+    MetricsBlock | ChartBlock | TableBlock | TimelineBlock | RouteBlock | TaskEvidenceBlock,
+    Field(discriminator="type"),
 ]
 
 
@@ -91,8 +98,34 @@ def number(value) -> float | None:
 
 def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
     blocks: list[UIBlock] = []
+    task = results.get("get_task_evidence")
+    if task and task.get("status") == "ok":
+        blocks.append(
+            TaskEvidenceBlock(
+                title="任务证据卡",
+                source=task["source"],
+                as_of=task["evidence"]["generated_at"],
+                evidence=TaskEvidence.model_validate(task["evidence"]),
+            )
+        )
     flight = results.get("get_flight_status")
-    if flight:
+    if flight and flight.get("telemetry_mode") == "planning":
+        route = flight.get("route") or {}
+        blocks.append(
+            MetricsBlock(
+                title="当前规划路线",
+                source=flight["source"],
+                note=flight["reason"],
+                items=[
+                    Metric(
+                        label="航点",
+                        value=len(route["waypoints"]) if route.get("waypoints") else None,
+                        unit="个",
+                    )
+                ],
+            )
+        )
+    if flight and flight.get("telemetry_mode") != "planning":
         sample = flight.get("telemetry") or {}
         blocks.append(
             MetricsBlock(

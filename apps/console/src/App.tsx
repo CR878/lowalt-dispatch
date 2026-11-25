@@ -1,3 +1,4 @@
+import type { AirspaceRegion } from "./navigation/airspace";
 import { DispatchPanel, rememberedDispatchTask } from "./DispatchPanel";
 import { useTheme } from "./portal/Theme";
 import {
@@ -109,6 +110,7 @@ import {
   fetchRadarFrame,
   fetchWeather,
   fetchWindField,
+  windRegionFor,
   hasRadarCoverage,
   weatherCodeLabel,
   WEATHER_REFRESH_MS,
@@ -151,7 +153,7 @@ const initialEvents: EventItem[] = [
     time: "13:44:24",
     type: "info",
     title: "任务数据已载入",
-    detail: "T-S1-01 · 几何基线 / 266个航点",
+    detail: "T-S1-01 · 冻结几何基线，详情见算法记录",
   },
   {
     id: "e1",
@@ -519,7 +521,7 @@ function WeatherHud({
             {!windView && <button onClick={onShowWind}>查看区域</button>}
           </div>
           {!windView ? (
-            <small>切到长三角总览可看风场。</small>
+            <small>切到任务区域总览可看风场。</small>
           ) : windError ? (
             <span role="status">
               {windError} <button onClick={onRetry}>重试</button>
@@ -603,7 +605,49 @@ export default function App({
     hillshade: true,
   });
   const [showLayers, setShowLayers] = useState(false);
-  const [compare, setCompare] = useState(true);
+  const [baselineReview, setBaselineReview] = useState<ReviewRoute | null>(
+    null,
+  );
+  useEffect(() => {
+    const abort = new AbortController();
+    fetch("/demo-scene.json", { signal: abort.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("场景不可用");
+        return r.json();
+      })
+      .then((data) => {
+        if (
+          !Array.isArray(data.margin_profile) ||
+          !data.margin_profile.length ||
+          !Array.isArray(data.validation_checks)
+        )
+          return;
+        if (
+          data.margin_profile.some(
+            (p: { s_m: number; margin_wh: number }) =>
+              !Number.isFinite(p.s_m) || !Number.isFinite(p.margin_wh),
+          )
+        )
+          return;
+        setBaselineReview({
+          id: "S1-01-baseline",
+          task_id: "T-S1-01",
+          title: "冻结基线",
+          version: data.metadata.revision.slice(0, 12),
+          algorithm: "astar_static",
+          energy_wh: data.energy_wh,
+          site: "",
+          checks: data.validation_checks,
+          waypoints: data.route,
+          samples: data.margin_profile,
+          source: data.metadata.source,
+          captured_at: data.metadata.generated_at,
+          is_simulated: true,
+        });
+      })
+      .catch(() => {});
+    return () => abort.abort();
+  }, []);
   const [reviewRoute, setReviewRoute] = useState<ReviewRoute | null>(null);
   const [taskRoute, setTaskRoute] = useState<{
     route_id: string;
@@ -636,6 +680,16 @@ export default function App({
   const [locationOpen, setLocationOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<GeoPlace | null>(null);
   const [geoMission, setGeoMission] = useState<GeoMission>(loadGeoMission);
+  const [intakeSelection, setIntakeSelection] = useState<{
+    id: string;
+    points: string;
+  } | null>(null);
+  const selectedIntakeId =
+    intakeSelection?.points ===
+    JSON.stringify([geoMission.origin?.point, geoMission.destination?.point])
+      ? intakeSelection.id
+      : null;
+  const [planningRegions, setPlanningRegions] = useState<AirspaceRegion[]>([]);
   const [realSchedule, setRealSchedule] = useState<string | null>(null);
   const [autoRealRequest, setAutoRealRequest] = useState<{
     mission: GeoMission;
@@ -736,6 +790,15 @@ export default function App({
     selectedPlace?.point ??
     enuToLngLat([1284, 1460]);
   const [weatherLng, weatherLat] = weatherTarget;
+  const windRegion = useMemo(
+    () => windRegionFor([weatherLng, weatherLat]),
+    [weatherLng, weatherLat],
+  );
+  const windRegionKey = JSON.stringify(windRegion);
+  useEffect(() => {
+    setWindField(null);
+    if (weatherLayer === "wind") setWindOverviewRequested(true);
+  }, [windRegionKey, weatherLayer]);
   const weatherTargetLabel = geoMission.origin
     ? `起点 · ${geoMission.origin.name}`
     : (selectedPlace?.name ?? "演示城区 · 上海");
@@ -769,22 +832,34 @@ export default function App({
       controller.abort();
     };
   }, [weatherLng, weatherLat, weatherNonce, weatherMapVisible]);
-  const windCache = useRef<{ field: WindField; loadedAt: number } | null>(null);
+  const windCache = useRef<{
+    field: WindField;
+    loadedAt: number;
+    regionKey: string;
+  } | null>(null);
   useEffect(() => {
     if (weatherLayer !== "wind" || !weatherMapVisible || !windView) return;
     const controller = new AbortController();
     const load = async () => {
       if (windMoving.current) return;
       const cached = windCache.current;
-      if (cached && Date.now() - cached.loadedAt < WEATHER_REFRESH_MS) {
+      if (
+        cached &&
+        cached.regionKey === windRegionKey &&
+        Date.now() - cached.loadedAt < WEATHER_REFRESH_MS
+      ) {
         setWindField(cached.field);
         setWindError("");
         return;
       }
       try {
-        const field = await fetchWindField(controller.signal);
+        const field = await fetchWindField(controller.signal, windRegion);
         if (controller.signal.aborted) return;
-        windCache.current = { field, loadedAt: Date.now() };
+        windCache.current = {
+          field,
+          loadedAt: Date.now(),
+          regionKey: windRegionKey,
+        };
         setWindField(field);
         setWindError("");
       } catch (error) {
@@ -798,7 +873,7 @@ export default function App({
       window.clearInterval(timer);
       controller.abort();
     };
-  }, [weatherLayer, weatherMapVisible, windView, weatherNonce]);
+  }, [weatherLayer, weatherMapVisible, windView, weatherNonce, windRegionKey]);
   useEffect(() => {
     if (weatherLayer !== "radar" || !weatherMapVisible) return;
     const controller = new AbortController();
@@ -872,6 +947,7 @@ export default function App({
       showWindRegion();
   };
   const mapWeather = {
+    windRegion,
     radarTiles: weatherLayer === "radar" ? (radar?.tiles ?? null) : null,
     wind: weatherLayer === "wind" ? windField : null,
   };
@@ -879,6 +955,9 @@ export default function App({
   const notify = useCallback((message: string) => setToast(message), []);
   const showRealRoute = useCallback(
     (route: NavRoute) => {
+      setAssistantPreview(null);
+      setTaskRoute(null);
+      setReviewRoute(null);
       setDemoVisible(false);
       setPlaying(false);
       setTerminalMap(false);
@@ -889,11 +968,17 @@ export default function App({
     },
     [notify],
   );
-  const realRouting = useRealRouting(geoMission, showRealRoute);
+  const realRouting = useRealRouting(
+    geoMission,
+    showRealRoute,
+    planningRegions,
+  );
   const realPlanningMode =
     !liveMode &&
     Boolean(
       autoRealRequest ||
+        selectedIntakeId ||
+        (geoMission.origin && geoMission.destination) ||
         realRouting.busy ||
         realRouting.result ||
         realRouting.error,
@@ -965,6 +1050,10 @@ export default function App({
             return;
           }
           setGeoMission({ origin, destination });
+          setIntakeSelection({
+            id: intakeId,
+            points: JSON.stringify([origin.point, destination.point]),
+          });
           setRealSchedule(item.scheduled_for ?? null);
           setDemoVisible(false);
           setPlaying(false);
@@ -981,7 +1070,12 @@ export default function App({
           const stored = item.real_route;
           if (
             stored?.status === "ok" &&
-            realRouting.hydrate(stored, item.scheduled_for ?? null)
+            realRouting.hydrate(
+              stored,
+              item.scheduled_for ?? null,
+              item.payload_kg,
+              { origin, destination },
+            )
           ) {
             setAutoRealRequest(null);
             notify("已载入工单和工单里已保存的真实避障航线");
@@ -1008,7 +1102,12 @@ export default function App({
                   const route = latest?.real_route;
                   if (route?.status === "ok") {
                     window.clearInterval(timer);
-                    realRouting.hydrate(route, latest.scheduled_for ?? null);
+                    realRouting.hydrate(
+                      route,
+                      latest.scheduled_for ?? null,
+                      latest.payload_kg,
+                      { origin, destination },
+                    );
                     notify("工单航线已计算完成");
                   } else if (route?.status === "unavailable") {
                     window.clearInterval(timer);
@@ -1153,6 +1252,23 @@ export default function App({
     [taskRoute, assistantPreview, realRouting.route],
   );
   const nav = useNavigation({
+    onRealCandidates: (route) => {
+      const place = (p: (typeof route.waypoints)[number]): GeoPlace => ({
+        name: p.label,
+        point: [p.x, p.y],
+        source: "coordinates",
+        capturedAt: new Date().toISOString(),
+      });
+      const mission = {
+        origin: place(route.waypoints[0]),
+        destination: place(route.waypoints[route.waypoints.length - 1]),
+      };
+      setGeoMission(mission);
+      setAutoRealRequest({ mission, scheduledFor: realSchedule });
+      notify("正在按当前路线起终点与导入限制区重新规划");
+    },
+    regions: planningRegions,
+    setRegions: setPlanningRegions,
     liveMode,
     liveFrame,
     liveStatus,
@@ -1173,6 +1289,22 @@ export default function App({
       setLayers((v) => ({ ...v, routes: true }));
     },
   });
+  const navigationActive =
+    (nav.open || nav.enabled) && nav.route?.id !== "demo-scene";
+  const activePlanningRoute = navigationActive
+    ? nav.route
+    : (navigationRoutes[0] ?? null);
+  const planningContext =
+    !liveMode &&
+    (realPlanningMode ||
+      !!assistantPreview ||
+      !!taskRoute ||
+      !!navigationActive);
+  const planningFrame = activePlanningRoute?.frame ?? "WGS84";
+  const contextIntakeId =
+    activePlanningRoute?.id === realRouting.route?.id ? selectedIntakeId : null;
+  const displayedReview =
+    reviewRoute ?? (!liveMode && !planningContext ? baselineReview : null);
   useEffect(() => {
     if (
       !nav.enabled ||
@@ -1408,21 +1540,44 @@ export default function App({
       schema_version: "aeris-ui-0.1",
       exported_at: new Date().toISOString(),
       provenance: {
-        is_simulated: liveMode ? (liveFrame?.is_simulated ?? null) : true,
-        source: liveMode ? (liveFrame?.source ?? null) : "frontend demo",
+        is_simulated: liveMode
+          ? (liveFrame?.is_simulated ?? null)
+          : planningContext
+            ? (activePlanningRoute?.is_simulated ?? null)
+            : true,
+        source: liveMode
+          ? (liveFrame?.source ?? null)
+          : planningContext
+            ? (activePlanningRoute?.source ?? "planning")
+            : "frontend demo",
         captured_at: liveMode ? (liveFrame?.captured_at ?? null) : null,
-        telemetry_mode: liveMode ? "live" : "demo",
+        telemetry_mode: liveMode
+          ? "live"
+          : planningContext
+            ? "planning"
+            : "demo",
         telemetry_status: liveMode ? liveStatus : null,
       },
-      telemetry: readings,
-      terrain,
-      events,
-      progress: liveMode ? null : progress,
+      active_route: activePlanningRoute,
+      telemetry: planningContext && !liveMode ? null : readings,
+      terrain: planningContext || liveMode ? null : terrain,
+      events: planningContext && !liveMode ? [] : events,
+      progress: liveMode || planningContext ? null : progress,
       drafts,
       geographic_mission: {
         crs: "EPSG:4326",
         ...geoMission,
-        route_status: "not_planned",
+        route_status: realRouting.busy
+          ? "pending"
+          : realRouting.route
+            ? "planned"
+            : realRouting.error
+              ? "unavailable"
+              : "not_planned",
+        route: realRouting.route,
+        scene_id: realRouting.result?.scene_id ?? null,
+        planning_result: realRouting.result,
+        scene: realRouting.scene,
         basemap: mapStatus,
         demo_anchor_is_georeferenced: false,
       },
@@ -1563,9 +1718,17 @@ export default function App({
             }}
           >
             <span className="status-dot" />{" "}
-            {liveMode ? "LIVE" : realPlanningMode ? "真实地图规划" : "DEMO"}{" "}
+            {liveMode
+              ? "LIVE"
+              : planningContext
+                ? `${planningFrame} 规划`
+                : "DEMO"}{" "}
             <span className="environment-label">
-              {liveMode ? "实时遥测" : "演示数据"}
+              {liveMode
+                ? "实时遥测"
+                : planningContext
+                  ? "几何参考"
+                  : "演示数据"}
             </span>
           </button>
           <time className="clock">
@@ -1695,25 +1858,29 @@ export default function App({
           </div>
         </div>
 
-        {realPlanningMode ? (
-          <section className="summary-strip" aria-label="真实航线状态概览">
+        {planningContext ? (
+          <section className="summary-strip" aria-label="规划航线状态概览">
             <div className="summary-current">
               <div>
-                <strong>WGS84 建筑避障</strong>
-                <small>OSM 真实地图 · 水平几何参考</small>
+                <strong>{planningFrame} 航线参考</strong>
+                <small>
+                  {activePlanningRoute?.source ?? "等待生成规划路线"}
+                </small>
               </div>
             </div>
             <div className="summary-item">
               <span>航线长度</span>
               <strong>
-                {realRouting.route
-                  ? `${(routeMetrics(realRouting.route).length / 1000).toFixed(2)} km`
+                {activePlanningRoute
+                  ? `${(routeMetrics(activePlanningRoute).length / 1000).toFixed(2)} km`
                   : "未生成"}
               </strong>
             </div>
             <div className="summary-item">
-              <span>地图来源</span>
-              <strong>OpenStreetMap</strong>
+              <span>坐标基准</span>
+              <strong>
+                {planningFrame === "ENU" ? "局部仿真坐标" : "WGS84 经纬度"}
+              </strong>
             </div>
             <div className="summary-item">
               <span>航路预报</span>
@@ -1769,7 +1936,7 @@ export default function App({
               <span>
                 {liveMode
                   ? "电量 / 电压"
-                  : realPlanningMode
+                  : planningContext
                     ? "AI 工单"
                     : "任务编号"}
               </span>
@@ -1780,7 +1947,7 @@ export default function App({
                     <small>%</small>
                     <small> / {metric(liveFrame?.voltage)} V</small>
                   </>
-                ) : realPlanningMode ? (
+                ) : planningContext ? (
                   <>
                     {geoMission.origin?.name ?? "起点"} →{" "}
                     {geoMission.destination?.name ?? "终点"} <i>AI 工单</i>
@@ -1794,14 +1961,14 @@ export default function App({
             </div>
             <div className="summary-item">
               <span>
-                {liveMode ? "地速" : realPlanningMode ? "真实航线" : "航程进度"}
+                {liveMode ? "地速" : planningContext ? "真实航线" : "航程进度"}
               </span>
               <strong>
                 {liveMode ? (
                   <>
                     {metric(liveFrame?.speed)} <small>m/s</small>
                   </>
-                ) : realPlanningMode ? (
+                ) : planningContext ? (
                   <>
                     {realRouting.route?.waypoints.length ?? 0}{" "}
                     <small>航点</small>
@@ -1866,7 +2033,7 @@ export default function App({
           </div>
         )}
         <div
-          className={`workspace ${panels.instruments && !focus && !realPlanningMode ? "" : "no-instruments"} ${realPlanningMode ? "real-planning" : ""}`}
+          className={`workspace ${panels.instruments && !focus && !planningContext ? "" : "no-instruments"} ${planningContext ? "real-planning" : ""}`}
         >
           <section className="map-panel panel" aria-label="地图与航线">
             <div className="map-toolbar">
@@ -1904,7 +2071,7 @@ export default function App({
                   title={
                     weatherLayer === "wind" && weatherMapVisible && windView
                       ? "关闭风场"
-                      : "查看长三角风场"
+                      : "查看区域风场"
                   }
                   onClick={() =>
                     selectWeatherLayer(
@@ -2296,7 +2463,7 @@ export default function App({
                 </div>
               )}
               {!liveMode &&
-                !realPlanningMode &&
+                !planningContext &&
                 panels.mission &&
                 !focus &&
                 !locationOpen && (
@@ -2330,12 +2497,13 @@ export default function App({
                     <div className="mission-card-footer">
                       <span>几何基线</span>
                       <span>
-                        266 航点 <ArrowUpRight size={11} />
+                        {baselineReview?.waypoints.length ?? "—"} 航点{" "}
+                        <ArrowUpRight size={11} />
                       </span>
                     </div>
                   </div>
                 )}
-              {!realPlanningMode && (
+              {!planningContext && (
                 <button
                   className={`terrain-status glass ${terrain?.count ? "changed" : ""}`}
                   onClick={() => setDrawer("settings")}
@@ -2356,74 +2524,71 @@ export default function App({
                   <ChevronRight size={13} />
                 </button>
               )}
-              {!liveMode &&
-                !realPlanningMode &&
-                panels.perception &&
-                !focus && (
-                  <div
-                    className={`perception-card glass${weatherExpanded ? " compact" : ""}`}
-                  >
-                    <div className="mission-card-top">
-                      <span>
-                        <Radar size={12} /> 感知与搜索 <small>DEMO</small>
-                      </span>
-                      {weatherExpanded ? (
-                        <IconButton
-                          label="展开感知与搜索"
-                          onClick={() => setWeatherOpen(false)}
-                        >
-                          <ChevronDown size={12} />
-                        </IconButton>
-                      ) : (
-                        <IconButton
-                          label="隐藏感知与搜索 5"
-                          onClick={() => togglePanel("perception")}
-                        >
-                          <Minus size={12} />
-                        </IconButton>
-                      )}
-                    </div>
-                    {!weatherExpanded && (
-                      <>
-                        <RadarDisplay
-                          heading={t.heading}
-                          playing={playing && !motionReduced}
-                        />
-                        <div className="perception-coverage">
-                          <strong>
-                            {t.coverage}
-                            <small>%</small>
-                          </strong>
-                          <span>
-                            区域覆盖
-                            <small>
-                              {t.scanned} / {t.totalCells} 网格
-                            </small>
-                          </span>
-                        </div>
-                        <div className="coverage-track">
-                          <i style={{ width: `${t.coverage}%` }} />
-                        </div>
-                        <div className="perception-metrics">
-                          <div>
-                            <span>目标距离</span>
-                            <strong>
-                              {t.distanceToTarget}
-                              <small> m</small>
-                            </strong>
-                          </div>
-                          <div>
-                            <span>前方障碍</span>
-                            <strong>
-                              {t.obstacleDistance}
-                              <small> m</small>
-                            </strong>
-                          </div>
-                        </div>
-                      </>
+              {!liveMode && !planningContext && panels.perception && !focus && (
+                <div
+                  className={`perception-card glass${weatherExpanded ? " compact" : ""}`}
+                >
+                  <div className="mission-card-top">
+                    <span>
+                      <Radar size={12} /> 感知与搜索 <small>DEMO</small>
+                    </span>
+                    {weatherExpanded ? (
+                      <IconButton
+                        label="展开感知与搜索"
+                        onClick={() => setWeatherOpen(false)}
+                      >
+                        <ChevronDown size={12} />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        label="隐藏感知与搜索 5"
+                        onClick={() => togglePanel("perception")}
+                      >
+                        <Minus size={12} />
+                      </IconButton>
                     )}
                   </div>
-                )}
+                  {!weatherExpanded && (
+                    <>
+                      <RadarDisplay
+                        heading={t.heading}
+                        playing={playing && !motionReduced}
+                      />
+                      <div className="perception-coverage">
+                        <strong>
+                          {t.coverage}
+                          <small>%</small>
+                        </strong>
+                        <span>
+                          区域覆盖
+                          <small>
+                            {t.scanned} / {t.totalCells} 网格
+                          </small>
+                        </span>
+                      </div>
+                      <div className="coverage-track">
+                        <i style={{ width: `${t.coverage}%` }} />
+                      </div>
+                      <div className="perception-metrics">
+                        <div>
+                          <span>目标距离</span>
+                          <strong>
+                            {t.distanceToTarget}
+                            <small> m</small>
+                          </strong>
+                        </div>
+                        <div>
+                          <span>前方障碍</span>
+                          <strong>
+                            {t.obstacleDistance}
+                            <small> m</small>
+                          </strong>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {showWeatherHud && (
                 <WeatherHud
@@ -2524,7 +2689,7 @@ export default function App({
                     (
                       [
                         ["off", "关闭天气叠加"],
-                        ["wind", "区域风场 · 长三角"],
+                        ["wind", "区域风场 · 跟随地点"],
                         ["radar", "降雨雷达 · RainViewer"],
                       ] as const
                     ).map(([layer, label]) => (
@@ -2589,7 +2754,7 @@ export default function App({
                   </span>
                   <span>
                     <i className="legend-planned" />
-                    对照示意
+                    起终点直线 · 非规划
                   </span>
                   <span>
                     <i className="legend-zone" />
@@ -2644,7 +2809,7 @@ export default function App({
                 )}
               </div>
             ) : (
-              <div className="playback" hidden={realPlanningMode}>
+              <div className="playback" hidden={planningContext}>
                 <IconButton
                   label={playing ? "暂停演示 空格" : "继续演示 空格"}
                   active={!playing}
@@ -2693,7 +2858,7 @@ export default function App({
             )}
           </section>
 
-          {panels.instruments && !focus && !realPlanningMode && (
+          {panels.instruments && !focus && !planningContext && (
             <aside className="instruments">
               <section className="panel telemetry-panel">
                 <PanelTitle title="飞行遥测" subtitle="TELEMETRY">
@@ -2934,27 +3099,24 @@ export default function App({
         {liveMode && !focus && (
           <LiveTelemetryDetails history={liveHistory} status={liveStatusText} />
         )}
-        {!focus && !realPlanningMode && (panels.analysis || panels.events) && (
+        {!focus && !planningContext && (panels.analysis || panels.events) && (
           <div
             className={`bottom-grid ${!panels.analysis ? "events-only" : ""} ${!panels.events ? "analysis-only" : ""}`}
           >
             {panels.analysis && (
               <section className="panel margin-panel">
                 <PanelTitle title="备降余量剖面" subtitle="DIVERSION MARGIN">
-                  <span className="data-tag">示例曲线</span>
+                  <span className="data-tag">
+                    {displayedReview
+                      ? "冻结算法剖面 · 示例参数"
+                      : "当前路线未计算剖面"}
+                  </span>
                   <button
                     className="chart-compare"
                     onClick={() => setDrawer("routes")}
                   >
                     <Route size={12} />
                     方案
-                  </button>
-                  <button
-                    className={`chart-compare ${compare ? "selected" : ""}`}
-                    aria-pressed={compare}
-                    onClick={() => setCompare((v) => !v)}
-                  >
-                    {compare ? <Eye size={12} /> : <EyeOff size={12} />} 对照
                   </button>
                   <IconButton
                     label="隐藏航线分析 3"
@@ -2967,36 +3129,33 @@ export default function App({
                   <div className="margin-summary">
                     <span>候选方案最小余量</span>
                     <strong>
-                      {reviewRoute
-                        ? reviewRoute.samples.length
+                      {displayedReview
+                        ? displayedReview.samples.length
                           ? Math.min(
-                              ...reviewRoute.samples.map((p) => p.margin_wh),
+                              ...displayedReview.samples.map(
+                                (p) => p.margin_wh,
+                              ),
                             ).toFixed(2)
                           : "—"
-                        : "+34.8"}
+                        : "—"}
                       <small>Wh</small>
                     </strong>
                     <div className="margin-chip">
                       <ShieldCheck size={11} />{" "}
-                      {reviewRoute
-                        ? `${reviewRoute.version} · 历史演示`
-                        : "示例全程非负"}
+                      {displayedReview
+                        ? `${displayedReview.version} · ${displayedReview.checks.every((c) => c.passed) ? "示例参数通过" : "存在拒绝项"}`
+                        : "暂无对应校验"}
                     </div>
                     <p>
-                      <i /> 候选示例 <span />
-                      <i className="gray" /> 对照示例
+                      <i /> 冻结算法样本
                     </p>
                   </div>
-                  {reviewRoute && !reviewRoute.samples.length ? (
+                  {!displayedReview || !displayedReview.samples.length ? (
                     <div className="review-no-profile">
-                      此历史方案暂无剖面数据
+                      当前路线暂无备降余量与独立校验结果；未借用演示曲线。
                     </div>
                   ) : (
-                    <MarginChart
-                      progress={progress}
-                      compare={compare && !reviewRoute}
-                      review={reviewRoute}
-                    />
+                    <MarginChart progress={progress} review={displayedReview} />
                   )}
                 </div>
               </section>
@@ -3046,21 +3205,21 @@ export default function App({
             <span className="status-dot" />{" "}
             {liveMode
               ? "M4 TELEMETRY"
-              : realPlanningMode
-                ? "OSM GEOMETRY"
+              : planningContext
+                ? `${planningFrame} GEOMETRY`
                 : "LOCAL DEMO"}{" "}
             <i />{" "}
             {liveMode
               ? "场景与备降剖面为示例"
-              : realPlanningMode
-                ? "真实建筑足迹 · 空域与平台性能待核对"
+              : planningContext
+                ? "几何规划参考 · 空域与平台性能待核对"
                 : "演示仪表不代表真实飞控遥测"}
           </span>
           <div>
             <span>
-              {realPlanningMode ? "WGS84 公开地图" : "地形阈值 ≥ 2 m"}
+              {planningContext ? `${planningFrame} 规划坐标` : "地形阈值 ≥ 2 m"}
             </span>
-            <span>{realPlanningMode ? "未生成飞控指令" : "场景版本 V0.1"}</span>
+            <span>{planningContext ? "未生成飞控指令" : "场景版本 V0.1"}</span>
             <button onClick={() => setDrawer("help")}>
               <Command size={11} /> 快捷键
             </button>
@@ -3080,15 +3239,41 @@ export default function App({
               liveMode && liveFrame
                 ? liveFrame.captured_at
                 : new Date().toISOString(),
-            task_id: "T-S1-01",
-            selected_task_id: dispatchTaskId || null,
-            route_id: "S1-01-baseline",
-            progress: liveMode ? 0 : progress,
-            telemetry_mode: liveMode ? "live" : "demo",
-            telemetry: liveMode ? null : t,
+            task_id: liveMode
+              ? (liveFrame?.task_id ?? null)
+              : planningContext
+                ? contextIntakeId || activePlanningRoute?.task_id || null
+                : "T-S1-01",
+            selected_task_id: planningContext ? null : dispatchTaskId || null,
+            selected_intake_id: planningContext ? contextIntakeId : null,
+            active_route:
+              planningContext && activePlanningRoute
+                ? {
+                    route_id: activePlanningRoute.id,
+                    task_id: contextIntakeId || activePlanningRoute.task_id,
+                    frame: activePlanningRoute.frame,
+                    source: activePlanningRoute.source,
+                    waypoints: activePlanningRoute.waypoints.map((p) => [
+                      p.x,
+                      p.y,
+                    ]),
+                  }
+                : null,
+            route_id: liveMode
+              ? (liveFrame?.plan_version ?? null)
+              : planningContext
+                ? (activePlanningRoute?.id ?? null)
+                : "S1-01-baseline",
+            progress: liveMode || planningContext ? 0 : progress,
+            telemetry_mode: liveMode
+              ? "live"
+              : planningContext
+                ? "planning"
+                : "demo",
+            telemetry: liveMode || planningContext ? null : t,
             live_telemetry: liveMode ? liveFrame : null,
-            terrain: liveMode ? null : terrain,
-            events,
+            terrain: liveMode || planningContext ? null : terrain,
+            events: planningContext && !liveMode ? [] : events,
           }}
           onDraft={saveAssistantDraft}
           onFocus={(point, label) => {
@@ -3097,6 +3282,12 @@ export default function App({
             setAssistantFocus(label);
           }}
           onRoute={(route) => {
+            if (route) {
+              realRouting.clear();
+              setAutoRealRequest(null);
+              setTaskRoute(null);
+              setReviewRoute(null);
+            }
             setAssistantPreview(route);
             if (route) {
               setLayers((l) => ({ ...l, routes: true }));
@@ -3460,7 +3651,7 @@ export default function App({
                     <span className="tag-purple">DEMO DATA</span>
                     <h3>透明的数据边界</h3>
                     <p>
-                      航线来自仓库几何A*基线；仪表为合成遥测。地形、建筑高度与余量曲线为界面演示。卫星影像、公开DEM、天气与雷达来自第三方公开服务，仅作演示参考，不用于飞行决策。
+                      航线来自仓库几何A*基线；仪表为合成遥测。地形与建筑高度为示意；备降余量读取冻结算法样本。卫星影像、公开DEM、天气与雷达来自第三方公开服务，仅作演示参考，不用于飞行决策。
                     </p>
                   </div>
                   <button

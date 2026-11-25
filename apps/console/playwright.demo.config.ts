@@ -13,6 +13,7 @@ export default defineConfig({
     baseURL: "http://127.0.0.1:4175",
     headless: true,
     launchOptions: { args: ["--enable-unsafe-swiftshader"] },
+    ...(process.platform === "win32" ? { channel: "chrome" } : {}),
     trace: "retain-on-failure",
   },
   webServer: {

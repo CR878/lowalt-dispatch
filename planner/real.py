@@ -157,6 +157,7 @@ def plan_real_route(
     max_expand: int = 500_000,
     heuristic_weight: float = 1.50,
     budget_s: float = PLANNING_BUDGET_S,
+    exclusions_fc: dict | None = None,
 ) -> dict:
     """Plan with exact endpoints, then independently verify continuous clearance.
 
@@ -204,6 +205,12 @@ def plan_real_route(
     features = obstacles_fc.get("features")
     if obstacles_fc.get("type") != "FeatureCollection" or not isinstance(features, list):
         raise ValueError("障碍物必须为 FeatureCollection")
+    if exclusions_fc is not None:
+        if exclusions_fc.get("type") != "FeatureCollection" or not isinstance(
+            exclusions_fc.get("features"), list
+        ):
+            raise ValueError("限制区必须为 FeatureCollection")
+        features = [*features, *exclusions_fc["features"]]
     warnings = [
         "全部建筑按足迹保守绕行；高度标签和估算高度均不用于允许越顶。",
         "局部等距圆柱投影为近似米制坐标；加权 A* 不保证最短路线。",

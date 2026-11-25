@@ -74,3 +74,9 @@ def test_agent_ui_reuse_guide_is_retrievable(monkeypatch):
     monkeypatch.setenv("AERIS_RAG", "keyword")
     hits = search("presentation 指标卡 时间线 CSV 复用")
     assert any(hit["path"] == "docs/Agent富界面输出与复用指南.md" for hit in hits)
+
+
+def test_current_competition_delivery_is_retrievable(monkeypatch):
+    monkeypatch.setenv("AERIS_RAG", "keyword")
+    hits = search("竞赛演示视频 最终交付目标 可重复录制")
+    assert any(hit["path"] in {"AGENTS.md", "docs/demo-video-roadmap.md"} for hit in hits)

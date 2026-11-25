@@ -116,10 +116,12 @@ def lookup(query: str, limit: int = 5) -> tuple[list[dict], str]:
         ("OpenStreetMap / Photon", _photon),
         ("OpenStreetMap / Nominatim", _nominatim),
     ]
+    responded = ""
     for name, provider in providers:
         for attempt in range(2):
             try:
                 rows = provider(query, limit)
+                responded = name
             except Exception:
                 rows = []
             if rows:
@@ -127,4 +129,4 @@ def lookup(query: str, limit: int = 5) -> tuple[list[dict], str]:
                 return rows, name
             if attempt == 0:
                 time.sleep(0.25)
-    return [], ""
+    return [], responded

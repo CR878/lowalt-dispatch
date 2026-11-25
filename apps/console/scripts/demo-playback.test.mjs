@@ -1,5 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { readTaskEvidence } from "../src/assistant/taskEvidence.ts";
+import { RoutePolyline } from "../src/routeGeometry.ts";
+import { Vector3 } from "three";
+import { sampleWind, windRegionFor } from "../src/weather.ts";
 import {
   chapters,
   DURATION,
@@ -9,6 +14,30 @@ import {
 } from "../src/demo/playback.ts";
 
 import { landmarks, makeCityLots } from "../src/demo/city-layout.ts";
+
+test("frozen task contracts accept both cases and reject contradictory or malformed data", () => {
+  const bundle = JSON.parse(
+    readFileSync(
+      new URL("../public/task-evidence.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(readTaskEvidence(bundle.cases.main).task_id, "T-S1-02");
+  assert.equal(readTaskEvidence(bundle.cases.contrast).verdict, "rejected");
+  assert.equal(
+    readTaskEvidence({ ...bundle.cases.contrast, verdict: "passed" }),
+    undefined,
+  );
+  assert.equal(
+    readTaskEvidence({ ...bundle.cases.main, samples: [] }),
+    undefined,
+  );
+  assert.equal(readTaskEvidence({ ...bundle.cases.main, gaps: [] }), undefined);
+  assert.equal(
+    readTaskEvidence({ ...bundle.cases.main, payload_kg: NaN }),
+    undefined,
+  );
+});
 
 test("fictional city has stable districts and unobstructed visual landmark labels", () => {
   const lots = makeCityLots();
@@ -38,7 +67,7 @@ test("confirmation and chapter boundaries are deterministic", () => {
   assert.equal(frameAt(118, true).phase, 4);
   assert.equal(frameAt(118, true).signal, "退化（情景）");
   assert.equal(frameAt(142, true).phase, 5);
-  assert.equal(frameAt(142, true).status, "仿真备降 · 物资待接续");
+  assert.equal(frameAt(142, true).status, "几何航线回放结束 · 未下发");
 });
 
 test("replay never loops from its terminal state and seeking is reversible", () => {
@@ -63,4 +92,30 @@ test("cinematic insert follows replay time and respects manual views", () => {
   assert.equal(visualViewAt("city", 40), "city");
   assert.equal(visualViewAt("studio", 0), "studio");
   assert.equal(visualViewAt("detail", 0), "detail");
+});
+
+test("rendered route preserves corners and uses the same horizontal progress as maps", () => {
+  const curve = new RoutePolyline([
+    new Vector3(0, 0, 0),
+    new Vector3(10, 99, 0),
+    new Vector3(10, 100, 10),
+  ]);
+  assert.deepEqual(curve.getPointAt(0.25).toArray(), [5, 49.5, 0]);
+  assert.deepEqual(curve.getPointAt(0.5).toArray(), [10, 99, 0]);
+  assert.deepEqual(curve.getPointAt(0.75).toArray(), [10, 99.5, 5]);
+  for (const p of curve.getPoints(100))
+    assert.ok(Math.abs(p.z) < 1e-9 || Math.abs(p.x - 10) < 1e-9);
+});
+
+test("wind fields cover the selected city and never reuse another region's grid", () => {
+  const point = [115.83, 28.76];
+  const region = windRegionFor(point);
+  const field = {
+    region,
+    validAt: "2026-11-25T00:00:00Z",
+    vectors: Array.from({ length: 121 }, () => [3, -1]),
+  };
+  assert.deepEqual(sampleWind(field, point), [3, -1]);
+  assert.equal(sampleWind(field, [121.47, 31.23]), null);
+  assert.ok(region.west <= point[0] && region.east >= point[0]);
 });

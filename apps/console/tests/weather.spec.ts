@@ -1,5 +1,51 @@
 import { expect, test } from "./fixtures";
 
+test("regional wind follows a selected city outside Shanghai", async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "aeris-geo-mission-v1",
+      JSON.stringify({
+        origin: {
+          name: "南昌测试起点",
+          point: [115.83, 28.76],
+          source: "coordinates",
+          capturedAt: new Date().toISOString(),
+        },
+        destination: null,
+      }),
+    ),
+  );
+  await page.route("https://basemaps.cartocdn.com/**", (r) => r.abort());
+  let fieldLongitudes: number[] = [];
+  await page.route("https://api.open-meteo.com/**", (r) => {
+    const params = new URL(r.request().url()).searchParams;
+    const points = params.get("latitude")!.split(",");
+    const current = {
+      time: "2026-11-25T08:00",
+      temperature_2m: 18,
+      wind_speed_10m: 4,
+      wind_direction_10m: 270,
+    };
+    if (points.length > 1) {
+      fieldLongitudes = params.get("longitude")!.split(",").map(Number);
+      return r.fulfill({
+        json: points.map((_, location_id) => ({ location_id, current })),
+      });
+    }
+    return r.fulfill({ json: { current } });
+  });
+  await page.goto("/airspace");
+  await page.getByRole("button", { name: "风场", exact: true }).click();
+  await expect.poll(() => fieldLongitudes.length).toBe(121);
+  expect(Math.max(...fieldLongitudes)).toBeLessThan(121);
+  expect(Math.min(...fieldLongitudes)).toBeLessThan(115.83);
+  await expect(
+    page.getByRole("region", { name: "任务区公开气象" }),
+  ).toContainText("南昌测试起点");
+});
+
 test("toolbar opens the regional wind field and weather follows existing mission points", async ({
   page,
 }) => {

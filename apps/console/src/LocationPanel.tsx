@@ -105,7 +105,11 @@ export default function LocationPanel({
       if (token !== generation.current || !mounted.current) return;
       setResults(value.places);
       if (!value.places.length)
-        setMessage("没有找到匹配地点。试试更完整的城市＋地址，或地图选点。");
+        setMessage(
+          value.unavailable
+            ? value.note || "地点搜索服务不可达，请稍后重试或地图选点。"
+            : "没有找到匹配地点。试试更完整的城市＋地址，或地图选点。",
+        );
     } catch (error) {
       if (
         token === generation.current &&
@@ -210,7 +214,9 @@ export default function LocationPanel({
               </span>
             </button>
           ))}
-          <small>搜索：© OpenStreetMap / Nominatim</small>
+          <small>
+            搜索结果为 POI 定位参考；请确认具体地点，并选择实际起降位置。
+          </small>
         </div>
       )}
       {selected && (

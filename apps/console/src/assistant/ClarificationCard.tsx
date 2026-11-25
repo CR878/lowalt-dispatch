@@ -173,6 +173,27 @@ export function ClarificationCard({ data, busy, onConfirm }: Props) {
             {pin.address && (
               <small className="intake-pin-address">{pin.address}</small>
             )}
+            {!!pin.candidates?.length && (
+              <div className="place-results">
+                {pin.candidates.map((candidate, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() =>
+                      setPicked((current) => ({
+                        ...current,
+                        [pin.field]: { ...candidate, source: "osm_search" },
+                      }))
+                    }
+                  >
+                    {candidate.name}
+                    <small>
+                      {candidate.address} · {formatCoordinates(candidate.point)}
+                    </small>
+                  </button>
+                ))}
+              </div>
+            )}
             {pin.point ? (
               <PinPreview
                 point={pin.point as LngLat}

@@ -1,4 +1,5 @@
 import type { ChartSpec } from "./ChartBlock";
+import { readTaskEvidence, type TaskEvidence } from "./taskEvidence";
 
 type BlockBase = {
   title: string;
@@ -8,6 +9,7 @@ type BlockBase = {
 };
 export type ResponseBlock = BlockBase &
   (
+    | { type: "task_evidence"; evidence: TaskEvidence }
     | {
         type: "metrics";
         items: { label: string; value: number | null; unit: string }[];
@@ -51,6 +53,8 @@ function validBlock(value: unknown): value is ResponseBlock {
   )
     return false;
   switch (value.type) {
+    case "task_evidence":
+      return !!readTaskEvidence(value.evidence);
     case "metrics":
       return (
         Array.isArray(value.items) &&

@@ -133,6 +133,9 @@ const toMap = (p: NavPoint, r: NavRoute): LngLat | null =>
       : null;
 
 type Input = {
+  onRealCandidates: (route: NavRoute) => void;
+  regions: AirspaceRegion[];
+  setRegions: (regions: AirspaceRegion[]) => void;
   liveMode: boolean;
   liveFrame: LiveTelemetry | null;
   liveStatus: string;
@@ -159,7 +162,7 @@ export function useNavigation(input: Input) {
     >("routes");
   const [preflight, setPreflight] = useState<PreflightRecord | null>(null);
   const [preflightDraft, setPreflightDraft] = useState(emptyPreflight);
-  const [regions, setRegions] = useState<AirspaceRegion[]>([]);
+  const { regions, setRegions } = input;
   const [regionKinds, setRegionKinds] = useState(
     Object.keys(airspaceKinds) as AirspaceKind[],
   );
@@ -542,6 +545,10 @@ export function useNavigation(input: Input) {
   }
   async function generateCandidates() {
     if (!scene || input.readOnly || busy) return;
+    if (route?.frame === "WGS84") {
+      latest.current.onRealCandidates(route);
+      return;
+    }
     candidateAbort.current?.abort();
     const abort = new AbortController();
     candidateAbort.current = abort;
@@ -549,7 +556,15 @@ export function useNavigation(input: Input) {
     setError("");
     const timer = window.setTimeout(() => abort.abort(), 30000);
     try {
-      const [start, end] = [scene.route[0], scene.route.at(-1)!];
+      const [start, end] = route
+        ? [
+            [route.waypoints[0].x, route.waypoints[0].y],
+            [
+              route.waypoints[route.waypoints.length - 1].x,
+              route.waypoints[route.waypoints.length - 1].y,
+            ],
+          ]
+        : [scene.route[0], scene.route.at(-1)!];
       const response = await fetch("/api/assistant/navigation/candidates", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Aeris-Request": "1" },

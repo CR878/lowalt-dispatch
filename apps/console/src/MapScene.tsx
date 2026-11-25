@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import * as THREE from "three";
+import { RoutePolyline, routeSegments } from "./routeGeometry";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { useTheme, type Theme } from "./portal/Theme";
 import { GRID, GRID_STEP, TerrainModel, pointAlong } from "./terrain";
@@ -197,6 +198,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
     function clearGroup(group: THREE.Group) {
       while (group.children.length) {
         const child = group.children[0] as THREE.Mesh;
+        if (child instanceof THREE.InstancedMesh) child.dispose();
         child.geometry?.dispose();
         if (child.material)
           (Array.isArray(child.material)
@@ -536,7 +538,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
     observer.observe(host);
     let data: SceneData | null = null,
       disposed = false;
-    let routeCurve: THREE.CatmullRomCurve3 | null = null;
+    let routeCurve: RoutePolyline | null = null;
     const routeParticles = new THREE.Group();
     groups.routes.add(routeParticles);
     const assistantPreview = new THREE.Group();
@@ -581,9 +583,15 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
             ),
           );
         });
-        source.zones.slice(0, 2).forEach((zone, i) => {
+        source.zones.forEach((zone, i) => {
           const closed = [...zone.polygon, zone.polygon[0]];
-          line(closed, i ? "#e8ad70" : "#c79a6c", 0.65, 7, groups.restrictions);
+          line(
+            closed,
+            zone.active === false ? "#728393" : i ? "#e8ad70" : "#c79a6c",
+            0.65,
+            7,
+            groups.restrictions,
+          );
           const shape = new THREE.Shape(
             zone.polygon.map(
               (p) => new THREE.Vector2(p[0] - 1500, p[1] - 1500),
@@ -596,7 +604,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
             new THREE.Mesh(
               geom,
               new THREE.MeshBasicMaterial({
-                color: "#d4a36b",
+                color: zone.active === false ? "#728393" : "#d4a36b",
                 opacity: 0.08,
                 transparent: true,
                 side: THREE.DoubleSide,
@@ -613,7 +621,7 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
             [0, 0] as Point,
           );
           labelPoints.push({
-            id: `${zone.id} 限制区`,
+            id: `${zone.id} ${zone.active === false ? "草稿 · 未生效" : "限制区"}`,
             pos: world(...centroid, 30),
             type: "zone",
           });
@@ -621,35 +629,30 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
         const routeVectors = source.route.map((p) =>
           world(...p, 130 + terrain.heightAt(...p)),
         );
-        routeCurve = new THREE.CatmullRomCurve3(
-          routeVectors,
-          false,
-          "centripetal",
-          0,
-        );
-        const routeGeo = new THREE.TubeGeometry(routeCurve, 360, 3.8, 5, false);
+        routeCurve = new RoutePolyline(routeVectors);
         groups.routes.add(
-          new THREE.Mesh(
-            routeGeo,
+          routeSegments(
+            routeVectors,
+            3.8,
             new THREE.MeshBasicMaterial({ color: "#bca5ff" }),
           ),
         );
-        const glow = new THREE.Mesh(
-          new THREE.TubeGeometry(routeCurve, 360, 14, 5, false),
-          new THREE.MeshBasicMaterial({
-            color: "#9b81ff",
-            transparent: true,
-            opacity: 0.09,
-            depthWrite: false,
-          }),
+        groups.routes.add(
+          routeSegments(
+            routeVectors,
+            14,
+            new THREE.MeshBasicMaterial({
+              color: "#9b81ff",
+              transparent: true,
+              opacity: 0.09,
+              depthWrite: false,
+            }),
+          ),
         );
-        groups.routes.add(glow);
         // Ground projection provides a legible map trace in top view.
         line(source.route, "#7c6ca8", 0.5, 3, groups.routes);
         const planned: Point[] = [
           source.route[0],
-          [1250, 1450],
-          [2100, 2380],
           source.route[source.route.length - 1],
         ];
         const dashed = new THREE.Line(
@@ -723,8 +726,8 @@ export default forwardRef<MapHandle, Props>(function MapScene(props, ref) {
       lastTimestamp = timestamp;
       const { mode, progress, layers, playing } = dynamic.current;
       const preview = dynamic.current.preview;
-      if ((preview?.route_id ?? "") !== lastPreview) {
-        lastPreview = preview?.route_id ?? "";
+      if (JSON.stringify(preview) !== lastPreview) {
+        lastPreview = JSON.stringify(preview);
         clearGroup(assistantPreview);
         if (preview) {
           const points = preview.waypoints.map((p) =>

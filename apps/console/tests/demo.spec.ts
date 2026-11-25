@@ -1,4 +1,41 @@
+import { pointAlong } from "../src/terrain";
 import { expect, test } from "@playwright/test";
+
+test("algorithm evidence shares a task, cursor and verdict across map and review", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/demo");
+  const card = page.locator(".demo-analysis .task-evidence");
+  await expect(card).toHaveAttribute("data-task-id", "T-S1-02");
+  await expect(page.locator(".demo-task-status")).toContainText("T-S1-02");
+  await expect(page.locator(".demo-mission")).toContainText("0.8 kg");
+  await page.getByRole("button", { name: "确认演示工单" }).click();
+  await page.getByRole("slider", { name: "演示时间轴" }).fill("70");
+  const map = page.getByLabel("算法证据主地图");
+  await expect(map).toBeVisible();
+  const before = await map.locator("svg").getAttribute("data-sample");
+  await card.getByRole("slider", { name: "证据采样点" }).fill("10");
+  await expect(map.locator("svg")).toHaveAttribute("data-sample", "10");
+  expect(before).not.toBe("10");
+  await page.screenshot({ path: testInfo.outputPath("task-evidence.png") });
+  await page
+    .getByRole("combobox", { name: "算法案例" })
+    .selectOption("contrast");
+  await expect(card).toHaveAttribute("data-task-id", "T-S1-01");
+  await expect(card).toContainText("独立校验拒绝");
+  await expect(card).toContainText("未标定");
+  await expect(
+    page.getByRole("button", { name: "确认演示工单" }),
+  ).toBeDisabled();
+  await expect(map.locator(".evidence-route")).toHaveAttribute(
+    "data-verdict",
+    "rejected",
+  );
+  await page.getByRole("button", { name: "重置", exact: true }).click();
+  await expect(card).toHaveAttribute("data-task-id", "T-S1-02");
+  await expect(page.locator(".demo-task-status")).toContainText("等待确认");
+  await expect(map).toBeHidden();
+});
 
 test("competition replay loads the local model and preserves the simulated mission", async ({
   page,
@@ -70,10 +107,19 @@ test("competition replay loads the local model and preserves the simulated missi
   await expect(scene).toHaveAttribute("data-rendered-view", "studio");
   await page.getByRole("slider", { name: "演示时间轴" }).fill("118");
   await expect(scene).toHaveAttribute("data-rendered-view", "city");
+  await expect(scene).toHaveAttribute("data-active-scene", "S1-02");
+  await expect(scene).toHaveAttribute("data-route-id", /T-S1-02/);
+  const source = await (await page.request.get("/task-evidence.json")).json();
+  const progress = Number(await scene.getAttribute("data-route-progress"));
+  const point = JSON.parse((await scene.getAttribute("data-plane-enu"))!);
+  const sample = pointAlong(source.cases.main.waypoints, progress);
+  expect(Math.hypot(point[0] - sample[0], point[1] - sample[1])).toBeLessThan(
+    1e-6,
+  );
   await expect(page.locator(".demo-alert")).toContainText("通信退化情景");
   await page.screenshot({ path: testInfo.outputPath("waterfront-city.png") });
   await page.getByRole("button", { name: "备降复盘", exact: true }).click();
-  await expect(page.locator(".demo-task-status")).toContainText("物资待接续");
+  await expect(page.locator(".demo-task-status")).toContainText("未下发");
   await page.getByRole("button", { name: "录制模式" }).click();
   await expect(page.locator(".demo-controls")).toBeHidden();
   await page.keyboard.press("Escape");

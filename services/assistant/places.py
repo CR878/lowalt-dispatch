@@ -33,8 +33,8 @@ def search_places(query: str) -> dict:
             "places": [],
             "source": provider or "OpenStreetMap",
             "crs": "EPSG:4326",
-            "unavailable": True,
-            "note": "地点搜索服务不可达或没有匹配；可手动输入经纬度或在地图上点选",
+            "unavailable": not bool(provider),
+            "note": "地点搜索没有匹配" if provider else "地点搜索服务不可达；可手动输入经纬度或在地图上点选",
         }
     with _lock:
         if len(_cache) >= 100:

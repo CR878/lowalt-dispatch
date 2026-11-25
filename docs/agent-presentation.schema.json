@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$defs": {
     "ChartBlock": {
       "additionalProperties": false,
@@ -109,6 +110,159 @@
         "value"
       ],
       "title": "Datum",
+      "type": "object"
+    },
+    "EvidenceCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "enum": [
+            "astar_static",
+            "astar_diversion"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "found": {
+          "title": "Found",
+          "type": "boolean"
+        },
+        "length_m": {
+          "minimum": 0,
+          "title": "Length M",
+          "type": "number"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "algorithm",
+        "found",
+        "length_m",
+        "reason"
+      ],
+      "title": "EvidenceCandidate",
+      "type": "object"
+    },
+    "EvidenceCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "title": "Name",
+          "type": "string"
+        },
+        "passed": {
+          "title": "Passed",
+          "type": "boolean"
+        },
+        "detail": {
+          "maxLength": 2000,
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "passed",
+        "detail"
+      ],
+      "title": "EvidenceCheck",
+      "type": "object"
+    },
+    "EvidenceSample": {
+      "additionalProperties": false,
+      "properties": {
+        "point": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 3000,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "maximum": 3000,
+              "minimum": 0,
+              "type": "number"
+            }
+          ],
+          "title": "Point",
+          "type": "array"
+        },
+        "s_m": {
+          "minimum": 0,
+          "title": "S M",
+          "type": "number"
+        },
+        "margin_wh": {
+          "title": "Margin Wh",
+          "type": "number"
+        },
+        "nearest_site_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Nearest Site Id"
+        }
+      },
+      "required": [
+        "point",
+        "s_m",
+        "margin_wh",
+        "nearest_site_id"
+      ],
+      "title": "EvidenceSample",
+      "type": "object"
+    },
+    "EvidenceSite": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "maxLength": 80,
+          "title": "Id",
+          "type": "string"
+        },
+        "point": {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 3000,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "maximum": 3000,
+              "minimum": 0,
+              "type": "number"
+            }
+          ],
+          "title": "Point",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "point"
+      ],
+      "title": "EvidenceSite",
       "type": "object"
     },
     "Metric": {
@@ -362,6 +516,276 @@
       "title": "TableBlock",
       "type": "object"
     },
+    "TaskEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "case": {
+          "enum": [
+            "main",
+            "contrast"
+          ],
+          "title": "Case",
+          "type": "string"
+        },
+        "task_id": {
+          "maxLength": 100,
+          "title": "Task Id",
+          "type": "string"
+        },
+        "scenario_id": {
+          "maxLength": 80,
+          "title": "Scenario Id",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "generated_at": {
+          "maxLength": 80,
+          "title": "Generated At",
+          "type": "string"
+        },
+        "revision": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Revision",
+          "type": "string"
+        },
+        "origin": {
+          "maxLength": 80,
+          "title": "Origin",
+          "type": "string"
+        },
+        "destination": {
+          "maxLength": 80,
+          "title": "Destination",
+          "type": "string"
+        },
+        "payload_kg": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Payload Kg",
+          "type": "number"
+        },
+        "vehicle_label": {
+          "maxLength": 120,
+          "title": "Vehicle Label",
+          "type": "string"
+        },
+        "algorithm": {
+          "enum": [
+            "astar_static",
+            "astar_diversion"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "verdict": {
+          "enum": [
+            "passed",
+            "rejected"
+          ],
+          "title": "Verdict",
+          "type": "string"
+        },
+        "route_id": {
+          "maxLength": 160,
+          "title": "Route Id",
+          "type": "string"
+        },
+        "route_digest": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Route Digest",
+          "type": "string"
+        },
+        "length_m": {
+          "minimum": 0,
+          "title": "Length M",
+          "type": "number"
+        },
+        "waypoints": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "maximum": 3000,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "maximum": 3000,
+                "minimum": 0,
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "maxItems": 5000,
+          "minItems": 2,
+          "title": "Waypoints",
+          "type": "array"
+        },
+        "samples": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSample"
+          },
+          "maxItems": 1000,
+          "minItems": 1,
+          "title": "Samples",
+          "type": "array"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/EvidenceCheck"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Checks",
+          "type": "array"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/EvidenceCandidate"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Candidates",
+          "type": "array"
+        },
+        "gaps": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Gaps",
+          "type": "array"
+        },
+        "buildings": {
+          "items": {
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "maximum": 3000,
+                  "minimum": 0,
+                  "type": "number"
+                },
+                {
+                  "maximum": 3000,
+                  "minimum": 0,
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            "type": "array"
+          },
+          "maxItems": 200,
+          "title": "Buildings",
+          "type": "array"
+        },
+        "sites": {
+          "items": {
+            "$ref": "#/$defs/EvidenceSite"
+          },
+          "maxItems": 50,
+          "title": "Sites",
+          "type": "array"
+        },
+        "dispatch_enabled": {
+          "const": false,
+          "default": false,
+          "title": "Dispatch Enabled",
+          "type": "boolean"
+        },
+        "is_simulated": {
+          "const": true,
+          "default": true,
+          "title": "Is Simulated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "case",
+        "task_id",
+        "scenario_id",
+        "source",
+        "generated_at",
+        "revision",
+        "origin",
+        "destination",
+        "payload_kg",
+        "vehicle_label",
+        "algorithm",
+        "verdict",
+        "route_id",
+        "route_digest",
+        "length_m",
+        "waypoints",
+        "samples",
+        "checks",
+        "candidates",
+        "gaps",
+        "buildings",
+        "sites"
+      ],
+      "title": "TaskEvidence",
+      "type": "object"
+    },
+    "TaskEvidenceBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "maxLength": 80,
+          "title": "Title",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 240,
+          "title": "Source",
+          "type": "string"
+        },
+        "as_of": {
+          "anyOf": [
+            {
+              "maxLength": 80,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "As Of"
+        },
+        "note": {
+          "default": "",
+          "maxLength": 600,
+          "title": "Note",
+          "type": "string"
+        },
+        "type": {
+          "const": "task_evidence",
+          "default": "task_evidence",
+          "title": "Type",
+          "type": "string"
+        },
+        "evidence": {
+          "$ref": "#/$defs/TaskEvidence"
+        }
+      },
+      "required": [
+        "title",
+        "source",
+        "evidence"
+      ],
+      "title": "TaskEvidenceBlock",
+      "type": "object"
+    },
     "TimelineBlock": {
       "additionalProperties": false,
       "properties": {
@@ -471,6 +895,7 @@
             "metrics": "#/$defs/MetricsBlock",
             "route": "#/$defs/RouteBlock",
             "table": "#/$defs/TableBlock",
+            "task_evidence": "#/$defs/TaskEvidenceBlock",
             "timeline": "#/$defs/TimelineBlock"
           },
           "propertyName": "type"
@@ -490,6 +915,9 @@
           },
           {
             "$ref": "#/$defs/RouteBlock"
+          },
+          {
+            "$ref": "#/$defs/TaskEvidenceBlock"
           }
         ]
       },
@@ -502,6 +930,5 @@
     "blocks"
   ],
   "title": "Presentation",
-  "type": "object",
-  "$schema": "https://json-schema.org/draft/2020-12/schema"
+  "type": "object"
 }

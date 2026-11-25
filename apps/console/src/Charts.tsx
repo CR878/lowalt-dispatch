@@ -48,81 +48,62 @@ export function Sparkline({
 
 export function MarginChart({
   progress,
-  compare,
   review,
 }: {
   progress: number;
-  compare: boolean;
   review?: ReviewRoute | null;
 }) {
   const id = useId().replace(/:/g, "");
   const [hover, setHover] = useState<number | null>(null);
-  const values = Array.from(
-    { length: 121 },
-    (_, i) => 80 - i * 0.31 + 4.6 * Math.sin(i * 0.23),
-  );
-  const minimum = Math.min(...values);
-  const candidate = review?.samples.length
-    ? Array.from({ length: 121 }, (_, i) => {
-        const sample = (i / 120) * (review.samples.length - 1),
-          lo = Math.floor(sample),
-          hi = Math.min(review.samples.length - 1, lo + 1);
-        return (
-          review.samples[lo].margin_wh +
-          (review.samples[hi].margin_wh - review.samples[lo].margin_wh) *
-            (sample - lo)
-        );
-      })
-    : values.map((v) => v - minimum + 34.8);
-  const maxY = Math.ceil(Math.max(...candidate, review ? 1 : 80) / 10) * 10;
+  if (!review?.samples.length)
+    return (
+      <div className="review-no-profile">当前路线没有备降余量计算结果</div>
+    );
+  const samples = review.samples;
+  const total = samples[samples.length - 1].s_m;
+  const margins = samples.map((s) => s.margin_wh);
+  const maxY =
+    Math.ceil(Math.max(...margins, 1, (-Math.min(...margins) * 84) / 30) / 10) *
+    10;
   const yAt = (value: number) => 127 - value * (84 / maxY);
-  const path = (series: number[]) =>
-    series
-      .map((v, i) => `${i ? "L" : "M"}${42 + (i / 120) * 658},${yAt(v)}`)
-      .join(" ");
-  const current = path(candidate);
-  const previous = path(
-    Array.from(
-      { length: 121 },
-      (_, i) => 76 - i * 0.84 + 5 * Math.sin(i * 0.16),
-    ),
+  const current = samples
+    .map(
+      (sample, i) =>
+        `${i ? "L" : "M"}${42 + (sample.s_m / Math.max(total, 1)) * 658},${yAt(sample.margin_wh)}`,
+    )
+    .join(" ");
+  const ratio = Math.max(0, Math.min(1, hover ?? progress));
+  const cursor = ratio * 120;
+  const distance = ratio * total;
+  const upper = Math.max(
+    0,
+    samples.findIndex((s) => s.s_m >= distance),
   );
-  const cursor = Math.max(0, Math.min(1, hover ?? progress)) * 120;
-  const lower = Math.floor(cursor),
-    upper = Math.min(120, lower + 1);
-  const cursorY = yAt(
-    candidate[lower] + (candidate[upper] - candidate[lower]) * (cursor - lower),
+  const lower = Math.max(0, upper - 1);
+  const mix =
+    (distance - samples[lower].s_m) /
+    Math.max(1e-9, samples[upper].s_m - samples[lower].s_m);
+  const cursorMargin =
+    samples[lower].margin_wh +
+    (samples[upper].margin_wh - samples[lower].margin_wh) * mix;
+  const cursorY = yAt(cursorMargin);
+  const totalKm = total / 1000;
+  const checkpoints = [...new Set(samples.map((s) => s.nearest_site_id))].map(
+    (name) => ({
+      x:
+        42 +
+        (samples.find((s) => s.nearest_site_id === name)!.s_m /
+          Math.max(total, 1)) *
+          658,
+      name: name ?? "不可达",
+    }),
   );
-  const totalKm = review?.samples.length
-    ? review.samples.at(-1)!.s_m / 1000
-    : 3.67;
-  const checkpoints = review?.samples.length
-    ? [...new Set(review.samples.map((s) => s.nearest_site_id))].map(
-        (name) => ({
-          x:
-            42 +
-            (review.samples.findIndex((s) => s.nearest_site_id === name) /
-              (review.samples.length - 1)) *
-              658,
-          name,
-        }),
-      )
-    : [
-        { x: 150, name: "L1" },
-        { x: 330, name: "L3" },
-        { x: 520, name: "L2" },
-        { x: 600, name: "L4" },
-      ];
   return (
     <svg
       className="margin-svg"
       viewBox="0 0 735 182"
       role="img"
-      aria-label={
-        review
-          ? `历史演示备降余量曲线 ${review.id}，零线以下为负余量`
-          : "演示备降余量曲线，紫线为候选示例，灰色虚线为对照示例，零线以下为负余量"
-      }
+      aria-label={`冻结备降余量曲线 ${review.id}，零线以下为负余量`}
       onPointerMove={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
         setHover(
@@ -197,16 +178,7 @@ export function MarginChart({
         </g>
       ))}
       <path d={`${current} L700 127 L42 127 Z`} fill={`url(#${id})`} />
-      {compare && (
-        <path
-          d={previous}
-          fill="none"
-          stroke="#a3a8b4"
-          strokeDasharray="4 5"
-          strokeWidth="1.2"
-          opacity=".65"
-        />
-      )}
+
       <path
         d={current}
         fill="none"
@@ -247,7 +219,7 @@ export function MarginChart({
       >
         {hover === null
           ? "当前位置"
-          : `${(hover * totalKm).toFixed(2)} km · ${(candidate[lower] + (candidate[upper] - candidate[lower]) * (cursor - lower)).toFixed(1)} Wh`}
+          : `${(hover * totalKm).toFixed(2)} km · ${cursorMargin.toFixed(1)} Wh`}
       </text>
       {[0, 1, 2, 3].map((n) => (
         <text

@@ -77,14 +77,34 @@ class Event(Contract):
     detail: str = Field(max_length=1000)
 
 
+class ActiveRoute(Contract):
+    route_id: str = Field(min_length=1, max_length=160)
+    task_id: str | None = Field(default=None, max_length=160)
+    frame: Literal["WGS84", "ENU"]
+    source: str = Field(min_length=1, max_length=240)
+    waypoints: list[tuple[float, float]] = Field(min_length=2, max_length=1000)
+
+    @model_validator(mode="after")
+    def coordinates(self):
+        if self.frame == "WGS84" and any(
+            not (-180 <= x <= 180 and -85.0511 <= y <= 85.0511) for x, y in self.waypoints
+        ):
+            raise ValueError("Invalid WGS84 route")
+        if self.frame == "ENU" and any(abs(x) > 100000 or abs(y) > 100000 for x, y in self.waypoints):
+            raise ValueError("Invalid ENU route")
+        return self
+
+
 class Context(Contract):
     is_simulated: Literal[True] = True
     sampled_at: datetime
-    task_id: Literal["T-S1-01"] = "T-S1-01"
+    task_id: str | None = Field(default="T-S1-01", max_length=160)
     selected_task_id: UUID | None = None
-    route_id: Literal["S1-01-baseline"] = "S1-01-baseline"
+    route_id: str | None = Field(default="S1-01-baseline", max_length=160)
+    selected_intake_id: str | None = Field(default=None, max_length=160)
+    active_route: ActiveRoute | None = None
     progress: float = Field(ge=0, le=1)
-    telemetry_mode: Literal["demo", "live"] = "demo"
+    telemetry_mode: Literal["demo", "live", "planning"] = "demo"
     telemetry: Telemetry | None
     live_telemetry: LiveTelemetry | None = None
     terrain: Terrain | None = None
@@ -104,6 +124,12 @@ class Context(Contract):
                 raise ValueError("Demo context requires demo telemetry")
         elif self.telemetry is not None:
             raise ValueError("Live context cannot contain demo telemetry")
+        if self.telemetry_mode == "planning" and (
+            self.live_telemetry is not None or self.terrain is not None
+        ):
+            raise ValueError("Planning context cannot borrow live telemetry or demo terrain")
+        if self.telemetry_mode == "demo" and (self.route_id != "S1-01-baseline" or self.task_id != "T-S1-01"):
+            raise ValueError("Demo telemetry belongs only to its baseline route")
         return self
 
 

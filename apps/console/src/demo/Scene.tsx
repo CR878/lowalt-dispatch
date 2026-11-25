@@ -1,3 +1,5 @@
+import { RoutePolyline, routeSegments } from "../routeGeometry";
+import type { TaskEvidence } from "../assistant/taskEvidence";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -17,41 +19,28 @@ import {
 } from "./Studio";
 import { createWater } from "./Water";
 
-// Artistic scene coordinates only. No map projection or real-world navigation.
-const points = [
-  new THREE.Vector3(-70, 2, 40),
-  new THREE.Vector3(-35, 24, 24),
-  new THREE.Vector3(5, 24, 4),
-  new THREE.Vector3(37, 2, -25),
-];
-const destination = new THREE.Vector3(76, 2, -52);
-const opening = new THREE.CatmullRomCurve3(points.slice(0, 3));
-const ending = new THREE.CatmullRomCurve3([
-  points[2],
-  new THREE.Vector3(26, 18, -12),
-  points[3],
-]);
-const illustratedPlan = new THREE.CatmullRomCurve3([
-  points[2],
-  new THREE.Vector3(44, 26, -30),
-  destination,
-]);
-const labels = [
-  { point: points[0], caption: "中心物资站" },
-  { point: points[3], caption: "备降点" },
-  { point: destination, caption: "河东救援点" },
-];
+// A fixed display transform of the evidence's ENU XY. Heights are visual only.
+const worldPoint = ([x, y]: [number, number], height = 24) =>
+  new THREE.Vector3((x - 1500) * 0.07, height, (1500 - y) * 0.07);
 
 export default function Scene({
   frame,
   view,
   studioAngle,
+  evidence,
 }: {
   frame: DemoFrame;
+  evidence: TaskEvidence;
   view: VisualView;
   studioAngle: StudioAngle;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const points = evidence.waypoints.map((p) => worldPoint(p));
+  const opening = new RoutePolyline(points);
+  const labels = [
+    { point: points[0], caption: evidence.origin },
+    { point: points[points.length - 1], caption: evidence.destination },
+  ];
   const current = useRef({ frame, view, studioAngle });
   const [unavailable, setUnavailable] = useState(false);
   const [modelState, setModelState] = useState<
@@ -118,31 +107,44 @@ export default function Scene({
     node.dataset.details = String(city.userData.detailCount);
     const water = createWater();
     scene.add(water);
+    const algorithmCity = new THREE.Group();
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(210, 210),
+      new THREE.MeshStandardMaterial({ color: 0x142531, roughness: 1 }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    algorithmCity.add(floor);
+    for (const polygon of evidence.buildings) {
+      const shape = new THREE.Shape(
+        polygon.map(
+          (p) => new THREE.Vector2((p[0] - 1500) * 0.07, (p[1] - 1500) * 0.07),
+        ),
+      );
+      const mesh = new THREE.Mesh(
+        new THREE.ExtrudeGeometry(shape, { depth: 4, bevelEnabled: false }),
+        new THREE.MeshStandardMaterial({
+          color: 0x4d687c,
+          metalness: 0.2,
+          roughness: 0.7,
+        }),
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      algorithmCity.add(mesh);
+    }
+    const grid = new THREE.GridHelper(210, 20, 0x36515f, 0x213744);
+    grid.position.y = 0.1;
+    algorithmCity.add(grid);
+    scene.add(algorithmCity);
     renderer.shadowMap.needsUpdate = true;
     // These overlays belong to the city review shot, not the beauty shot.
     const reviewOverlay = new THREE.Group();
     scene.add(reviewOverlay);
-    const line = new THREE.Mesh(
-      new THREE.TubeGeometry(opening, 40, 0.52, 6, false),
+    const line = routeSegments(
+      points,
+      0.52,
       new THREE.MeshBasicMaterial({ color: 0x6ee8df, toneMapped: false }),
     );
     reviewOverlay.add(line);
-    const alternate = new THREE.Mesh(
-      new THREE.TubeGeometry(ending, 40, 0.52, 6, false),
-      new THREE.MeshBasicMaterial({ color: 0xffc779, toneMapped: false }),
-    );
-    alternate.visible = false;
-    reviewOverlay.add(alternate);
-    const planned = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(illustratedPlan.getPoints(40)),
-      new THREE.LineDashedMaterial({
-        color: 0x87a4ba,
-        dashSize: 3,
-        gapSize: 2,
-      }),
-    );
-    planned.computeLineDistances();
-    reviewOverlay.add(planned);
     const marker = (p: THREE.Vector3, color: number) => {
       const ring = new THREE.Mesh(
         new THREE.RingGeometry(5, 6.3, 48),
@@ -153,8 +155,9 @@ export default function Scene({
       reviewOverlay.add(ring);
     };
     marker(points[0], 0x56e0dd);
-    marker(points[3], 0xffc779);
-    marker(destination, 0x87a4ba);
+    marker(points[points.length - 1], 0x87a4ba);
+    for (const site of evidence.sites)
+      marker(worldPoint(site.point, 0), 0xffc779);
     const aircraft = new THREE.Group();
     const fallback = new THREE.Mesh(
       new THREE.OctahedronGeometry(3.3),
@@ -264,6 +267,7 @@ export default function Scene({
       { time: 180, angle: -0.22, height: 153, distance: 200 },
     ];
     let renderedView: VisualView | null = null;
+    let renderedAlgorithm: boolean | null = null;
     let renderedAngle: StudioAngle | null = null;
     let renderedTime = -1;
     const animate = () => {
@@ -302,16 +306,35 @@ export default function Scene({
         cityNeedsShadow = false;
       }
       water.material.uniforms.uTime.value = time;
-      reviewOverlay.visible = activeView === "city";
-      aircraft.position.copy(
-        state.time < 118
-          ? opening.getPoint(
-              THREE.MathUtils.clamp((state.time - 95) / 23, 0, 1),
-            )
-          : ending.getPoint(
-              THREE.MathUtils.clamp((state.time - 118) / 24, 0, 1),
-            ),
+      const algorithmView = activeView === "city" && state.time >= 52;
+      if (renderedAlgorithm !== algorithmView) {
+        renderer.shadowMap.needsUpdate = true;
+        renderedAlgorithm = algorithmView;
+      }
+      node.dataset.activeScene = algorithmView
+        ? evidence.scenario_id
+        : "waterfront";
+      node.dataset.activeBuildings = String(
+        algorithmView ? evidence.buildings.length : city.userData.buildingCount,
       );
+      city.visible = !algorithmView;
+      water.visible = !algorithmView;
+      algorithmCity.visible = algorithmView;
+      reviewOverlay.visible = algorithmView;
+      node.dataset.routeId = evidence.route_id;
+      node.dataset.routeRevision = evidence.revision;
+      aircraft.position.copy(
+        opening.getPointAt(
+          state.confirmed && evidence.verdict === "passed" ? state.progress : 0,
+        ),
+      );
+      const tangent = opening.getTangentAt(state.progress);
+      aircraft.rotation.y = Math.atan2(tangent.x, tangent.z);
+      node.dataset.routeProgress = String(state.progress);
+      node.dataset.planeEnu = JSON.stringify([
+        aircraft.position.x / 0.07 + 1500,
+        1500 - aircraft.position.z / 0.07,
+      ]);
       const next = shots.findIndex((shot) => state.time < shot.time);
       const index = next === -1 ? shots.length - 1 : Math.max(1, next);
       const before = shots[index - 1];
@@ -343,7 +366,7 @@ export default function Scene({
         camera.lookAt(0, 5, 0);
       }
       camera.updateMatrixWorld();
-      alternate.visible = state.phase >= 4;
+
       labels.forEach(({ point }, index) => {
         const element = labelElements.current[index];
         if (!element) return;

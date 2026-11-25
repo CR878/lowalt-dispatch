@@ -20,6 +20,7 @@ from services.assistant.telemetry import LiveTelemetry
 from services.assistant.tools import ALIASES, PLACES, Toolset, draft_digest
 
 DOCUMENT_QUESTION = re.compile(
+    r"竞赛.*(?:目标|交付|视频|现状)|演示视频|/demo|"
     r"项目(?:文档|资料)|知识库|查(?:一下|一查)?(?:文档|资料)|怎么启动|如何启动|"
     r"(?:什么是|解释一下).*(?:ACK|回执|限制区|备降|PX4|SITL|MAVSDK|M[1-5])|"
     r"(?:ACK|回执).*(?:是什么|什么意思|代表|等于|区别|飞完)",
@@ -310,6 +311,17 @@ class Engine:
             )
         if re.search(r"饼图|柱状图|折线图", turn.text) and "get_intake_overview" in tools.results:
             text = intake_chart(turn.text, tools.results["get_intake_overview"])
+        evidence = tools.results.get("get_task_evidence")
+        flight = tools.results.get("get_flight_status")
+        if flight and flight.get("telemetry_mode") == "planning":
+            text = flight["reason"]
+        if evidence:
+            if evidence.get("status") == "ok":
+                item = evidence["evidence"]
+                verdict = "通过独立校验" if item["verdict"] == "passed" else "被独立校验拒绝"
+                text = f"冻结任务 {item['task_id']} 在示例参数下{verdict}，路线、校验项和数据缺口见证据卡。不是实飞或飞行许可。"
+            else:
+                text = evidence.get("reason", "冻结证据不可用")
         return {
             "turn_id": str(turn.request_id),
             "provider": self.settings.provider,
@@ -335,6 +347,12 @@ class Engine:
 
     def _local(self, turn, tools, call):
         text = turn.text
+        if re.search(r"证据卡|任务证据|算法证据|冻结任务|拒绝案例|通过案例", text):
+            call(
+                "get_task_evidence",
+                {"case": "contrast" if re.search(r"拒绝|对照|S1-01", text, re.I) else "main"},
+            )
+            return ""
         if re.search(r"饼图|柱状图|折线图", text) and re.search(r"工单|载荷|航线|路线", text):
             call("get_intake_overview")
             return ""
@@ -403,6 +421,8 @@ class Engine:
             return call("get_task_status").get("reason") or "已读取当前任务状态。"
         if re.search(r"复盘|总结|报告|飞行记录|发生了什么", text):
             flight, events = call("get_flight_status"), call("list_events")
+            if flight.get("telemetry_mode") == "planning":
+                return flight["reason"]
             risk = call("inspect_terrain_risk") if turn.context.terrain else None
             if flight.get("telemetry_mode") == "live":
                 return (
@@ -425,7 +445,7 @@ class Engine:
             call("get_flight_status")
             events = call("list_events")
             risk = call("inspect_terrain_risk")
-            if turn.context.telemetry_mode == "live":
+            if turn.context.telemetry_mode != "demo":
                 return risk["reason"]
             return self._risk_text(risk) + (
                 f"\n\n当前还有{events['warnings']}条页面告警。请结合原始事件、数据时效及独立校验结果复核。"
@@ -472,6 +492,8 @@ class Engine:
             )
         if re.search(r"状态|电量|电池|高度|速度|姿态|链路|遥测|进度|GNSS", text, re.I):
             flight = call("get_flight_status")
+            if flight.get("telemetry_mode") == "planning":
+                return flight["reason"]
             t = flight["telemetry"]
             if flight.get("telemetry_mode") == "live":
                 if t is None:
@@ -515,6 +537,7 @@ class Engine:
         prompt = """你是AERIS低空调度助手，用简洁中文协助用户查询、建任务、风险分析、解释记录。
 必须先调用工具取得证据，不能凭空报告遥测、路线、原因、回执、能量或安全结论。
 查询当前本地合成任务的状态、回执或拦截原因时，调用get_task_status，执行端受理与合成执行完成分开判断。
+用户要求竞赛任务证据卡或算法通过/拒绝案例时调用get_task_evidence；它只对应冻结示例，不能当成用户当前工单。最新竞赛交付口径从项目文档检索。
 解释项目规则、字段语义或启动步骤时，调用search_project_docs。文档只用于解释规则，实时状态以对应业务工具为依据。缺少文档依据时明确告知，引用实际返回的文件和行号。
 纯规则/文档问题（ACK 含义、M4 验收边界、字段解释、启动步骤）只调用一次 search_project_docs 后直接回答，不要解析地点、不要查天气、不要建单；工具不在列表里就是不允许调用。同一工具同一参数不要重复调用，检索一次没有依据就直说没有依据。
 用户明确要求图表（饼图/柱状图/折线图）时，必须在回答中直接输出 ```chart 代码块，不要只描述、不要反问要不要画；格式为 JSON：{"type":"bar|pie|line","title":"标题","unit":"单位","data":[{"label":"名称","value":数值}]}。数值必须来自工具结果或检索到的原文，不得编造；若确实缺少可画图的数值，先说明缺哪些数据，不要输出空图表。

@@ -13,6 +13,57 @@
 .aeris-demo * {
   box-sizing: border-box;
 }
+.demo-evidence-select {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.demo-evidence-select select {
+  width: 100%;
+  background: #14232e;
+  color: inherit;
+  padding: 7px;
+  border: 1px solid #40515c;
+  border-radius: 6px;
+}
+.demo-algorithm-map {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  padding: 20px;
+  background: #0c1722;
+  display: flex;
+  flex-direction: column;
+  color: #d3e4ee;
+}
+.demo-algorithm-map header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+.demo-algorithm-map button {
+  background: transparent;
+  border: 1px solid #40515c;
+  color: inherit;
+  padding: 6px;
+  border-radius: 5px;
+}
+.demo-algorithm-map .task-evidence-map {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+.demo-algorithm-map p {
+  text-align: center;
+  font-size: 12px;
+}
+.demo-analysis {
+  max-height: 850px;
+  overflow-y: auto;
+}
 .aeris-demo button {
   cursor: pointer;
   font: inherit;

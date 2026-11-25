@@ -17,11 +17,19 @@ export type AssistantDraft = {
 export type AssistantContext = {
   is_simulated: true;
   sampled_at: string;
-  task_id: "T-S1-01";
+  task_id: string | null;
   selected_task_id: string | null;
-  route_id: "S1-01-baseline";
+  route_id: string | null;
+  selected_intake_id?: string | null;
+  active_route?: {
+    route_id: string;
+    task_id: string | null;
+    frame: "WGS84" | "ENU";
+    source: string;
+    waypoints: Point[];
+  } | null;
   progress: number;
-  telemetry_mode: "demo" | "live";
+  telemetry_mode: "demo" | "live" | "planning";
   telemetry: Telemetry | null;
   live_telemetry: LiveTelemetry | null;
   terrain: TerrainChange | null;
@@ -77,6 +85,13 @@ export type ClarificationQuestion = {
   options?: { label: string; value: string }[];
 };
 export type MapPin = {
+  candidates?: {
+    name: string;
+    point: [number, number];
+    address?: string;
+    source: string;
+    capturedAt: string;
+  }[];
   field: string;
   name: string;
   point: [number, number] | null;
@@ -164,6 +179,7 @@ export type Packet =
   | { type: "heartbeat" };
 
 export const toolLabels: Record<string, string> = {
+  get_task_evidence: "读取冻结任务证据",
   search_project_docs: "检索项目文档",
   get_flight_status: "读取遥测快照",
   get_task_status: "查询当前联调任务",

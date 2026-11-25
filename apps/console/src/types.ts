@@ -91,6 +91,6 @@ export type SceneData = {
   metadata: { source: string; isSimulated: true; note: string };
   route: Point[];
   buildings: { id: string; polygon: Point[]; height: number }[];
-  zones: { id: string; polygon: Point[] }[];
+  zones: { id: string; polygon: Point[]; active?: boolean }[];
   sites: { id: string; point: Point }[];
 };

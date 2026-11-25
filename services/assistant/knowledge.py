@@ -13,6 +13,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 DOCUMENTS = (
+    "AGENTS.md",
+    "docs/demo-video-roadmap.md",
+    "docs/demo-integration-status.md",
     "事实文档.md",
     "docs/接口契约.md",
     "启动指南.md",

@@ -16,7 +16,6 @@ import {
   chapters,
   DURATION,
   frameAt,
-  mission,
   timeLabel,
   visualViewAt,
   type VisualChoice,
@@ -24,6 +23,8 @@ import {
 import type { StudioAngle } from "./Studio";
 import Scene from "./Scene";
 import "./demo.css";
+import { readTaskEvidence, type TaskEvidence } from "../assistant/taskEvidence";
+import { EvidenceMap, TaskEvidenceCard } from "../assistant/TaskEvidenceCard";
 
 const explanations = [
   {
@@ -35,8 +36,8 @@ const explanations = [
     copy: "虚构城区与 CR30 模型共同呈现任务环境。所有地标为场景示意。",
   },
   {
-    title: "为什么要考虑备降？",
-    copy: "备降可达性是规划阶段的约束。图中展示接受与拒绝的概念，具体算法结果以实验记录为准。",
+    title: "沿着航线，查看每一步的备降余量",
+    copy: "冻结的算法输出与独立校验记录共同驱动场景图和余量曲线；数值仅适用于示例机型。",
   },
   {
     title: "合成执行回放",
@@ -44,28 +45,73 @@ const explanations = [
   },
   {
     title: "通信状态发生变化",
-    copy: "情景展示边缘端选择已准备的备用方案。播放内容为脚本演示。",
+    copy: "通信退化为情景提示；保持已验证的冻结路线，不展示未经验证的途中备降切换。",
   },
-  { title: "仿真备降完成", copy: "本情景终点为备降点，应急物资仍待后续接续。" },
+  {
+    title: "几何航线回放完成",
+    copy: "回放到达冻结航线终点；未下发任务，配送完成情况未验证。",
+  },
 ];
 const events = [
   { at: 0, label: "工单已确认" },
-  { at: 52, label: "备降约束概念展示" },
+  { at: 52, label: "查看冻结算法与校验记录" },
   { at: 95, label: "开始合成回放" },
   { at: 118, label: "通信退化情景" },
-  { at: 142, label: "仿真备降 · 物资待接续" },
+  { at: 142, label: "回放结束 · 未下发" },
 ];
 
 export default function Demo() {
+  const [cases, setCases] = useState<{
+    main?: TaskEvidence;
+    contrast?: TaskEvidence;
+  }>({});
+  useEffect(() => {
+    const abort = new AbortController();
+    fetch("/task-evidence.json", { signal: abort.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error("证据不可用");
+        return r.json();
+      })
+      .then((data) =>
+        setCases({
+          main: readTaskEvidence(data.cases?.main),
+          contrast: readTaskEvidence(data.cases?.contrast),
+        }),
+      )
+      .catch(() => {});
+    return () => abort.abort();
+  }, []);
   const [confirmed, setConfirmed] = useState(false);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [capture, setCapture] = useState(false);
   const [visualChoice, setVisualChoice] = useState<VisualChoice>("auto");
   const [studioAngle, setStudioAngle] = useState<StudioAngle>("orbit");
+  const [evidenceCase, setEvidenceCase] = useState<"main" | "contrast">("main");
+  const [algorithmMap, setAlgorithmMap] = useState(false);
+  const evidence = cases[evidenceCase];
+  const [selectedSample, setSelectedSample] = useState<number | null>(null);
   const frame = frameAt(time, confirmed);
   const visualView = visualViewAt(visualChoice, frame.time);
   const explain = explanations[frame.phase];
+  const sampleIndex = evidence
+    ? Math.min(
+        evidence.samples.length - 1,
+        selectedSample ??
+          Math.floor(
+            Math.max(0, Math.min(1, (time - 52) / 43)) *
+              (evidence.samples.length - 1),
+          ),
+      )
+    : 0;
+  const mission = {
+    id: evidence?.task_id ?? "证据不可用",
+    origin: evidence?.origin ?? "—",
+    destination: evidence?.destination ?? "—",
+    cargo: "应急医疗物资",
+    weight: evidence ? `${evidence.payload_kg} kg（示例）` : "—",
+    aircraft: "CR30（仅外观展示）",
+  };
 
   useEffect(() => {
     if (!playing || !confirmed) return;
@@ -97,10 +143,15 @@ export default function Demo() {
     setConfirmed(false);
     setVisualChoice("auto");
     setStudioAngle("orbit");
+    setEvidenceCase("main");
+    setSelectedSample(null);
+    setAlgorithmMap(false);
   }
 
   function seek(seconds: number) {
     setPlaying(false);
+    setSelectedSample(null);
+    setAlgorithmMap(false);
     setTime(seconds);
   }
 
@@ -129,7 +180,11 @@ export default function Demo() {
         </div>
         <div className="demo-task-status">
           <small>MISSION / {mission.id}</small>
-          <strong>{frame.status}</strong>
+          <strong>
+            {evidenceCase === "contrast"
+              ? "对照案例 · 独立校验拒绝，未执行"
+              : frame.status}
+          </strong>
         </div>
       </section>
       <div className="demo-grid">
@@ -153,7 +208,7 @@ export default function Demo() {
             <dd>{mission.aircraft}</dd>
           </dl>
           <button
-            disabled={confirmed}
+            disabled={confirmed || evidenceCase === "contrast" || !evidence}
             className="demo-primary"
             onClick={() => {
               setConfirmed(true);
@@ -164,10 +219,53 @@ export default function Demo() {
             {confirmed ? "已确认仿真任务" : "确认演示工单"}
           </button>
           <p className="demo-caption">固定工单示例 · 不提交至飞控或业务后端</p>
+          <label className="demo-evidence-select">
+            算法案例
+            <select
+              aria-label="算法案例"
+              value={evidenceCase}
+              onChange={(event) => {
+                setEvidenceCase(event.target.value as "main" | "contrast");
+                setPlaying(false);
+                setConfirmed(false);
+                setSelectedSample(null);
+                setTime(52);
+                setAlgorithmMap(true);
+              }}
+            >
+              <option value="main">S1-02 · 通过例</option>
+              <option value="contrast">S1-01 · 拒绝对照</option>
+            </select>
+          </label>
         </aside>
 
         <section className="demo-map" data-view={visualView}>
-          <Scene frame={frame} view={visualView} studioAngle={studioAngle} />
+          {evidence && (
+            <Scene
+              key={evidence.revision}
+              frame={frame}
+              view={visualView}
+              studioAngle={studioAngle}
+              evidence={evidence}
+            />
+          )}
+          {evidence && (algorithmMap || frame.phase === 2) && (
+            <div className="demo-algorithm-map" aria-label="算法证据主地图">
+              <header>
+                <strong>{evidence.task_id} · 算法场景</strong>
+                <button
+                  onClick={() => {
+                    setAlgorithmMap(false);
+                    if (frame.phase === 2) seek(95);
+                  }}
+                >
+                  返回城市镜头
+                </button>
+              </header>
+              <EvidenceMap evidence={evidence} sampleIndex={sampleIndex} />
+              <p>{evidence.algorithm} · 栅格 ENU · 冻结仿真输入</p>
+            </div>
+          )}
           <div className="demo-map-top">
             <span>
               <span className="demo-dot" />{" "}
@@ -175,7 +273,9 @@ export default function Demo() {
                 ? "CR30 / STUDIO"
                 : visualView === "detail"
                   ? "CITY / ARCHITECTURE"
-                  : "VIRTUAL CITY"}
+                  : frame.time >= 52
+                    ? "ALGORITHM / ENU"
+                    : "VIRTUAL CITY"}
             </span>
             <div className="demo-view-switch" aria-label="视觉镜头">
               <button
@@ -216,7 +316,11 @@ export default function Demo() {
               <div>
                 <i className="demo-key amber" /> 备降标记
               </div>
-              <span>虚拟滨水城区 · 非真实地理坐标</span>
+              <span>
+                {frame.time >= 52
+                  ? "冻结算法 ENU 场景 · 高度仅作示意"
+                  : "虚拟滨水城区 · 非真实地理坐标"}
+              </span>
             </div>
           ) : visualView === "detail" ? (
             <div className="demo-map-bottom">
@@ -257,7 +361,7 @@ export default function Demo() {
           )}
           {frame.phase === 4 && visualView === "city" && (
             <div className="demo-alert">
-              <Radio size={17} /> 通信退化情景 · 备用方案回放
+              <Radio size={17} /> 通信退化情景 · 航线保持冻结版本
             </div>
           )}
         </section>
@@ -280,21 +384,24 @@ export default function Demo() {
           <div className="demo-meter">
             <i style={{ width: `${frame.progress * 100}%` }} />
           </div>
-          <div className="demo-concept">
-            <small>规划机制 · 概念示意</small>
-            <div>
-              <span>候选方案</span>
-              <b>约束检查</b>
-            </div>
-            <div>
-              <span>普通几何规划</span>
-              <span className="demo-warning">可能余量不足</span>
-            </div>
-            <div>
-              <span>备降约束规划</span>
-              <span>筛除不满足条件的候选</span>
-            </div>
-          </div>
+          {evidence ? (
+            <TaskEvidenceCard
+              key={evidence.revision}
+              evidence={evidence}
+              sampleIndex={sampleIndex}
+              onSample={(index) => {
+                setSelectedSample(index);
+                setPlaying(false);
+                setAlgorithmMap(true);
+              }}
+              onLocate={() => {
+                setAlgorithmMap(true);
+                setPlaying(false);
+              }}
+            />
+          ) : (
+            <p role="alert">冻结算法证据不可用，请重新导出。</p>
+          )}
           <h3>事件记录</h3>
           <ol className="demo-events">
             {events.map((event) => (
@@ -315,8 +422,9 @@ export default function Demo() {
         <div className="demo-play-actions">
           <button
             aria-label={playing ? "暂停" : "播放"}
-            disabled={!confirmed}
+            disabled={!confirmed || evidenceCase === "contrast"}
             onClick={() => {
+              setSelectedSample(null);
               if (time >= DURATION) setTime(0);
               setPlaying(!playing);
             }}

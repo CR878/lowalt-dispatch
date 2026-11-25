@@ -153,13 +153,22 @@ test("historical route and negative profile can be compared without replacing th
   );
   await expect(
     page.getByRole("img", {
-      name: "历史演示备降余量曲线 RT-S2-01-A，零线以下为负余量",
+      name: "冻结备降余量曲线 RT-S2-01-A，零线以下为负余量",
     }),
   ).toBeVisible();
   await expect(page.locator(".mission-card")).toContainText("应急医疗物资配送");
   await page.getByRole("button", { name: "关闭历史方案对比" }).click();
   await expect(page.locator(".review-map-label")).toHaveCount(0);
-  await expect(page.locator(".margin-summary strong")).toContainText("+34.8");
+  const scene = await (await page.request.get("/demo-scene.json")).json();
+  const actualMinimum = Math.min(
+    ...scene.margin_profile.map((p: { margin_wh: number }) => p.margin_wh),
+  ).toFixed(2);
+  await expect(page.locator(".margin-summary strong")).toContainText(
+    actualMinimum,
+  );
+  await expect(page.locator(".margin-summary strong")).not.toContainText(
+    "+34.8",
+  );
 });
 
 test("offline basemap can retry while preserving selected geographic points", async ({

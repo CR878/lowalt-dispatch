@@ -4,6 +4,7 @@ import { DataExport, DataTable } from "./DataTable";
 import type { Presentation, ResponseBlock } from "./presentation";
 import type { PreviewRoute } from "./types";
 import "./responseBlocks.css";
+import { TaskEvidenceCard } from "./TaskEvidenceCard";
 
 const metric = (value: number | null) =>
   value === null
@@ -176,6 +177,24 @@ export function ResponseBlocks({
           )}
           {block.type === "route" && (
             <RoutePreview block={block} onRoute={onRoute} />
+          )}
+          {block.type === "task_evidence" && (
+            <TaskEvidenceCard
+              evidence={block.evidence}
+              onLocate={() =>
+                onRoute({
+                  status: "geometry_only",
+                  route_id: block.evidence.route_id,
+                  draft_digest: block.evidence.revision,
+                  length_m: block.evidence.length_m,
+                  waypoint_count: block.evidence.waypoints.length,
+                  waypoints: block.evidence.waypoints,
+                  source: block.evidence.source,
+                  assumptions: "冻结算法证据；示例参数；未下发",
+                  dispatch_enabled: false,
+                })
+              }
+            />
           )}
           <Source block={block} />
         </section>

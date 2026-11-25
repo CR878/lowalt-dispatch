@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Literal
 
@@ -30,6 +30,65 @@ class GeographicPoint(BaseModel):
     lat: float = Field(ge=-80, le=80)
 
 
+class AvoidRegion(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    id: str = Field(min_length=1, max_length=160)
+    kind: Literal["restricted", "internal"]
+    geometry: dict
+    source: str = Field(min_length=1, max_length=300)
+    source_ref: str = Field(default="", max_length=1000)
+    effective_from: str | None = None
+    effective_until: str | None = None
+
+    @model_validator(mode="after")
+    def valid(self):
+        from shapely.geometry import shape
+
+        if self.geometry.get("type") not in {"Polygon", "MultiPolygon"}:
+            raise ValueError("限制区仅支持 Polygon/MultiPolygon")
+        rings = self.geometry.get("coordinates", [])
+        polygons = [rings] if self.geometry["type"] == "Polygon" else rings
+        if (
+            not isinstance(polygons, list)
+            or not polygons
+            or any(not isinstance(p, list) or not p for p in polygons)
+        ):
+            raise ValueError("限制区多边形结构无效")
+        if any(
+            not isinstance(ring, list) or len(ring) < 4 or ring[0] != ring[-1] for p in polygons for ring in p
+        ):
+            raise ValueError("限制区环必须闭合且至少四点")
+        vertices = [p for polygon in polygons for ring in polygon for p in ring]
+        if (
+            not vertices
+            or len(vertices) > 5000
+            or any(
+                not isinstance(p, list)
+                or len(p) != 2
+                or not all(
+                    isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in p
+                )
+                or not (-180 <= p[0] <= 180 and -80 <= p[1] <= 80)
+                for p in vertices
+            )
+        ):
+            raise ValueError("限制区坐标无效或顶点过多")
+        geom = shape(self.geometry)
+        if geom.is_empty or not geom.is_valid:
+            raise ValueError("限制区拓扑无效")
+        for value in (self.effective_from, self.effective_until):
+            if value is not None and datetime.fromisoformat(value.replace("Z", "+00:00")).tzinfo is None:
+                raise ValueError("限制区时刻须包含时区")
+        if (
+            self.effective_from
+            and self.effective_until
+            and datetime.fromisoformat(self.effective_until.replace("Z", "+00:00"))
+            <= datetime.fromisoformat(self.effective_from.replace("Z", "+00:00"))
+        ):
+            raise ValueError("限制区时间范围无效")
+        return self
+
+
 class CandidateInput(VehicleSelection):
     model_config = ConfigDict(extra="forbid")
     origin: ScenePoint | GeographicPoint
@@ -38,6 +97,7 @@ class CandidateInput(VehicleSelection):
     scheduled_for: str | None = None
     resolution_m: Literal[10, 20, 30] = 10
     max_expand: int = Field(default=500_000, ge=1000, le=1_000_000)
+    avoid_regions: list[AvoidRegion] = Field(default_factory=list, max_length=100)
 
     @model_validator(mode="after")
     def distinct(self):
@@ -58,6 +118,8 @@ class CandidateInput(VehicleSelection):
             if abs(start[0] - goal[0]) > 180 or distance > 80_000:
                 raise ValueError("真实航线限80km局部区域，跨日期变更线请分段规划")
         else:
+            if self.avoid_regions:
+                raise ValueError("WGS84 导入限制区不能绑定到 ENU 演示锚点，请使用真实坐标规划")
             if not isinstance(self.origin, ScenePoint) or not isinstance(self.destination, ScenePoint):
                 raise ValueError("ENU 起终点须使用固定仿真场景 x、y")
             distance = (
@@ -126,6 +188,23 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
     goal = (body.destination.lng, body.destination.lat)
     dataset = fetch_obstacles(start, goal, margin_m=1000)
     metadata = dataset["metadata"]
+    departure = (
+        datetime.fromisoformat(body.scheduled_for.replace("Z", "+00:00"))
+        if body.scheduled_for
+        else datetime.now(UTC)
+    )
+    enforced = [
+        r
+        for r in body.avoid_regions
+        if not r.effective_until
+        or datetime.fromisoformat(r.effective_until.replace("Z", "+00:00")) > departure
+    ]
+    exclusions = {
+        "type": "FeatureCollection",
+        "features": [
+            {"type": "Feature", "properties": {"id": r.id}, "geometry": r.geometry} for r in enforced
+        ],
+    }
 
     # Coarse resolutions (20/30 m) carry a larger half-cell margin, so dense
     # urban corridors can be sealed even when a 10 m grid is traversable. That is
@@ -155,6 +234,7 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
             start,
             goal,
             dataset["obstacles"],
+            exclusions_fc=exclusions,
             resolution_m=resolution,
             max_expand=body.max_expand,
             budget_s=min(28.0, remaining),
@@ -258,7 +338,14 @@ def real_candidate_routes(body: CandidateInput, *, budget_total_s: float = 42.0)
         "vehicle_assessment": evaluate_vehicle(body, result["length_m"] if found else None),
         "obstacle_source": metadata["source"],
         "weather_source": weather["source"],
-        "airspace": {"status": "manual_review_required", "source": None, "dispatch_enabled": False},
+        "airspace": {
+            "status": "user_exclusions_applied" if enforced else "manual_review_required",
+            "source": "用户导入参考；来源未独立核验",
+            "enforced_ids": [r.id for r in enforced],
+            "dispatch_enabled": False,
+            "note": "对尚未过期的禁飞/内部管制多边形保守作全高度避让（含未来生效、时效未知）；其他类别仅展示，未接官方空域服务。",
+        },
+        "avoid_regions": [r.model_dump() for r in body.avoid_regions],
         "clearance_m": result["clearance_m"],
         "grid_clearance_m": result.get("grid_clearance_m"),
         "resolution_m": result["resolution_m"],

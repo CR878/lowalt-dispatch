@@ -5,15 +5,6 @@
  */
 export const DURATION = 180;
 
-export const mission = {
-  id: "DEMO-001",
-  origin: "中心物资站",
-  destination: "河东救援点",
-  aircraft: "CR30",
-  cargo: "应急医疗物资",
-  weight: "1 kg（示例）",
-} as const;
-
 export const chapters = [
   { time: 0, title: "任务确认", label: "01 / INTAKE" },
   { time: 32, title: "虚拟城区", label: "02 / DIGITAL TWIN" },
@@ -53,13 +44,13 @@ export function frameAt(seconds: number, confirmed: boolean) {
     status: !confirmed
       ? "等待确认"
       : phase === 5
-        ? "仿真备降 · 物资待接续"
+        ? "几何航线回放结束 · 未下发"
         : phase === 4
-          ? "备用方案情景回放"
+          ? "链路退化示意 · 航线保持冻结版本"
           : phase === 3
             ? "合成回放中"
             : phase === 2
-              ? "查看约束示意"
+              ? "查看冻结算法证据"
               : "仿真工单已确认",
   };
 }

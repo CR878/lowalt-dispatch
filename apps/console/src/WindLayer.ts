@@ -11,20 +11,19 @@ export const WIND_COLORS = [
 ];
 const STOPS = [0, 2, 4, 7, 10];
 const SIZE = 512;
-const { west, east, south, north } = WIND_REGION;
-const top = MercatorCoordinate.fromLngLat([west, north]);
-const bottom = MercatorCoordinate.fromLngLat([east, south]);
 type Pixel = [x: number, y: number];
 
-function windAtPixel(field: WindField, x: number, y: number) {
-  const point = new MercatorCoordinate(
-    top.x + ((bottom.x - top.x) * x) / SIZE,
-    top.y + ((bottom.y - top.y) * y) / SIZE,
-  ).toLngLat();
-  return sampleWind(field, [point.lng, point.lat]);
-}
-
 export function createWindLayer(field: WindField) {
+  const { west, east, south, north } = field.region ?? WIND_REGION;
+  const top = MercatorCoordinate.fromLngLat([west, north]);
+  const bottom = MercatorCoordinate.fromLngLat([east, south]);
+  const windAtPixel = (_field: WindField, x: number, y: number) => {
+    const point = new MercatorCoordinate(
+      top.x + ((bottom.x - top.x) * x) / SIZE,
+      top.y + ((bottom.y - top.y) * y) / SIZE,
+    ).toLngLat();
+    return sampleWind(field, [point.lng, point.lat]);
+  };
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = SIZE;
   const ctx = canvas.getContext("2d")!;

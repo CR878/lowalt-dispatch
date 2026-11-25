@@ -413,8 +413,19 @@ def resolve_place(
             "is_simulated": True,
         }
     try:
-        rows, provider = geocode.lookup(name, 1)
+        rows, provider = geocode.lookup(name, 5)
         if rows:
+            if len(rows) > 1:
+                return {
+                    "status": "ambiguous",
+                    "name": name,
+                    "point": None,
+                    "crs": "unresolved",
+                    "source": provider,
+                    "address": "存在多个候选，请选择具体地点并确认实际起降点；未自动采用第一条。",
+                    "is_simulated": False,
+                    "candidates": rows,
+                }
             first = rows[0]
             return {
                 "status": "ok",

@@ -1,6 +1,12 @@
+import type { AirspaceRegion } from "./navigation/airspace";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FeatureCollection } from "geojson";
-import { validLngLat, type GeoMission, type LngLat } from "./geo";
+import {
+  distanceMeters,
+  validLngLat,
+  type GeoMission,
+  type LngLat,
+} from "./geo";
 import { parseRoutes, type NavRoute } from "./navigation/engine";
 import "./real-routing.css";
 import { useAircraft, type Assessment } from "./aircraft";
@@ -10,20 +16,22 @@ export type RealScene = {
   obstacles: FeatureCollection;
   roads: FeatureCollection;
 };
-type RoutingResult = {
+export type RoutingResult = {
   status: string;
   route: unknown;
   scene_id: string | null;
-  clearance_m: number;
-  grid_clearance_m: number;
-  resolution_m: number;
-  elapsed_ms: number;
+  clearance_m: number | null;
+  grid_clearance_m: number | null;
+  resolution_m: number | null;
+  elapsed_ms: number | null;
   obstacle_source: string;
   weather_source: string;
   warnings: string[];
   limitation: string;
   alternatives: { reason: string | null }[];
   vehicle_assessment?: Assessment;
+  airspace?: { status: string; enforced_ids?: string[]; note?: string };
+  avoid_regions?: unknown[];
   data: {
     building_count?: number;
     road_count?: number;
@@ -50,11 +58,48 @@ type RoutingResult = {
   };
 };
 
+export type StoredRealRoute = {
+  status?: string;
+  route_id?: string;
+  route?: unknown;
+  planning_result?: RoutingResult;
+  scene_id?: string | null;
+  waypoints?: { x?: number; y?: number; lng?: number; lat?: number }[];
+  length_m?: number | null;
+  clearance_m?: number | null;
+  resolution_used_m?: number | null;
+  obstacle_source?: string | null;
+  warnings?: string[];
+  note?: string | null;
+};
+
+export function restoredRoute(stored: StoredRealRoute): NavRoute {
+  return parseRoutes(
+    stored.route ?? {
+      id: stored.route_id || "restored-intake-route",
+      title: "工单保存的真实几何路线",
+      source: stored.obstacle_source || "历史工单；建筑来源待核对",
+      frame: "WGS84",
+      is_simulated: false,
+      waypoints: stored.waypoints?.map((p) => ({
+        x: p.x ?? p.lng,
+        y: p.y ?? p.lat,
+      })),
+    },
+  )[0];
+}
+
 export function useRealRouting(
   mission: GeoMission,
   onReady: (route: NavRoute) => void,
+  regions: AirspaceRegion[],
 ) {
   const aircraft = useAircraft();
+  const regionRef = useRef(regions);
+  regionRef.current = regions;
+  const regionKey = JSON.stringify(
+    regions.filter((r) => r.kind === "restricted" || r.kind === "internal"),
+  );
   const [payloadKg, setPayloadKg] = useState("");
   const selectionRef = useRef(aircraft.selection);
   selectionRef.current = aircraft.selection;
@@ -69,17 +114,19 @@ export function useRealRouting(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const abort = useRef<AbortController | null>(null);
-  const skipClear = useRef(false);
+  const skipClear = useRef<string | null>(null);
   const key = JSON.stringify([
     mission.origin?.point,
     mission.destination?.point,
+    regionKey,
   ]);
   // Clear route and downloaded context whenever the actual endpoints change.
   useEffect(() => {
-    if (skipClear.current) {
-      skipClear.current = false;
+    if (skipClear.current === key) {
+      skipClear.current = null;
       return;
     }
+    skipClear.current = null;
     abort.current?.abort();
     abort.current = null;
     setResult(null);
@@ -88,11 +135,13 @@ export function useRealRouting(
     setQueriedSchedule(null);
     setBusy(false);
     setError("");
-    return () => {
-      abort.current?.abort();
-      abort.current = null;
-    };
   }, [key]);
+  useEffect(
+    () => () => {
+      abort.current?.abort();
+    },
+    [],
+  );
   const compute = useCallback(
     async (
       points: GeoMission,
@@ -129,6 +178,17 @@ export function useRealRouting(
             origin: { lng, lat },
             destination: { lng: endLng, lat: endLat },
             scheduled_for: scheduledFor,
+            avoid_regions: regionRef.current
+              .filter((r) => r.kind === "restricted" || r.kind === "internal")
+              .map((r) => ({
+                id: r.id,
+                kind: r.kind,
+                geometry: r.geometry,
+                source: r.source,
+                source_ref: r.source_ref,
+                effective_from: r.effective_from,
+                effective_until: r.effective_until,
+              })),
             ...selection,
             payload_kg: payloadText.trim() ? Number(payloadText) : null,
           }),
@@ -152,8 +212,10 @@ export function useRealRouting(
             !parsed.waypoints.every((p) => validLngLat([p.x, p.y]))
           )
             throw new Error("服务返回的真实航线坐标无效");
-          setRoute(parsed);
-          onReady(parsed);
+          if (!payload.scene_id) {
+            setRoute(parsed);
+            onReady(parsed);
+          }
         }
         if (payload.scene_id) {
           const data = await fetch(
@@ -165,7 +227,14 @@ export function useRealRouting(
               "航线已计算，但同一批建筑和道路快照加载失败，请重试",
             );
           const snapshot = await data.json();
-          if (!controller.signal.aborted) setScene(snapshot);
+          if (!controller.signal.aborted) {
+            setScene(snapshot);
+            if (payload.route) {
+              const parsed = parseRoutes(payload.route)[0];
+              setRoute(parsed);
+              onReady(parsed);
+            }
+          }
         }
       } catch (e) {
         if (abort.current === controller)
@@ -188,54 +257,134 @@ export function useRealRouting(
    */
   const hydrate = useCallback(
     (
-      stored: {
-        status?: string;
-        waypoints?: { x?: number; y?: number; lng?: number; lat?: number }[];
-        length_m?: number | null;
-        clearance_m?: number | null;
-        resolution_used_m?: number | null;
-        obstacle_source?: string | null;
-        warnings?: string[];
-        note?: string | null;
-      },
+      stored: StoredRealRoute,
       scheduledFor: string | null = null,
+      intakePayload?: number | null,
+      expected?: GeoMission,
     ) => {
-      if (stored.status !== "ok" || !stored.waypoints?.length) return false;
-      const routePayload = {
-        frame: "WGS84",
-        waypoints: stored.waypoints,
-        length_m: stored.length_m ?? null,
-      };
-      const parsed = parseRoutes(routePayload)[0];
       if (
-        parsed.frame !== "WGS84" ||
-        !parsed.waypoints.every((p) => validLngLat([p.x, p.y]))
+        stored.status !== "ok" ||
+        (!stored.waypoints?.length && !stored.route)
       )
         return false;
+      const currentRegions = regionRef.current
+        .filter((r) => r.kind === "restricted" || r.kind === "internal")
+        .map((r) => ({
+          id: r.id,
+          kind: r.kind,
+          geometry: r.geometry,
+          source: r.source,
+          source_ref: r.source_ref,
+          effective_from: r.effective_from,
+          effective_until: r.effective_until,
+        }));
+      if (
+        currentRegions.length &&
+        JSON.stringify(currentRegions) !==
+          JSON.stringify(stored.planning_result?.avoid_regions ?? [])
+      ) {
+        setError("当前导入限制区与工单计算时不同，请重新计算航线");
+        return false;
+      }
+      let parsed: NavRoute;
+      try {
+        parsed = restoredRoute(stored);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "工单航线格式无效");
+        return false;
+      }
+      if (parsed.frame !== "WGS84") return false;
+      const first: LngLat = [parsed.waypoints[0].x, parsed.waypoints[0].y];
+      const last: LngLat = [
+        parsed.waypoints[parsed.waypoints.length - 1].x,
+        parsed.waypoints[parsed.waypoints.length - 1].y,
+      ];
+      if (
+        expected?.origin &&
+        expected.destination &&
+        (distanceMeters(first, expected.origin.point) > 1 ||
+          distanceMeters(last, expected.destination.point) > 1)
+      ) {
+        setError("工单航线与起终点不一致，请重新计算");
+        return false;
+      }
       abort.current?.abort();
       abort.current = null;
-      skipClear.current = true;
-      setBusy(false);
+      skipClear.current = JSON.stringify([
+        expected?.origin?.point ?? first,
+        expected?.destination?.point ?? last,
+        JSON.stringify(
+          regionRef.current.filter(
+            (r) => r.kind === "restricted" || r.kind === "internal",
+          ),
+        ),
+      ]);
+      const controller = new AbortController();
+      abort.current = controller;
+      setScene(null);
+      setRoute(null);
+      setResult(null);
       setError("");
       setQueriedSchedule(scheduledFor);
-      setRoute(parsed);
-      setResult({
+      const sceneId = stored.scene_id ?? stored.planning_result?.scene_id;
+      const legacy = !sceneId;
+      if (intakePayload != null) setPayloadKg(String(intakePayload));
+      setQueriedVehicle("");
+      const payload: RoutingResult = stored.planning_result ?? {
         status: "ok",
-        route: routePayload,
-        scene_id: null,
-        clearance_m: stored.clearance_m ?? 0,
-        grid_clearance_m: 0,
-        resolution_m: stored.resolution_used_m ?? 0,
-        elapsed_ms: 0,
-        obstacle_source: stored.obstacle_source ?? "",
+        route: parsed,
+        scene_id: sceneId ?? null,
+        clearance_m: stored.clearance_m ?? null,
+        grid_clearance_m: null,
+        resolution_m: stored.resolution_used_m ?? null,
+        elapsed_ms: null,
+        obstacle_source: stored.obstacle_source ?? "历史来源待核对",
         weather_source: "",
-        warnings: stored.warnings ?? [],
+        warnings: [
+          ...(stored.warnings ?? []),
+          ...(legacy
+            ? ["历史工单未保存对应建筑快照；仅恢复航点，请重新计算以核对环境。"]
+            : []),
+        ],
         limitation: stored.note ?? "",
         alternatives: [],
         data: {},
         weather: { status: "unavailable" },
-      });
-      onReady(parsed);
+      };
+      const publish = (snapshot: RealScene | null) => {
+        if (controller.signal.aborted) return;
+        setScene(snapshot);
+        setResult(payload);
+        setRoute(parsed);
+        setBusy(false);
+        onReady(parsed);
+      };
+      if (!sceneId) {
+        setBusy(false);
+        publish(null);
+      } else {
+        setBusy(true);
+        const timer = window.setTimeout(() => controller.abort(), 30_000);
+        fetch(
+          `/api/assistant/navigation/scenes/${encodeURIComponent(sceneId)}`,
+          { signal: controller.signal },
+        )
+          .then(async (response) => {
+            if (!response.ok)
+              throw new Error("工单建筑快照不可用或过期，请重新计算航线");
+            return response.json();
+          })
+          .then(publish)
+          .catch((error) => {
+            if (abort.current === controller) {
+              setError(
+                error instanceof Error ? error.message : "工单快照恢复失败",
+              );
+              setBusy(false);
+            }
+          })
+          .finally(() => window.clearTimeout(timer));
+      }
       return true;
     },
     [onReady],
@@ -252,7 +401,16 @@ export function useRealRouting(
     aircraft,
     payloadKg,
     setPayloadKg,
-    vehicleChanged: queriedVehicle !== selectionKey,
+    clear: () => {
+      abort.current?.abort();
+      setRoute(null);
+      setResult(null);
+      setScene(null);
+      setBusy(false);
+      setError("");
+    },
+    vehicleChanged: !!queriedVehicle && queriedVehicle !== selectionKey,
+    vehicleUnknown: !!route && !queriedVehicle,
   };
 }
 
@@ -283,6 +441,9 @@ export function RealRoutingPanel({
       data-testid="real-routing"
     >
       <strong>真实建筑避障规划</strong>
+      <p>
+        地点坐标只作定位参考；请在开阔处确认实际起降点。起终点被占用时会拒绝规划，不会自动移点。
+      </p>
       <p>
         {mission.origin.name} → {mission.destination.name}
       </p>
@@ -335,6 +496,11 @@ export function RealRoutingPanel({
               起飞时刻已更改，请重新计算；下方结果仍对应上次查询时刻。
             </p>
           )}
+          {routing.vehicleUnknown && (
+            <p role="status">
+              历史工单未绑定当前选择的机型参数；请核对后重新计算。
+            </p>
+          )}
           {routing.vehicleChanged && (
             <p role="alert">
               机型或载荷已更改，请重新计算；下方为上次参数的结果。
@@ -346,9 +512,18 @@ export function RealRoutingPanel({
               : `未找到航线：${result.alternatives[0]?.reason ?? "未知原因"}`}
           </p>
           <p>
-            要求水平净空 ≥ {result.clearance_m} m · 网格 {result.resolution_m} m
-            · 搜索 {(result.elapsed_ms / 1000).toFixed(2)} s
+            要求水平净空 ≥ {result.clearance_m ?? "—"} m · 网格{" "}
+            {result.resolution_m ?? "—"} m · 搜索{" "}
+            {result.elapsed_ms == null
+              ? "—"
+              : (result.elapsed_ms / 1000).toFixed(2)}{" "}
+            s
           </p>
+          <p>
+            导入区域：{result.airspace?.enforced_ids?.length ?? 0}{" "}
+            个禁飞/内部管制区参与全高度几何避让；其他类别仅作资料提醒。
+          </p>
+          <p>{result.airspace?.note}</p>
           <p>建筑高度：OSM 标签／楼层推算／未知；点击建筑查看来源。</p>
           {result.data.building_count != null && (
             <p>

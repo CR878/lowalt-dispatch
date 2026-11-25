@@ -24,6 +24,19 @@ export const WIND_REGION = {
   south: 28.25,
   north: 34.25,
 };
+export type WindRegion = typeof WIND_REGION;
+export function windRegionFor([lng, lat]: LngLat): WindRegion {
+  if (
+    lng >= WIND_REGION.west &&
+    lng <= WIND_REGION.east &&
+    lat >= WIND_REGION.south &&
+    lat <= WIND_REGION.north
+  )
+    return WIND_REGION;
+  const x = Math.max(-176, Math.min(176, Math.round(lng * 2) / 2));
+  const y = Math.max(-81, Math.min(81, Math.round(lat * 2) / 2));
+  return { west: x - 4, east: x + 4, south: y - 3, north: y + 3 };
+}
 const WIND_GRID_SIZE = 11;
 
 export type WeatherSnapshot = {
@@ -45,6 +58,7 @@ export type RadarFrame = {
 };
 
 export type WindField = {
+  region?: WindRegion;
   validAt: string;
   vectors: [east: number, north: number][];
 };
@@ -207,8 +221,11 @@ export async function fetchWeather(
   };
 }
 
-export async function fetchWindField(signal: AbortSignal): Promise<WindField> {
-  const { west, east, south, north } = WIND_REGION;
+export async function fetchWindField(
+  signal: AbortSignal,
+  region: WindRegion = WIND_REGION,
+): Promise<WindField> {
+  const { west, east, south, north } = region;
   const points = Array.from({ length: WIND_GRID_SIZE ** 2 }, (_, i) => [
     west + ((i % WIND_GRID_SIZE) * (east - west)) / (WIND_GRID_SIZE - 1),
     south +
@@ -253,14 +270,14 @@ export async function fetchWindField(signal: AbortSignal): Promise<WindField> {
     const radians = (direction * Math.PI) / 180;
     vectors[id] = [-speed * Math.sin(radians), -speed * Math.cos(radians)];
   });
-  return { validAt: new Date(validTime).toISOString(), vectors };
+  return { validAt: new Date(validTime).toISOString(), vectors, region };
 }
 
 export function sampleWind(
   field: WindField,
   [lng, lat]: LngLat,
 ): [number, number] | null {
-  const { west, east, south, north } = WIND_REGION;
+  const { west, east, south, north } = field.region ?? WIND_REGION;
   if (lng < west || lng > east || lat < south || lat > north) return null;
   const x = ((lng - west) / (east - west)) * (WIND_GRID_SIZE - 1);
   const y = ((lat - south) / (north - south)) * (WIND_GRID_SIZE - 1);

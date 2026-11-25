@@ -61,7 +61,14 @@ function terminalGrid(
         layers.restrictions &&
         scene.zones.some((zone) => contains(position, zone.polygon))
       ) {
-        return { text: "X", ink: "zone" };
+        return {
+          text: scene.zones.some(
+            (zone) => zone.active !== false && contains(position, zone.polygon),
+          )
+            ? "X"
+            : "r",
+          ink: "zone",
+        };
       }
       if (
         layers.buildings &&
@@ -289,8 +296,10 @@ export function TerminalMap({
             )}
             {layers.restrictions && (
               <span>
-                <code data-ink="zone">X</code> S1-01 限制区 {scene.zones.length}{" "}
-                · 均未生效
+                <code data-ink="zone">X</code> 区域草稿 {scene.zones.length} ·
+                本任务生效{" "}
+                {scene.zones.filter((z) => z.active !== false).length} ·
+                均未生效
               </span>
             )}
             {layers.routes && (

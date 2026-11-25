@@ -30,6 +30,7 @@ from services.assistant.intake import (
 )
 from services.assistant.knowledge import search
 from services.assistant.models import DocumentQuery, Draft, DraftUpdate, NoArgs, Turn
+from services.assistant.task_evidence import EvidenceQuery, read_task_evidence
 from services.assistant.telemetry import STALE_SECONDS, LiveTelemetry
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,6 +44,7 @@ ALIASES = {"中转站": "医疗物资中转站", "北区中心": "北区应急�
 # renders it instead of offering clickable prompts that only produce boilerplate.
 CAPABILITIES = {
     "available": [
+        "竞赛冻结任务证据卡：算法路线、余量剖面、独立校验与数据缺口",
         "项目文档与无人机合规知识检索（带文件、行号或来源链接）",
         "当前页面的演示或 M4 遥测查询",
         "本地合成任务状态与回执查询",
@@ -151,6 +153,9 @@ def real_route_for_intake(origin: list[float], destination: list[float], schedul
         "status": result["status"],
         "frame": "WGS84",
         "route_id": route.get("id"),
+        "route": route,
+        "scene_id": result.get("scene_id"),
+        "planning_result": result,
         "waypoints": route.get("waypoints") or [],
         "length_m": route.get("length_m"),
         "resolution_requested_m": result.get("resolution_requested_m"),
@@ -282,6 +287,11 @@ def _compute_route_in_background(
 
 class Toolset:
     SPECS = {
+        "get_task_evidence": (
+            "读取竞赛冻结任务的算法证据。main 为 S1-02 通过例，contrast 为 S1-01 拒绝例；"
+            "含路线、余量剖面、独立校验与缺口，仅示例参数，不是当前业务工单或飞控结果。",
+            EvidenceQuery,
+        ),
         "search_project_docs": (
             "查找项目规则、接口和操作说明，返回原文、文件位置和内容版本。",
             DocumentQuery,
@@ -398,6 +408,19 @@ class Toolset:
 
     def get_flight_status(self, _args):
         ctx = self.turn.context
+        if ctx.telemetry_mode == "planning":
+            route = ctx.active_route
+            return {
+                "telemetry_mode": "planning",
+                "source": "当前页面规划上下文（未连接执行遥测）",
+                "task_id": ctx.task_id,
+                "sampled_at": ctx.sampled_at.isoformat(),
+                "stale": False,
+                "telemetry": None,
+                "progress_pct": None,
+                "route": route.model_dump(mode="json") if route else None,
+                "reason": f"当前路线 {route.route_id if route else '尚未生成'}；仅规划参考，当前没有对应任务的电量、位置或执行进度。",
+            }
         if ctx.telemetry_mode == "live":
             frame = self.read_live_telemetry() if self.read_live_telemetry else ctx.live_telemetry
             age = frame.age_seconds() if frame else None
@@ -426,7 +449,34 @@ class Toolset:
             "point": point_at(baseline(), ctx.progress),
         }
 
+    def get_task_evidence(self, args: EvidenceQuery):
+        return read_task_evidence(args.case)
+
     def get_task_status(self, _args):
+        ctx = self.turn.context
+        if ctx.selected_intake_id:
+            try:
+                item = intake_store.get(ctx.selected_intake_id)
+            except (KeyError, ValueError):
+                return {"status": "unavailable", "reason": "当前选中工单不可用，请重新选择。"}
+            route = item.get("real_route") or {}
+            label = {"ok": "工单几何路线已生成", "pending": "工单路线计算中"}.get(
+                route.get("status"), "工单路线尚不可用"
+            )
+            return {
+                "status": "ok",
+                "source": "服务端工单记录",
+                "task_id": ctx.selected_intake_id,
+                "scenario_id": "WGS84",
+                "label": label,
+                "planning_label": label,
+                "execution_label": "仅工单，未下发",
+                "ack_accepted": None,
+                "plan_version": route.get("route_id"),
+                "reason": label + "；未下发飞控，不能推断配送或备降完成。",
+            }
+        if ctx.telemetry_mode == "planning":
+            return {"status": "not_selected", "reason": "当前是几何规划预览，没有对应的执行任务或回执。"}
         selected = self.turn.context.selected_task_id
         if selected is None:
             return {"status": "not_selected", "reason": "请先在「本地任务联调」选择要查询的任务。"}
@@ -578,6 +628,13 @@ class Toolset:
         }
 
     def inspect_terrain_risk(self, _args):
+        if self.turn.context.telemetry_mode == "planning":
+            return {
+                "status": "no_change_data",
+                "source": "当前规划上下文",
+                "reason": "当前规划路线没有绑定同坐标与高度基准的地形快照；未借用 S1-01 演示地形分析。",
+                "dispatch_enabled": False,
+            }
         if self.turn.context.telemetry_mode == "live":
             return {
                 "status": "no_change_data",
@@ -830,6 +887,7 @@ class Toolset:
                 "crs": item.get("crs"),
                 "source": item.get("source"),
                 "address": item.get("address", ""),
+                "candidates": item.get("candidates", []),
                 "confirmed": args.places_confirmed,
                 "note": (
                     "已在地图上定位，请确认是不是这个位置"

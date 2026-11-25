@@ -1,6 +1,33 @@
 import { readFile } from "node:fs/promises";
 import { expect, test } from "./fixtures";
 
+test("task evidence is produced by the real local tool and locates its route", async ({
+  page,
+}) => {
+  await page.route("https://basemaps.cartocdn.com/**", (r) => r.abort());
+  await page.goto("/airspace");
+  await page.getByRole("button", { name: "打开调度助手", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "向调度助手提问" })
+    .fill("显示拒绝案例的任务证据卡");
+  await page.getByRole("button", { name: "发送给调度助手" }).click();
+  const card = page.locator(".assistant-response-block.response-task_evidence");
+  await expect(card).toContainText("T-S1-01");
+  await expect(card).toContainText("独立校验拒绝");
+  await expect(card.locator(".task-evidence")).toHaveAttribute(
+    "data-revision",
+    /^[a-f0-9]{64}$/,
+  );
+  await card.getByRole("button", { name: "定位算法地图" }).click();
+  await expect(
+    page.getByRole("button", { name: "隐藏预览航线", exact: true }),
+  ).toBeVisible();
+  const summary = page.getByRole("region", { name: "规划航线状态概览" });
+  await expect(summary).toContainText("ENU 航线参考");
+  await expect(summary).toContainText("局部仿真坐标");
+  await expect(summary).not.toContainText("OpenStreetMap");
+});
+
 test("real status questions produce evidence-backed metric cards", async ({
   page,
 }) => {
@@ -19,7 +46,7 @@ test("real status questions produce evidence-backed metric cards", async ({
 
 test("structured replies support chart tables, sorting, CSV, timeline and route actions", async ({
   page,
-}) => {
+}, testInfo) => {
   await page.route("https://basemaps.cartocdn.com/**", (r) => r.abort());
   const metadata = {
     source: "界面回归测试数据",
@@ -124,7 +151,7 @@ test("structured replies support chart tables, sorting, CSV, timeline and route 
   await expect(page.locator(".assistant-metric-grid")).toContainText("—");
   await page.locator(".response-metrics").scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: "C:/Users/31772/.codex/visualizations/2026/11/11/01a1ca49-bcdf-7f93-b9c1-ba44e5b59ee8/aeris-agent-cards.png",
+    path: testInfo.outputPath("aeris-agent-cards.png"),
   });
   await chart.getByRole("button", { name: "表格", exact: true }).click();
   const table = chart.getByRole("table");

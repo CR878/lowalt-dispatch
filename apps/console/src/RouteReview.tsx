@@ -11,7 +11,7 @@ export type ReviewRoute = {
   site: string;
   checks: { name: string; passed: boolean; detail: string }[];
   waypoints: Point[];
-  samples: { s_m: number; margin_wh: number; nearest_site_id: string }[];
+  samples: { s_m: number; margin_wh: number; nearest_site_id: string | null }[];
   source: string;
   captured_at: string;
   is_simulated: true;

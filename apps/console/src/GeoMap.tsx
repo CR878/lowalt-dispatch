@@ -65,7 +65,7 @@ const offline = (dark: boolean): StyleSpecification => ({
     },
   ],
 });
-type FeatureProps = Record<string, string | number>;
+type FeatureProps = Record<string, string | number | boolean>;
 const feature = (
   geometry: Geometry,
   properties: FeatureProps = {},
@@ -100,6 +100,7 @@ export type GeoMapHandle = {
 export type WeatherOverlay = {
   radarTiles: string | null;
   wind: WindField | null;
+  windRegion?: typeof WIND_REGION;
 };
 export type GeoMapProps = {
   onAirspaceSelect?: (id: string) => void;
@@ -196,11 +197,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         }),
       flyTo: fly,
       showWindRegion: () => {
-        // Frame the Yangtze Delta inside the wider data extent, with room to pan.
+        const r = dynamic.current.weather?.windRegion ?? WIND_REGION;
         runtime.current?.map.fitBounds(
           [
-            [119.2, 29.95],
-            [123.8, 32.55],
+            [r.west + 1.7, r.south + 1.7],
+            [r.east - 1.7, r.north - 1.7],
           ],
           {
             padding: 32,
@@ -323,12 +324,13 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         const bounds = map.getBounds();
         const center = map.getCenter();
         const offset = center.lng - center.wrap().lng;
+        const region = dynamic.current.weather?.windRegion ?? WIND_REGION;
         const next =
           map.getZoom() < WIND_MAX_ZOOM &&
-          bounds.getEast() - offset >= WIND_REGION.west &&
-          bounds.getWest() - offset <= WIND_REGION.east &&
-          bounds.getNorth() >= WIND_REGION.south &&
-          bounds.getSouth() <= WIND_REGION.north;
+          bounds.getEast() - offset >= region.west &&
+          bounds.getWest() - offset <= region.east &&
+          bounds.getNorth() >= region.south &&
+          bounds.getSouth() <= region.north;
         if (windView !== next) {
           windView = next;
           dynamic.current.onWindView(next);
@@ -575,7 +577,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             windData = field;
           }
           if (windLayer) {
-            const { west, east, south, north } = WIND_REGION;
+            const { west, east, south, north } = field?.region ?? WIND_REGION;
             map.addSource("weather-wind", {
               type: "canvas",
               canvas: windLayer.canvas,
@@ -650,7 +652,11 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         source(
           "demo-zones",
           collection(
-            scene.zones.map((z) => polygon(z.polygon.map(enuToLngLat))),
+            scene.zones.map((z) =>
+              polygon(z.polygon.map(enuToLngLat), {
+                active: z.active !== false,
+              }),
+            ),
           ),
         );
         source("demo-route", collection([line(scene.route.map(enuToLngLat))]));
@@ -696,8 +702,13 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           type: "fill-extrusion",
           source: "demo-zones",
           paint: {
-            "fill-extrusion-color": "#dd8db4",
-            "fill-extrusion-height": 100,
+            "fill-extrusion-color": [
+              "case",
+              ["get", "active"],
+              "#dd8db4",
+              "#728393",
+            ],
+            "fill-extrusion-height": ["case", ["get", "active"], 100, 0],
             "fill-extrusion-opacity": 0.12,
           },
         });
@@ -706,7 +717,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           type: "line",
           source: "demo-zones",
           paint: {
-            "line-color": "#e8a3c7",
+            "line-color": ["case", ["get", "active"], "#e8a3c7", "#728393"],
             "line-width": 1.1,
             "line-dasharray": [4, 3],
           },
@@ -806,7 +817,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           scene.zones.forEach((zone) =>
             marker(
               enuToLngLat(zone.polygon[0]),
-              `${zone.id} 限制区 · 演示`,
+              `${zone.id} ${zone.active === false ? "区域草稿 · 本任务未生效" : "限制区"} · 演示`,
               "zone",
               "restrictions",
             ),
@@ -1223,8 +1234,8 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             ]),
           );
         }
-        if ((p.preview?.route_id ?? "") !== lastPreview) {
-          lastPreview = p.preview?.route_id ?? "";
+        if (JSON.stringify(p.preview) !== lastPreview) {
+          lastPreview = JSON.stringify(p.preview);
           source(
             "demo-preview",
             collection(
