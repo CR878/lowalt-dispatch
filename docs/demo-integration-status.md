@@ -124,3 +124,13 @@
 | 控制台三维回放 | `references/rea-city-flight/asset/out/cr30_lod1.glb` |
 
 录制入口直接引用 LOD，构建时由 Vite 打包。其他工程所需的文件不在本轮删除。
+
+## 2026-11-27 与 Antigravity 视觉包融合
+
+这次是把汇总目录里的三维演示融进正式控制台，不是用那份旧演示稿替换上面的任务证据。
+
+- `/` 首页英雄区、`/console` 和 `/airspace?map=shenzhen` 使用深圳湾艺术三维。坐标是场景单位，不是测绘，也不是实飞。
+- `/demo` 在 52 秒之后仍切到冻结 ENU 证据场景；52 秒之前的城市镜头换成艺术深圳湾。证据卡、拒绝案例和「未下发」终态保留。
+- 算法侧栏的余量曲线是概念示意。「冻结评测」页引用 `results/frozen_example_vehicle_e9674ab.*`，那是 commit `e9674ab` 的历史规划快照，不是本分支重跑，也不是官方实测。
+- 全站 CR30 爆炸背景只是展示层，`pointer-events` 不拦截助手、地图和工单操作。
+- 助手天气、障碍物和航线时间仍走 `services/assistant`。时变禁飞复算在 `planner/diversion.py` 的 `hard_constraint_report`，由 `python -m tools.acceptance` 和评测规划器一起验收。两套判定不能互相代替。
