@@ -169,24 +169,26 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         if (!points.length) return;
         const map = runtime.current?.map;
         if (!map) return;
-        if (!map.isStyleLoaded()) {
-          map.once("load", () => runtime.current?.overview(points));
-          return;
-        }
-        // The real-route panel can change the workspace width in this same
-        // React commit. Fit against its current layout rather than a stale
-        // viewport, and render the matching GPU frame below.
-        map.resize();
-        const bounds = new maplibregl.LngLatBounds(points[0], points[0]);
-        points.slice(1).forEach((p) => bounds.extend(p));
-        map.fitBounds(bounds, {
-          padding: { top: 80, bottom: 65, left: 45, right: 45 },
-          maxZoom: 16,
-          pitch: 0,
-          bearing: 0,
-          duration: dynamic.current.reducedMotion ? 0 : 800,
-        });
-        map.redraw();
+        const fit = () => {
+          if (!runtime.current?.map) return;
+          const current = runtime.current.map;
+          // The real-route panel can change the workspace width in this same
+          // React commit. Fit against its current layout rather than a stale
+          // viewport, and render the matching GPU frame below.
+          current.resize();
+          const bounds = new maplibregl.LngLatBounds(points[0], points[0]);
+          points.slice(1).forEach((p) => bounds.extend(p));
+          current.fitBounds(bounds, {
+            padding: { top: 80, bottom: 65, left: 45, right: 45 },
+            maxZoom: 16,
+            pitch: 0,
+            bearing: 0,
+            duration: dynamic.current.reducedMotion ? 0 : 800,
+          });
+          current.redraw();
+        };
+        if (map.isStyleLoaded()) fit();
+        else map.once("load", fit);
       },
       reset: () =>
         runtime.current?.map.flyTo({
