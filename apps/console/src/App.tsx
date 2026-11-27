@@ -81,7 +81,10 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import MapSurface, { type MapSurfaceHandle } from "./MapSurface";
+import MapSurface, {
+  type MapSurfaceHandle,
+  type MapSurfaceKind,
+} from "./MapSurface";
 import LocationPanel from "./LocationPanel";
 import { TerminalMap } from "./TerminalMap";
 import {
@@ -566,10 +569,12 @@ export default function App({
   embedded = false,
   readOnly = false,
   initialLive = false,
+  initialMapKind,
 }: {
   embedded?: boolean;
   readOnly?: boolean;
   initialLive?: boolean;
+  initialMapKind?: MapSurfaceKind;
 }) {
   const { theme } = useTheme();
   const preferences = useRef(loadPreferences()).current;
@@ -654,7 +659,15 @@ export default function App({
     waypoints: [number, number][];
     navigation?: NavRoute;
   } | null>(null);
-  const [mapKind, setMapKind] = useState<"world" | "terrain">("world");
+  const [mapKind, setMapKind] = useState<MapSurfaceKind>(() => {
+    if (initialMapKind) return initialMapKind;
+    const param = new URLSearchParams(window.location.search).get("map");
+    if (param === "shenzhen") return "shenzhen";
+    return "world";
+  });
+  useEffect(() => {
+    if (initialMapKind) setMapKind(initialMapKind);
+  }, [initialMapKind]);
   const [terminalMap, setTerminalMap] = useState(
     () => new URLSearchParams(window.location.search).get("map") === "terminal",
   );
@@ -1345,10 +1358,17 @@ export default function App({
     nav.setFollow(false);
   }, [locationOpen, weatherLayer, mapKind, showTerminal]);
   useEffect(() => {
-    if (nav.enabled && (mapKind === "terrain" || showTerminal)) {
+    if (
+      nav.enabled &&
+      (mapKind === "terrain" || mapKind === "shenzhen" || showTerminal)
+    ) {
       nav.setEnabled(false);
       nav.setFollow(false);
-      notify("已暂停导航参考；地形实验和终端视图保留原场景，飞控任务未受影响");
+      notify(
+        mapKind === "shenzhen"
+          ? "已暂停导航参考；深圳三维是艺术场景，不是当前 WGS84 航线，飞控任务未受影响"
+          : "已暂停导航参考；地形实验和终端视图保留原场景，飞控任务未受影响",
+      );
     }
   }, [nav.enabled, mapKind, showTerminal]);
   const navigationOverview = () => {
@@ -2045,13 +2065,15 @@ export default function App({
                     ? "LOCAL ENU / ASCII"
                     : showLocalTrack
                       ? (position?.frame ?? "局部定位")
-                      : mapKind === "world"
-                        ? basemap === "satellite"
-                          ? "ESRI WORLD IMAGERY / WGS84"
-                          : theme === "dark"
-                            ? "CARTO DARK MATTER / WGS84"
-                            : "CARTO POSITRON / WGS84"
-                        : "地形实验 / ENU · 3 × 3 km"}
+                      : mapKind === "shenzhen"
+                        ? "深圳湾艺术场景 / 非测绘坐标"
+                        : mapKind === "world"
+                          ? basemap === "satellite"
+                            ? "ESRI WORLD IMAGERY / WGS84"
+                            : theme === "dark"
+                              ? "CARTO DARK MATTER / WGS84"
+                              : "CARTO POSITRON / WGS84"
+                          : "地形实验 / ENU · 3 × 3 km"}
                 </span>
               </div>
               <div className="map-toolbar-actions">
@@ -2160,25 +2182,51 @@ export default function App({
                 )}
                 {!liveMode && (
                   <button
-                    className="map-surface-toggle"
-                    aria-label={mapKind === "world" ? "地形实验" : "真实地图"}
+                    className={`map-surface-toggle ${mapKind === "shenzhen" ? "selected" : ""}`}
+                    aria-label={
+                      mapKind === "shenzhen" ? "退出深圳三维" : "深圳三维"
+                    }
+                    aria-pressed={mapKind === "shenzhen"}
+                    title="深圳湾艺术三维。不是实测空域，也不替代天气、障碍物或禁飞验收"
                     onClick={() => {
                       setTerminalMap(false);
-                      setMapKind((k) => (k === "world" ? "terrain" : "world"));
+                      setMapKind((k) =>
+                        k === "shenzhen" ? "world" : "shenzhen",
+                      );
+                      setLocationOpen(false);
+                      setReady(false);
+                      setMapError("");
+                    }}
+                  >
+                    <Orbit size={13} />
+                    <span>
+                      {mapKind === "shenzhen" ? "退出深圳三维" : "深圳三维"}
+                    </span>
+                  </button>
+                )}
+                {!liveMode && (
+                  <button
+                    className="map-surface-toggle"
+                    aria-label={mapKind === "terrain" ? "真实地图" : "地形实验"}
+                    onClick={() => {
+                      setTerminalMap(false);
+                      setMapKind((k) =>
+                        k === "terrain" ? "world" : "terrain",
+                      );
                       setLocationOpen(false);
                       setMapError("");
                     }}
                     title="在真实地图与原始地形实验视图间切换"
                   >
-                    {mapKind === "world" ? (
-                      <>
-                        <Mountain size={13} />
-                        <span>地形实验</span>
-                      </>
-                    ) : (
+                    {mapKind === "terrain" ? (
                       <>
                         <Globe2 size={13} />
                         <span>真实地图</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mountain size={13} />
+                        <span>地形实验</span>
                       </>
                     )}
                   </button>

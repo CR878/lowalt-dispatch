@@ -711,7 +711,17 @@ class Toolset:
                 "dynamic_constraints": "not_checked",
                 "flight_execution": "not_connected",
             },
-            "assumptions": "保守地将场景全部限制区作为静态障碍；地形、能耗、动态时效未加入搜索。",
+            "linked_checks": {
+                "time_varying_nfz": "planner.diversion.hard_constraint_report",
+                "weather_and_obstacles": "assess_route_environment",
+                "scope_note": (
+                    "本预览只做 v0 场景的静态几何，不代替另外两条验收。"
+                    "at_s>0 限制区由 planner.diversion.hard_constraint_report 按到达时刻复算，"
+                    "并已接入 eval 规划验收；天气与障碍物只看 assess_route_environment（WGS84）。"
+                    "缺数据不得判通过。两条都不构成飞行批准。"
+                ),
+            },
+            "assumptions": "保守地将场景全部限制区作为静态障碍；地形、能耗、动态时效未加入这条预览搜索。",
             "dispatch_enabled": False,
             "is_simulated": True,
         }

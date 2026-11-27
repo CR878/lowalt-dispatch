@@ -571,6 +571,7 @@ class Engine:
 compare_departure_times 只能给各时刻的判定对比，不得推荐"最佳起飞时间"。
 explain_verdict 只能解释已有的 evidence_id，不得重新计算。
 涉及法规/空域时，明确"未接入 NOTAM/UOM，需人工核对"，不得引用记忆中的条款号。
+虚拟场景的时变禁飞由规划器 hard_constraint_report 与搜索期 nfz_active_at 验收，不能用 assess_route_environment 的结论代替，也不能把环境判定说成已经检查了禁飞区。地理航线的天气和障碍物只看 assess_route_environment；缺数据保持 unknown 或 degraded，不得判 pass，不得编造缺测数值。
 每次最多调用 5 个工具；同一工具同一参数不要重复调用。
 """
         prompt += f"\n服务器当前时刻为 {datetime.now(LOCAL_TZ).isoformat()}，日期推断使用此时刻。确认参数以用户确认卡为准。"
