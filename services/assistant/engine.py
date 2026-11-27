@@ -33,9 +33,110 @@ NO_DOCUMENT_EVIDENCE = "项目文档里没有找到能回答这个问题的依�
 GEO_INTENT = re.compile(
     r"送|配送|运送|寄|任务|工单|航线|路线|起飞|降落|返航|地点|定位|地图|"
     r"从.{0,24}到|公斤|千克|kg|载荷|机场|大学|校区|园区|天气|风速|阵风|预报|"
-    r"能耗|航时|海拔|高度|能不能飞|能飞|风险|未判定|缺口|判定|备降|起降|台账",
+    r"能耗|航时|海拔|高度|能不能飞|能飞|风险|未判定|缺口|判定|备降|起降|台账|"
+    r"禁飞|限制区|管制区|空域|绕行|冲突|快照",
     re.I,
 )
+
+AIRSPACE_CHECK_QUESTION = re.compile(
+    r"(?:有没有|是否|有无|用没用|纳没纳入).*(?:禁飞|限制区|管制区|空域)|"
+    r"(?:禁飞区|限制区|管制区|空域约束).*(?:考虑|检查|核对|冲突|绕行|快照|版本|依据|漏|哪些|怎么)|"
+    r"原路线.*(?:冲突|禁飞|限制)|为什么.*(?:绕行|判为冲突)",
+    re.I,
+)
+
+
+def _format_airspace_audit(audit: dict) -> str:
+    if audit.get("status") != "ok":
+        return str(audit.get("reason") or "当前无法读取任务的空域约束快照。")
+    snap = audit.get("constraint_snapshot")
+    check = audit.get("airspace_check") or {}
+    lines: list[str] = []
+    if audit.get("scope") == "intake":
+        lines.append(
+            f"核查对象：AI 工单 `{audit.get('intake_id')}`（{audit.get('origin') or '起点'} → "
+            f"{audit.get('destination') or '终点'}），当前路线版本 `{audit.get('route_version') or '未生成'}`"
+            + (f"（`{audit['route_id']}`）" if audit.get("route_id") else "")
+            + "。"
+        )
+    elif audit.get("scope") == "active_route":
+        lines.append(
+            f"核查对象：当前地图规划路线 `{audit.get('route_id')}`（共 {audit.get('waypoint_count')} 个航点）。"
+        )
+    else:
+        lines.append("核查对象：当前工作区空域约束快照（尚未选中具体工单或真实航线）。")
+
+    if snap is None:
+        lines.append(
+            "约束依据：**历史建筑避障结果，空域未核对**（该历史记录未保存空域约束快照，不能视为已检查）。"
+        )
+    else:
+        zones = snap.get("zones") or []
+        enforced = [z for z in zones if z.get("participates_in_avoidance")]
+        sources = sorted({str(z.get("source") or "") for z in zones if z.get("source")})
+        lines.append(
+            f"约束快照：`{snap.get('snapshot_id')}` · 摘要 `{snap.get('digest')}` · 坐标基准 `{snap.get('crs')}` · "
+            f"来源状态 `{snap.get('source_status')}`。"
+        )
+        lines.append(
+            f"纳入避让区域：{len(enforced)} / {len(zones)} 个禁飞/内部管制区"
+            + (f"（来源：{'；'.join(sources)}）" if sources else "（当前无导入区域）")
+            + f"；项目边界缓冲 `{snap.get('zone_buffer_m', 0):g} m`（{snap.get('buffer_source')}，边界接触判为冲突）。"
+        )
+        if enforced:
+            zone_desc = "、".join(
+                f"「{z['name']}」（`{z['id']}`，{'演练' if z.get('is_simulated') else '导入'}）"
+                for z in enforced[:5]
+            )
+            lines.append(f"生效区域清单：{zone_desc}。")
+
+    lines.append(f"本次检查结论：**{check.get('verdict_label') or check.get('status')}**。")
+    conflicts = check.get("conflicts") or []
+    if conflicts:
+        segs = "；".join(
+            f"第 {c.get('segment_number', c.get('segment_index', 0) + 1)} 航段与 `{c['zone_id']}`（{c['reason']}）"
+            for c in conflicts[:4]
+        )
+        lines.append(f"当前路线冲突明细：{segs}。")
+
+    prev = audit.get("previous_version")
+    if isinstance(prev, dict):
+        prev_check = prev.get("rechecked_airspace_check") or {}
+        prev_conflicts = prev_check.get("conflicts") or []
+        if prev_conflicts:
+            prev_segs = "、".join(
+                f"第 {idx + 1} 航段" for idx in prev_check.get("conflicting_segment_indices", [])
+            )
+            prev_zones = "、".join(f"`{zid}`" for zid in prev_check.get("conflicting_zone_ids", []))
+            detour_note = (
+                "新路线已实际绕开冲突区域并复核通过"
+                if audit.get("route_changed") is True and check.get("status") == "passed_known_snapshot"
+                else "重算后路线几何未发生变化"
+                if audit.get("route_changed") is False
+                else "重算状态见当前检查结论"
+            )
+            lines.append(
+                f"重算前后版本对比：原路线 `{prev.get('version_label', 'v1')}`（`{prev.get('route_id')}`）"
+                f"在最新快照 `{prev.get('rechecked_against_snapshot_id')}` 下被判冲突（涉及区域 {prev_zones}，{prev_segs}）；"
+                f"现路线 `{audit.get('route_version', 'v2')}`：{detour_note}。"
+            )
+
+    if audit.get("stale_against_workspace"):
+        ws_recheck = audit.get("workspace_recheck") or {}
+        lines.append(
+            f"版本失效提醒：工作区最新快照已变更为 `{audit.get('workspace_active_snapshot_id')}`"
+            f"（`{audit.get('workspace_active_snapshot_digest')}`），旧路线按新快照复核结果为："
+            f"**{ws_recheck.get('verdict_label') or '需重新规划'}**，请重新规划以更新绑定结果。"
+        )
+
+    gaps = check.get("gaps") or []
+    if gaps:
+        lines.append(
+            "未判定项与数据边界："
+            + "；".join(gaps[:4])
+            + "。未连接真实飞控执行（`dispatch_enabled=false`）。"
+        )
+    return "\n\n".join(lines)
 
 
 def _needs_geo_tools(text: str) -> bool:
@@ -414,6 +515,9 @@ class Engine:
                 # Local rules have no model to phrase an answer; return the excerpt itself.
                 return excerpts[0]["text"].replace("**", "").replace("`", "")
             return NO_DOCUMENT_EVIDENCE
+        if AIRSPACE_CHECK_QUESTION.search(text):
+            audit = call("inspect_airspace_constraints")
+            return _format_airspace_audit(audit)
         if re.search(
             r"(?:这单|任务).*(?:到哪|状态|进度|回执|受理|完成|失败|被拦)|回执|ACK|为什么.*(?:被拦|拦截|拒绝)",
             text,
@@ -572,6 +676,7 @@ compare_departure_times 只能给各时刻的判定对比，不得推荐"最佳�
 explain_verdict 只能解释已有的 evidence_id，不得重新计算。
 涉及法规/空域时，明确"未接入 NOTAM/UOM，需人工核对"，不得引用记忆中的条款号。
 虚拟场景的时变禁飞由规划器 hard_constraint_report 与搜索期 nfz_active_at 验收，不能用 assess_route_environment 的结论代替，也不能把环境判定说成已经检查了禁飞区。地理航线的天气和障碍物只看 assess_route_environment；缺数据保持 unknown 或 degraded，不得判 pass，不得编造缺测数值。
+用户问"有没有考虑禁飞区 / 用了哪些限制区 / 原路线为什么冲突 / 空域核对了吗"时，必须调用 inspect_airspace_constraints 读取本次任务绑定的约束快照（snapshot_id、digest）、生效区域来源、原路线冲突航段与新路线核对结论及未判定缺口，绝不能靠口头保证或泛泛背诵文档。对导入或演练快照通过时只能表述为"通过本次已知区域检查"，严禁声称现实无禁飞区或已获准飞行。
 每次最多调用 5 个工具；同一工具同一参数不要重复调用。
 """
         prompt += f"\n服务器当前时刻为 {datetime.now(LOCAL_TZ).isoformat()}，日期推断使用此时刻。确认参数以用户确认卡为准。"
@@ -678,6 +783,9 @@ explain_verdict 只能解释已有的 evidence_id，不得重新计算。
                 parts.append(
                     "天气：未取到（" + str(weather.get("reason") or "服务不可达") + "），没有填任何数值。"
                 )
+        airspace_audit = tools.results.get("inspect_airspace_constraints")
+        if isinstance(airspace_audit, dict) and airspace_audit.get("status") == "ok":
+            parts.append(_format_airspace_audit(airspace_audit))
         docs = tools.results.get("search_project_docs") or {}
         for excerpt in (docs.get("excerpts") or [])[:1]:
             parts.append("文档依据：" + excerpt["text"][:600].replace("**", "").replace("`", ""))

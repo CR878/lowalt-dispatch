@@ -2,7 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 
 const telemetryFixture = resolve("test-results/telemetry-feed.ndjson");
-const runtimeRoot = resolve("../../logs/browser-tests", String(Date.now()));
+const runtimeRoot =
+  process.env.AERIS_TEST_RUNTIME_DIR ||
+  resolve("../../logs/browser-tests", String(Date.now()));
 
 export default defineConfig({
   testDir: "./tests",
@@ -36,6 +38,9 @@ export default defineConfig({
         AERIS_DISPATCH_TRANSPORT: "direct",
         AERIS_DISPATCH_DIR: resolve(runtimeRoot, "dispatch"),
         AERIS_IDENTITY_DIR: resolve(runtimeRoot, "identity"),
+        AERIS_AIRSPACE_DIR: resolve(runtimeRoot, "airspace"),
+        AERIS_INTAKE_DIR: resolve(runtimeRoot, "intakes"),
+        AERIS_OSM_CACHE_DIR: resolve(runtimeRoot, "osm_cache"),
         SQLITE_PATH: resolve(runtimeRoot, "planning.sqlite"),
         AERIS_REGISTRATION: "invite",
       },

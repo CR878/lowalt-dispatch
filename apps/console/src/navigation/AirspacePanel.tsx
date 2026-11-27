@@ -124,8 +124,17 @@ export default function Airspace({
         ))}
       </div>
       <p className="nav-note">
-        计数为本次载入总数，不是当前视野或全国总数；没有数据不表示该地点没有限制。示例区域始终标记为演练，区域不会自动加入规划器或修改飞控电子围栏。
+        计数为本次载入总数，不是当前视野或全国总数；没有数据不表示该地点没有限制。尚未过期的禁飞区与内部管制区会写入服务端约束快照并纳入二维全高度避让，隐藏分类仅影响地图显示、不会取消避让约束，也不会修改飞控电子围栏。
       </p>
+      {nav.activeSnapshot &&
+        nav.activeSnapshot.source_status !== "not_loaded" && (
+          <p className="nav-note" data-testid="airspace-panel-snapshot">
+            当前服务端快照：<code>{nav.activeSnapshot.snapshot_id}</code> · 摘要{" "}
+            <code>{nav.activeSnapshot.digest.slice(0, 23)}…</code> · 纳入硬避让{" "}
+            {nav.activeSnapshot.enforced_zone_count} /{" "}
+            {nav.activeSnapshot.total_zone_count} 个区域
+          </p>
+        )}
       {nav.regionError && (
         <div className="nav-error" role="alert">
           {nav.regionError}
@@ -232,7 +241,7 @@ export default function Airspace({
           </div>
           <div className="nav-start-row">
             <p>
-              区域资料仅在本次页面会话保留。适飞、授权或未触发告警均不代表可以起飞。
+              当前区域已同步至服务端约束快照，刷新页面或恢复绑定工单后仍可找回。通过已知区域检查不代表获准起飞。
             </p>
             <div className="nav-inline">
               <button
@@ -258,11 +267,7 @@ export default function Airspace({
               </button>
               <button
                 className="nav-link"
-                onClick={() => {
-                  nav.setRegions([]);
-                  nav.setSelectedRegion("");
-                  nav.notify("本次导入图层已移除；未改变真实空域或飞控限制");
-                }}
+                onClick={() => void nav.clearAirspace("clear")}
               >
                 移除本次导入图层
               </button>
@@ -273,7 +278,11 @@ export default function Airspace({
         <div className="nav-empty">
           <Layers size={25} />
           <div>
-            <strong>尚未载入区域边界</strong>
+            <strong>
+              {nav.activeSnapshot?.source_status === "known_empty"
+                ? "当前已知空域快照显式为空（0 个区域）"
+                : "尚未载入区域边界"}
+            </strong>
             <p>
               已提供分类图例与导入入口。请提供有来源的 WGS84 GeoJSON
               后显示真实边界；不会将构造示例自动画到真实地图。

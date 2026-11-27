@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import math
 import re
@@ -19,6 +20,13 @@ from planner.astar import plan
 from planner.grid import build_grid
 from planner.scene import load_scene
 from services.assistant import evidence
+from services.assistant.airspace_snapshot import (
+    ConstraintSnapshot,
+    check_route_against_snapshot,
+)
+from services.assistant.airspace_snapshot import (
+    store as airspace_store,
+)
 from services.assistant.environment import EnvQuery
 from services.assistant.intake import (
     ForecastQuery,
@@ -68,6 +76,11 @@ class ProvenanceQuery(BaseModel):
     evidence_id: str | None = None
 
 
+class AirspaceAuditQuery(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    intake_id: str | None = Field(default=None, max_length=160)
+
+
 ENV_TOOL_NAMES = {
     "assess_route_environment",
     "explain_verdict",
@@ -99,6 +112,7 @@ CAPABILITIES = {
         "多轮任务工单：先追问、信息齐了再建单",
         "几何 A* 路线预览（ENU 仿真）",
         "WGS84 真实建筑足迹避障规划与 OSM 道路参照（公开数据可能不全）",
+        "WGS84 禁飞/限制区约束快照绑定、逐航段冲突检出与重算绕行复核（支持导入或演练多边形）",
         "Open-Meteo 航路逐时预报（自定义能耗明确标记用户参数测试）",
         "配送机型库：厂家官方规格与用户自定义参数测试",
         "地形变化平面影响分析",
@@ -159,16 +173,109 @@ def point_at(route, progress):
     return list(route[-1])
 
 
-def real_route_for_intake(origin: list[float], destination: list[float], scheduled_for: str | None) -> dict:
-    """Compute one real-geometry route for an intake; never raises.
+def _airspace_evidence_from_snapshot(
+    snapshot: ConstraintSnapshot,
+    airspace_check: dict | None = None,
+) -> dict:
+    """Build intake ``airspace`` field from a WGS84 ConstraintSnapshot (never ENU v0)."""
+    verdict = (airspace_check or {}).get("verdict_label") or (
+        "未导入空域区域（空域未核对，非通过）"
+        if snapshot.source_status == "not_loaded"
+        else "已知快照显式为空（0 个已知限制区；非官方放行）"
+        if snapshot.source_status == "known_empty"
+        else f"已绑定 {snapshot.enforced_zone_count}/{snapshot.total_zone_count} 个参与避让的已知区域"
+    )
+    return {
+        "status": (airspace_check or {}).get("status") or snapshot.source_status,
+        "source_status": snapshot.source_status,
+        "snapshot_id": snapshot.snapshot_id,
+        "version": snapshot.version,
+        "digest": snapshot.digest,
+        "crs": snapshot.crs,
+        "is_simulated": snapshot.is_simulated,
+        "zone_buffer_m": snapshot.zone_buffer_m,
+        "buffer_source": snapshot.buffer_source,
+        "boundary_rule": snapshot.boundary_rule,
+        "enforced_zone_count": snapshot.enforced_zone_count,
+        "total_zone_count": snapshot.total_zone_count,
+        "enforced_zone_ids": list(snapshot.enforced_zone_ids),
+        "zones": [
+            {
+                "id": z.id,
+                "name": z.name,
+                "kind": z.kind,
+                "source": z.source,
+                "source_kind": z.source_kind,
+                "is_simulated": z.is_simulated,
+                "participates_in_avoidance": z.participates_in_avoidance,
+                "buffer_m": z.buffer_m,
+                "avoidance_rule": z.avoidance_rule,
+            }
+            for z in snapshot.zones
+        ],
+        "note": f"{verdict}。快照 {snapshot.snapshot_id}（{snapshot.digest[:19]}…）；未接官方 UOM/NOTAM，不代表获准飞行。",
+    }
 
-    A first call can fetch ~28k OSM buildings and take tens of seconds; the
-    result is cached for 24 h by the obstacle fetcher. Failure is recorded as
-    ``status=unavailable`` with the reason so the intake never pretends a route
-    exists.
-    """
+
+def _invoke_route_provider(
+    provider: Callable[..., dict],
+    origin: list[float],
+    destination: list[float],
+    scheduled_for: str | None,
+    *,
+    snapshot: ConstraintSnapshot | None = None,
+    intake_id: str | None = None,
+    previous_waypoints: list[list[float]] | None = None,
+) -> dict:
+    """Call real_route_for_intake or a 3-arg test stub, always attaching snapshot & check."""
+    sig = inspect.signature(provider)
+    accepts_kw = "snapshot" in sig.parameters or any(
+        p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+    )
+    if accepts_kw:
+        result = provider(
+            origin,
+            destination,
+            scheduled_for,
+            snapshot=snapshot,
+            intake_id=intake_id,
+            previous_waypoints=previous_waypoints,
+        )
+    else:
+        result = provider(origin, destination, scheduled_for)
+
+    if snapshot is not None and isinstance(result, dict):
+        result = dict(result)
+        result.setdefault("constraint_snapshot", snapshot.model_dump(mode="json"))
+        if result.get("airspace_check") is None:
+            wps = result.get("waypoints") or []
+            result["airspace_check"] = check_route_against_snapshot(
+                wps,
+                snapshot,
+                scheduled_for=scheduled_for,
+            )
+        if previous_waypoints and result.get("previous_route_check") is None:
+            result["previous_route_check"] = check_route_against_snapshot(
+                previous_waypoints,
+                snapshot,
+                scheduled_for=scheduled_for,
+            )
+    return result
+
+
+def real_route_for_intake(
+    origin: list[float],
+    destination: list[float],
+    scheduled_for: str | None,
+    *,
+    snapshot: ConstraintSnapshot | None = None,
+    intake_id: str | None = None,
+    previous_waypoints: list[list[float]] | None = None,
+) -> dict:
+    """Compute one real-geometry route for an intake bound to a ConstraintSnapshot; never raises."""
     from services.assistant.navigation import CandidateInput, real_candidate_routes
 
+    bound = snapshot or airspace_store.resolve(scheduled_for=scheduled_for)
     try:
         body = CandidateInput(
             frame="WGS84",
@@ -177,8 +284,12 @@ def real_route_for_intake(origin: list[float], destination: list[float], schedul
             scheduled_for=scheduled_for,
             resolution_m=10,
             max_expand=1_000_000,
+            snapshot_id=bound.snapshot_id,
+            zone_buffer_m=bound.zone_buffer_m,
+            intake_id=intake_id,
+            previous_waypoints=previous_waypoints,
         )
-        result = real_candidate_routes(body, budget_total_s=30.0)
+        result = real_candidate_routes(body, budget_total_s=30.0, snapshot=bound)
     except Exception as exc:  # network, OSM schema, budget — record, do not guess
         from pydantic import ValidationError
 
@@ -187,11 +298,25 @@ def real_route_for_intake(origin: list[float], destination: list[float], schedul
             reason = f"输入不合法：{first.get('msg', '')}（字段 {'.'.join(map(str, first.get('loc', ())))}）"
         else:
             reason = f"{type(exc).__name__}: {str(exc)[:200]}"
+        failed_check = check_route_against_snapshot([], bound, scheduled_for=scheduled_for)
         return {
             "status": "unavailable",
             "frame": "WGS84",
             "waypoints": [],
             "reason": reason,
+            "geometric_generation": {
+                "generated": False,
+                "route_id": None,
+                "waypoint_count": 0,
+                "length_m": None,
+                "reason": reason,
+            },
+            "constraint_snapshot": bound.model_dump(mode="json"),
+            "airspace_check": {
+                **failed_check,
+                "passed_known_snapshot": None,
+                "verdict_label": f"几何路线未生成（{reason}）；未完成航段空域核验",
+            },
             "computed_at": datetime.now(UTC).isoformat(),
             "note": "真实航线未生成；未使用直线或仿真路线代替。",
         }
@@ -208,18 +333,129 @@ def real_route_for_intake(origin: list[float], destination: list[float], schedul
         "resolution_requested_m": result.get("resolution_requested_m"),
         "resolution_used_m": result.get("resolution_used_m"),
         "clearance_m": result.get("clearance_m"),
+        "zone_buffer_m": result.get("zone_buffer_m"),
         "continuous_clearance_verified": result.get("continuous_clearance_verified", False),
+        "continuous_zone_verified": result.get("continuous_zone_verified", False),
+        "geometric_generation": result.get("geometric_generation"),
+        "constraint_snapshot": result.get("constraint_snapshot"),
+        "airspace_check": result.get("airspace_check"),
+        "previous_route_check": result.get("previous_route_check"),
+        "route_changed": result.get("route_changed"),
         "obstacle_source": result.get("obstacle_source"),
         "reason": (result.get("alternatives") or [{}])[0].get("reason"),
         "attempts": result.get("plan_attempts", []),
         "warnings": [
             warning
             for warning in result.get("warnings", [])
-            if "空域" in warning or "OSM" in warning or "自动改用" in warning
-        ][:4],
+            if "空域" in warning or "OSM" in warning or "自动改用" in warning or "管制区" in warning
+        ][:5],
         "computed_at": datetime.now(UTC).isoformat(),
         "note": "几何避障参考；未接真实空域、地形、线缆，不代表获准飞行。",
     }
+
+
+def apply_route_update_to_intake(
+    intake: dict,
+    new_route: dict,
+    snapshot: ConstraintSnapshot,
+    *,
+    store_override=None,
+) -> dict:
+    """Persist a newly computed route onto an intake, archiving any prior version + its conflict check."""
+    history = list(intake.get("route_history") or [])
+    old_route = intake.get("real_route") or {}
+    old_wps = old_route.get("waypoints") or []
+    old_lonlats = [
+        [float(pt.get("lng", pt.get("x"))), float(pt.get("lat", pt.get("y")))]
+        for pt in old_wps
+        if isinstance(pt, dict) and pt.get("lng", pt.get("x")) is not None
+    ]
+    recheck_old = None
+    if len(old_lonlats) >= 2:
+        recheck_old = check_route_against_snapshot(
+            old_lonlats,
+            snapshot,
+            scheduled_for=intake.get("scheduled_for"),
+        )
+        old_snap = intake.get("constraint_snapshot") or (old_route.get("planning_result") or {}).get(
+            "constraint_snapshot"
+        )
+        prev_idx = len(history) + 1
+        history.append(
+            {
+                "version_index": prev_idx,
+                "version_label": f"v{prev_idx}",
+                "route_id": old_route.get("route_id") or (old_route.get("route") or {}).get("id"),
+                "waypoints": old_wps,
+                "length_m": old_route.get("length_m"),
+                "original_snapshot_id": (old_snap or {}).get("snapshot_id"),
+                "original_snapshot_digest": (old_snap or {}).get("digest"),
+                "original_airspace_check": intake.get("airspace_check")
+                or check_route_against_snapshot(
+                    old_lonlats, old_snap, scheduled_for=intake.get("scheduled_for")
+                ),
+                "rechecked_against_snapshot_id": snapshot.snapshot_id,
+                "rechecked_against_snapshot_digest": snapshot.digest,
+                "rechecked_airspace_check": recheck_old,
+                "archived_at": datetime.now(UTC).isoformat(),
+            }
+        )
+
+    version_idx = len(history) + 1
+    new_wps = new_route.get("waypoints") or []
+    new_lonlats = [
+        [float(pt.get("lng", pt.get("x"))), float(pt.get("lat", pt.get("y")))]
+        for pt in new_wps
+        if isinstance(pt, dict) and pt.get("lng", pt.get("x")) is not None
+    ]
+    route_changed: bool | None = None
+    if len(old_lonlats) >= 2 and len(new_lonlats) >= 2:
+        old_norm = [[round(a, 6), round(b, 6)] for a, b in old_lonlats]
+        new_norm = [[round(a, 6), round(b, 6)] for a, b in new_lonlats]
+        route_changed = old_norm != new_norm
+
+    enriched_route = {
+        **new_route,
+        "version_index": version_idx,
+        "version_label": f"v{version_idx}",
+        "constraint_snapshot": snapshot.model_dump(mode="json"),
+        "previous_route_check": recheck_old or new_route.get("previous_route_check"),
+        "route_changed": route_changed if route_changed is not None else new_route.get("route_changed"),
+    }
+    airspace_check = enriched_route.get("airspace_check") or check_route_against_snapshot(
+        new_lonlats,
+        snapshot,
+        scheduled_for=intake.get("scheduled_for"),
+    )
+    enriched_route["airspace_check"] = airspace_check
+
+    warnings = [
+        item
+        for item in intake.get("warnings", [])
+        if "后台计算中" not in item and "真实航线未生成" not in item and "几何避障结果" not in item
+    ]
+    if enriched_route.get("status") == "ok":
+        warnings.append(
+            f"航线 {enriched_route['version_label']} 为公开地图建筑足迹 + 20 m 物理净空、"
+            f"并绑定约束快照 {snapshot.snapshot_id}（{snapshot.enforced_zone_count} 个生效限制区）的几何避障结果；"
+            "未接官方 UOM/NOTAM、地形、线缆，不代表获准飞行。"
+        )
+    else:
+        warnings.append(
+            "真实航线未生成：" + str(enriched_route.get("reason") or "未知原因") + "；未用直线代替。"
+        )
+
+    updated = {
+        **intake,
+        "real_route": enriched_route,
+        "constraint_snapshot": snapshot.model_dump(mode="json"),
+        "airspace_check": airspace_check,
+        "airspace": _airspace_evidence_from_snapshot(snapshot, airspace_check),
+        "route_history": history,
+        "warnings": warnings,
+    }
+    target_store = store_override or intake_store
+    return target_store.create(TaskIntake.model_validate(updated))
 
 
 def normalize_scheduled_for(value: str | None) -> tuple[str | None, str]:
@@ -287,40 +523,44 @@ def _compute_route_in_background(
     origin: list[float],
     destination: list[float],
     scheduled_for: str | None,
+    *,
+    frozen_snapshot: ConstraintSnapshot | None = None,
 ) -> None:
-    """Fill ``real_route`` after the intake is already visible.
-
-    The first fetch for a new 14 km bbox can take minutes (OSM buildings+roads).
-    Blocking the chat turn on it made the console hit its request timeout while
-    the intake had not been written yet. Now the record is created immediately
-    with ``status=pending`` and updated when the route is ready.
-    """
+    """Fill ``real_route`` after the intake is already visible, using the frozen ConstraintSnapshot."""
     with _ROUTE_WORKERS_LOCK:
         if intake_id in _ROUTE_WORKERS:
             return
         _ROUTE_WORKERS.add(intake_id)
 
+    bound = frozen_snapshot or airspace_store.resolve(scheduled_for=scheduled_for)
+
     def worker() -> None:
         try:
             with _ROUTE_SEMAPHORE:
                 try:
-                    result = provider(origin, destination, scheduled_for)
+                    result = _invoke_route_provider(
+                        provider,
+                        origin,
+                        destination,
+                        scheduled_for,
+                        snapshot=bound,
+                        intake_id=intake_id,
+                    )
                 except Exception as exc:  # never lose the intake
                     result = _unavailable_route(exc)
+                    result["constraint_snapshot"] = bound.model_dump(mode="json")
+                    result["airspace_check"] = {
+                        **check_route_against_snapshot([], bound, scheduled_for=scheduled_for),
+                        "passed_known_snapshot": None,
+                        "verdict_label": f"几何路线未生成（{result.get('reason') or '未知原因'}）",
+                    }
             record = intake_store.get(intake_id)
-            record["real_route"] = result
-            warnings = [item for item in record.get("warnings", []) if "后台计算中" not in item]
-            if result.get("status") == "ok":
-                warnings.append(
-                    "航线为公开地图建筑足迹 + 20 m 物理净空的几何避障结果；"
-                    "未接真实空域、地形、线缆，不代表获准飞行。"
-                )
-            else:
-                warnings.append(
-                    "真实航线未生成：" + str(result.get("reason") or "未知原因") + "；未用直线代替。"
-                )
-            record["warnings"] = warnings
-            intake_store.create(TaskIntake.model_validate(record))
+            used_snapshot = (
+                ConstraintSnapshot.model_validate(result["constraint_snapshot"])
+                if isinstance(result.get("constraint_snapshot"), dict)
+                else bound
+            )
+            apply_route_update_to_intake(record, result, used_snapshot)
         except Exception:
             # The intake itself is already persisted; a failed refresh must not
             # surface as a turn error.
@@ -368,7 +608,15 @@ class Toolset:
             "不可达时返回 unavailable，不填任何数字。",
             ForecastQuery,
         ),
-        "get_airspace_zones": ("列出仓库草稿限制区；明确标注仿真草稿、非实测空域。", NoArgs),
+        "get_airspace_zones": (
+            "读取当前工作区 WGS84 空域约束快照（若在 ENU 演示模式且未载入真实区域，则说明 v0 草稿边界且不混用）。",
+            NoArgs,
+        ),
+        "inspect_airspace_constraints": (
+            "读取当前任务/工单或地图规划路线绑定的空域约束快照、逐航段冲突复核记录、重算前后路线对比与未判定缺口。"
+            "用户问'有没有考虑禁飞区''用了哪些限制区''原路线为什么冲突''空域核对了吗'时必须调用本工具。",
+            AirspaceAuditQuery,
+        ),
         "get_intake_overview": (
             "给图表用的真实工单数据：最近工单的航线状态计数、载荷、以及最新一条航线的"
             "累计距离采样（最多12点）。用户要求画折线/饼图/柱状图且与 AI 工单相关时调用。",
@@ -468,7 +716,13 @@ class Toolset:
         # network. Repeated weather calls used to cost 8 s each and pushed the
         # turn into the step limit without producing an answer.
         cache_key = ""
-        if name not in {"create_task_intake", "update_task_draft", "get_flight_status", "get_task_status"}:
+        if name not in {
+            "create_task_intake",
+            "update_task_draft",
+            "get_flight_status",
+            "get_task_status",
+            "inspect_airspace_constraints",
+        }:
             cache_key = name + "|" + json.dumps(arguments, sort_keys=True, ensure_ascii=False)
             if name == "plan_task_preview":
                 cache_key += "|" + (draft_digest(self.draft) if self.draft else "no-draft")
@@ -549,6 +803,10 @@ class Toolset:
             except (KeyError, ValueError):
                 return {"status": "unavailable", "reason": "当前选中工单不可用，请重新选择。"}
             route = item.get("real_route") or {}
+            airspace_check = item.get("airspace_check") or route.get("airspace_check") or {}
+            verdict_suffix = (
+                f"（{airspace_check['verdict_label']}）" if airspace_check.get("verdict_label") else ""
+            )
             label = {"ok": "工单几何路线已生成", "pending": "工单路线计算中"}.get(
                 route.get("status"), "工单路线尚不可用"
             )
@@ -558,11 +816,13 @@ class Toolset:
                 "task_id": ctx.selected_intake_id,
                 "scenario_id": "WGS84",
                 "label": label,
-                "planning_label": label,
+                "planning_label": label + verdict_suffix,
                 "execution_label": "仅工单，未下发",
                 "ack_accepted": None,
                 "plan_version": route.get("route_id"),
-                "reason": label + "；未下发飞控，不能推断配送或备降完成。",
+                "constraint_snapshot_id": (item.get("constraint_snapshot") or {}).get("snapshot_id"),
+                "constraint_digest": (item.get("constraint_snapshot") or {}).get("digest"),
+                "reason": label + verdict_suffix + "；未下发飞控，不能推断配送或备降完成。",
             }
         if ctx.telemetry_mode == "planning":
             return {"status": "not_selected", "reason": "当前是几何规划预览，没有对应的执行任务或回执。"}
@@ -800,7 +1060,199 @@ class Toolset:
         return evidence.fetch_weather_forecast(args.latitude, args.longitude, args.scheduled_for)
 
     def get_airspace_zones(self, _args):
+        ctx = self.turn.context
+        active = (
+            airspace_store.resolve(snapshot_id=ctx.airspace_snapshot_id)
+            if ctx.airspace_snapshot_id
+            else airspace_store.get_active()
+        )
+        if active is not None or ctx.telemetry_mode == "planning":
+            snap = active or airspace_store.get_active_or_unloaded()
+            return {
+                "status": snap.source_status,
+                "snapshot_id": snap.snapshot_id,
+                "version": snap.version,
+                "digest": snap.digest,
+                "crs": snap.crs,
+                "is_simulated": snap.is_simulated,
+                "enforced_zone_count": snap.enforced_zone_count,
+                "total_zone_count": snap.total_zone_count,
+                "zone_buffer_m": snap.zone_buffer_m,
+                "buffer_source": snap.buffer_source,
+                "zones": [
+                    {
+                        "id": z.id,
+                        "name": z.name,
+                        "kind": z.kind,
+                        "source": z.source,
+                        "source_kind": z.source_kind,
+                        "is_simulated": z.is_simulated,
+                        "participates_in_avoidance": z.participates_in_avoidance,
+                        "buffer_m": z.buffer_m,
+                        "avoidance_rule": z.avoidance_rule,
+                    }
+                    for z in snap.zones
+                ],
+                "source": "服务端 WGS84 空域约束快照（不会混入本地 ENU v0 草稿）",
+                "note": (
+                    "仅代表当前工作区已知导入/演练区域，未接入官方 UOM/NOTAM；"
+                    "本地 ENU 演示区域 scenarios/v0/zones.geojson 已隔离，不套用于真实 WGS84 地点。"
+                ),
+            }
         return evidence.list_airspace_zones()
+
+    def inspect_airspace_constraints(self, args: AirspaceAuditQuery):
+        ctx = self.turn.context
+        target_intake_id = args.intake_id or ctx.selected_intake_id
+        if target_intake_id:
+            try:
+                item = intake_store.get(target_intake_id)
+            except (KeyError, ValueError):
+                return {
+                    "status": "unavailable",
+                    "source": "服务端工单记录",
+                    "reason": f"找不到工单 {target_intake_id}，无法读取其空域约束快照。",
+                    "dispatch_enabled": False,
+                }
+            route = item.get("real_route") or {}
+            snap_dict = item.get("constraint_snapshot") or (route.get("planning_result") or {}).get(
+                "constraint_snapshot"
+            )
+            check = item.get("airspace_check") or route.get("airspace_check")
+            if check is None:
+                check = check_route_against_snapshot(
+                    route.get("waypoints") or [],
+                    snap_dict,
+                    scheduled_for=item.get("scheduled_for"),
+                )
+            active_snap = (
+                airspace_store.resolve(
+                    snapshot_id=ctx.airspace_snapshot_id, scheduled_for=item.get("scheduled_for")
+                )
+                if ctx.airspace_snapshot_id
+                else airspace_store.get_active()
+            )
+            stale_against_workspace = bool(
+                active_snap is not None
+                and snap_dict is not None
+                and active_snap.digest != snap_dict.get("digest")
+            )
+            live_workspace_recheck = (
+                check_route_against_snapshot(
+                    route.get("waypoints") or [],
+                    active_snap,
+                    scheduled_for=item.get("scheduled_for"),
+                )
+                if stale_against_workspace and (route.get("waypoints") or [])
+                else None
+            )
+            history = item.get("route_history") or []
+            latest_prev = history[-1] if history else None
+            return {
+                "status": "ok",
+                "scope": "intake",
+                "source": "服务端工单绑定约束快照与独立连续航段复核",
+                "intake_id": item["intake_id"],
+                "origin": (item.get("origin") or {}).get("name"),
+                "destination": (item.get("destination") or {}).get("name"),
+                "route_status": route.get("status") or "not_planned",
+                "route_id": route.get("route_id") or (route.get("route") or {}).get("id"),
+                "route_version": route.get("version_label")
+                or ("v1" if route.get("status") == "ok" else None),
+                "waypoint_count": len(route.get("waypoints") or []),
+                "length_m": route.get("length_m"),
+                "route_changed": route.get("route_changed"),
+                "constraint_snapshot": snap_dict,
+                "airspace_check": check,
+                "stale_against_workspace": stale_against_workspace,
+                "workspace_active_snapshot_id": active_snap.snapshot_id if active_snap else None,
+                "workspace_active_snapshot_digest": active_snap.digest if active_snap else None,
+                "workspace_recheck": live_workspace_recheck,
+                "previous_version": latest_prev,
+                "honesty_boundary": {
+                    "known_zone_avoidance": "已执行二维全高度保守避让与独立逐航段复核"
+                    if snap_dict and snap_dict.get("enforced_zone_count", 0) > 0
+                    else "当前绑定快照无生效限制区或尚未绑定快照",
+                    "simulation_demo": "包含演练标识区域，仅作确定性演示复核"
+                    if snap_dict and snap_dict.get("is_simulated")
+                    else "用户导入坐标边界（未经官方真伪核验）",
+                    "official_airspace_verification": "未接入官方 UOM / NOTAM 实时空域核验",
+                    "flight_execution": "未连接真实飞控执行（dispatch_enabled=false）",
+                },
+                "dispatch_enabled": False,
+                "operationally_approved": False,
+            }
+
+        if ctx.active_route and ctx.active_route.frame == "WGS84":
+            snap_id = ctx.active_route.constraint_snapshot_id or ctx.airspace_snapshot_id
+            snap = airspace_store.resolve(snapshot_id=snap_id)
+            check = check_route_against_snapshot(ctx.active_route.waypoints, snap)
+            active_ws = (
+                airspace_store.resolve(snapshot_id=ctx.airspace_snapshot_id)
+                if ctx.airspace_snapshot_id
+                else airspace_store.get_active()
+            )
+            stale = bool(active_ws and active_ws.digest != snap.digest)
+            ws_recheck = (
+                check_route_against_snapshot(ctx.active_route.waypoints, active_ws) if stale else None
+            )
+            return {
+                "status": "ok",
+                "scope": "active_route",
+                "source": "当前地图规划航线与服务端约束快照实时核查",
+                "intake_id": ctx.active_route.task_id,
+                "route_status": "ok",
+                "route_id": ctx.active_route.route_id,
+                "route_version": "current",
+                "waypoint_count": len(ctx.active_route.waypoints),
+                "length_m": None,
+                "constraint_snapshot": snap.model_dump(mode="json"),
+                "airspace_check": check,
+                "stale_against_workspace": stale,
+                "workspace_active_snapshot_id": active_ws.snapshot_id if active_ws else None,
+                "workspace_active_snapshot_digest": active_ws.digest if active_ws else None,
+                "workspace_recheck": ws_recheck,
+                "previous_version": None,
+                "honesty_boundary": {
+                    "known_zone_avoidance": "对当前绑定快照做了逐航段闭区间几何复核",
+                    "simulation_demo": "演练/导入参考图层，非官方许可",
+                    "official_airspace_verification": "未接入官方 UOM / NOTAM 实时空域核验",
+                    "flight_execution": "未连接真实飞控执行（dispatch_enabled=false）",
+                },
+                "dispatch_enabled": False,
+                "operationally_approved": False,
+            }
+
+        snap = (
+            airspace_store.resolve(snapshot_id=ctx.airspace_snapshot_id)
+            if ctx.airspace_snapshot_id
+            else airspace_store.get_active_or_unloaded()
+        )
+        check = check_route_against_snapshot([], snap)
+        return {
+            "status": "ok",
+            "scope": "workspace_snapshot",
+            "source": "服务端工作区空域约束快照（当前尚未选中具体 WGS84 航线或工单）",
+            "intake_id": None,
+            "route_status": "not_selected",
+            "route_id": None,
+            "route_version": None,
+            "waypoint_count": 0,
+            "length_m": None,
+            "constraint_snapshot": snap.model_dump(mode="json"),
+            "airspace_check": check,
+            "stale_against_workspace": False,
+            "workspace_recheck": None,
+            "previous_version": None,
+            "honesty_boundary": {
+                "known_zone_avoidance": "尚未选定真实航线；新建工单或点击计算航线时将自动冻结并应用当前快照",
+                "simulation_demo": "本地 ENU 演示场景与真实 WGS84 空域快照严格隔离，禁止混用",
+                "official_airspace_verification": "未接入官方 UOM / NOTAM 实时空域核验",
+                "flight_execution": "未连接真实飞控执行（dispatch_enabled=false）",
+            },
+            "dispatch_enabled": False,
+            "operationally_approved": False,
+        }
 
     def get_intake_overview(self, _args):
         """Real series for charts: status counts, payloads, latest route profile."""
@@ -1124,20 +1576,32 @@ class Toolset:
                 weather = evidence.unavailable_weather(
                     "起终点未解析为 WGS84 坐标，未取预报", args.scheduled_for
                 )
-        airspace = self.results.get("get_airspace_zones") or evidence.list_airspace_zones()
+        is_wgs84_mission = (
+            origin.get("crs") == "EPSG:4326"
+            and bool(origin.get("point"))
+            and destination.get("crs") == "EPSG:4326"
+            and bool(destination.get("point"))
+        )
+        frozen_snapshot: ConstraintSnapshot | None = None
+        bound_airspace_check: dict | None = None
+        if is_wgs84_mission:
+            frozen_snapshot = airspace_store.resolve(
+                snapshot_id=self.turn.context.airspace_snapshot_id,
+                scheduled_for=args.scheduled_for,
+            )
+            airspace_store.save(frozen_snapshot, set_active=False)
+            airspace = _airspace_evidence_from_snapshot(frozen_snapshot)
+        else:
+            airspace = self.results.get("get_airspace_zones") or evidence.list_airspace_zones()
+
         preview = self.results.get("plan_task_preview")
         route_preview = preview if preview and preview.get("status") == "geometry_only" else None
 
         real_route = None
         route_needs_background = False
         route_inputs: tuple[list[float], list[float], str | None] | None = None
-        if (
-            origin.get("crs") == "EPSG:4326"
-            and origin.get("point")
-            and destination.get("crs") == "EPSG:4326"
-            and destination.get("point")
-            and list(origin["point"]) != list(destination["point"])
-        ):
+        if is_wgs84_mission and list(origin["point"]) != list(destination["point"]):
+            assert frozen_snapshot is not None
             provider = self.real_route_provider or real_route_for_intake
             route_inputs = (
                 list(origin["point"]),
@@ -1148,30 +1612,62 @@ class Toolset:
                 real_route = {
                     "status": "pending",
                     "frame": "WGS84",
+                    "version_index": 1,
+                    "version_label": "v1",
+                    "frozen_snapshot_id": frozen_snapshot.snapshot_id,
+                    "frozen_snapshot_digest": frozen_snapshot.digest,
                     "waypoints": [],
                     "reason": None,
                     "requested_at": datetime.now(UTC).isoformat(),
-                    "note": "真实航线后台计算中（首次拉取 OSM 可能数分钟）；完成后刷新工单查看。",
+                    "note": (
+                        f"真实航线后台计算中（已冻结空域约束快照 {frozen_snapshot.snapshot_id}，"
+                        f"{frozen_snapshot.enforced_zone_count} 个生效限制区）；完成后刷新工单查看。"
+                    ),
+                }
+                bound_airspace_check = {
+                    **check_route_against_snapshot([], frozen_snapshot, scheduled_for=args.scheduled_for),
+                    "passed_known_snapshot": None,
+                    "verdict_label": f"后台计算中（已冻结快照 {frozen_snapshot.snapshot_id}）",
                 }
                 route_needs_background = True
             else:
                 try:
-                    real_route = provider(*route_inputs)
+                    real_route = _invoke_route_provider(
+                        provider,
+                        *route_inputs,
+                        snapshot=frozen_snapshot,
+                    )
                 except Exception as exc:  # a provider bug must not lose the intake
                     real_route = _unavailable_route(exc)
+                    real_route["constraint_snapshot"] = frozen_snapshot.model_dump(mode="json")
+                real_route.setdefault("version_index", 1)
+                real_route.setdefault("version_label", "v1")
+                bound_airspace_check = real_route.get("airspace_check") or check_route_against_snapshot(
+                    real_route.get("waypoints") or [],
+                    frozen_snapshot,
+                    scheduled_for=args.scheduled_for,
+                )
+                real_route["airspace_check"] = bound_airspace_check
+                airspace = _airspace_evidence_from_snapshot(frozen_snapshot, bound_airspace_check)
 
         warnings = [
             "天气预报不是实测值；风速未进入能耗或绕路计算。",
-            "限制区来自仿真草稿，不是实测空域，不能用于安全判定。",
+            (
+                f"空域约束采用本次绑定快照 {frozen_snapshot.snapshot_id}（{frozen_snapshot.source_status}），"
+                "未接入官方 UOM/NOTAM，不能作为获准飞行结论。"
+                if frozen_snapshot is not None
+                else "限制区来自仿真草稿，不是实测空域，不能用于安全判定。"
+            ),
             "工单不是 core.models.Task，不进入 M3 状态机，不产生飞控指令。",
         ]
         if real_route and real_route.get("status") == "ok":
             warnings.append(
-                "航线为公开地图建筑足迹 + 20 m 物理净空的几何避障结果；未接真实空域、地形、线缆，不代表获准飞行。"
+                "航线为公开地图建筑足迹 + 20 m 物理净空及本次已知限制区快照的几何避障结果；"
+                "未接真实空域、地形、线缆，不代表获准飞行。"
             )
         elif real_route and real_route.get("status") == "pending":
             warnings.append(
-                "真实航线在后台计算中（首次拉取 OSM 建筑可能数分钟）；完成后刷新工单查看，失败会写明原因。"
+                "真实航线在后台计算中（已冻结启动时刻的空域约束快照）；完成后刷新工单查看，失败会写明原因。"
             )
         elif real_route:
             warnings.append(
@@ -1193,13 +1689,18 @@ class Toolset:
             airspace=airspace,
             route_preview=route_preview,
             real_route=real_route,
+            constraint_snapshot=frozen_snapshot.model_dump(mode="json") if frozen_snapshot else None,
+            airspace_check=bound_airspace_check,
             warnings=warnings,
         )
         self.checkpoint()
         stored, newly_created = intake_store.create_once(record, request_key, fingerprint)
         if newly_created and route_needs_background and route_inputs is not None:
             _compute_route_in_background(
-                stored["intake_id"], self.real_route_provider or real_route_for_intake, *route_inputs
+                stored["intake_id"],
+                self.real_route_provider or real_route_for_intake,
+                *route_inputs,
+                frozen_snapshot=frozen_snapshot,
             )
         self.terminal = True
         return self._created_result(stored)
@@ -1220,6 +1721,8 @@ class Toolset:
                 "payload_kg",
                 "priority",
                 "real_route",
+                "constraint_snapshot",
+                "airspace_check",
                 "is_simulated",
                 "dispatch_enabled",
             )
@@ -1253,6 +1756,7 @@ class Toolset:
         from services.assistant.environment import assess_route_environment
         from services.assistant.route_weather import _distance
 
+        updates: dict = {}
         route = self.turn.context.active_route
         if (
             route
@@ -1262,7 +1766,22 @@ class Toolset:
                 and _distance(route.waypoints[-1], args.destination) <= 1
             )
         ):
-            args = EnvQuery.model_validate({**args.model_dump(), "waypoints": route.waypoints})
+            updates["waypoints"] = route.waypoints
+            if route.constraint_snapshot_id and not args.airspace_snapshot_id:
+                updates["airspace_snapshot_id"] = route.constraint_snapshot_id
+        if not args.airspace_snapshot_id and "airspace_snapshot_id" not in updates:
+            if self.turn.context.airspace_snapshot_id:
+                updates["airspace_snapshot_id"] = self.turn.context.airspace_snapshot_id
+            elif self.turn.context.selected_intake_id:
+                try:
+                    item = intake_store.get(self.turn.context.selected_intake_id)
+                    snap_id = (item.get("constraint_snapshot") or {}).get("snapshot_id")
+                    if snap_id:
+                        updates["airspace_snapshot_id"] = snap_id
+                except (KeyError, ValueError):
+                    pass
+        if updates:
+            args = EnvQuery.model_validate({**args.model_dump(), **updates})
 
         return assess_route_environment(args, turn_id=str(self.turn.request_id))
 

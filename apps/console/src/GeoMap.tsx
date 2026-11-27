@@ -119,6 +119,8 @@ export type GeoMapProps = {
   terrainModel: TerrainModel;
   mission: GeoMission;
   realRoute?: LngLat[];
+  realPreviousRoute?: LngLat[];
+  realConflictSegments?: [LngLat, LngLat][];
   realScene?: RealScene | null;
   selected: GeoPlace | null;
   preview?: { route_id: string; waypoints: Point[] } | null;
@@ -891,6 +893,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       let lastNavigation = "";
       let lastRealScene: RealScene | null | undefined;
       let lastRealRoute = "";
+      let lastRealConflictKey = "";
       let lastAirspaces = "";
       let airspaceLabels: maplibregl.Marker[] = [];
       function syncNavigation() {
@@ -957,6 +960,12 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
               .addTo(map);
           });
         }
+        const restrictionsVisible = dynamic.current.layers.restrictions;
+        setLayerVisibility("airspace-regions-fill", restrictionsVisible);
+        setLayerVisibility("airspace-regions-outline", restrictionsVisible);
+        airspaceLabels.forEach((m) => {
+          m.getElement().hidden = !restrictionsVisible;
+        });
         const key = JSON.stringify(nav);
         if (key === lastNavigation && map.getSource("navigation-active"))
           return;
@@ -1052,6 +1061,40 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             ),
           );
         }
+        const conflictKey = JSON.stringify([
+          p.realPreviousRoute,
+          p.realConflictSegments,
+        ]);
+        if (
+          lastRealConflictKey !== conflictKey ||
+          !map.getSource("real-conflict-segments")
+        ) {
+          lastRealConflictKey = conflictKey;
+          source(
+            "real-previous-route",
+            collection(
+              (p.realPreviousRoute?.length ?? 0) > 1
+                ? [line(p.realPreviousRoute!)]
+                : [],
+            ),
+          );
+          source(
+            "real-conflict-segments",
+            collection(
+              (p.realConflictSegments ?? [])
+                .filter((seg) => seg.length === 2)
+                .map((seg) => line([seg[0], seg[1]])),
+            ),
+          );
+          if (root.current) {
+            root.current.dataset.realConflictSegments = String(
+              p.realConflictSegments?.length ?? 0,
+            );
+            root.current.dataset.realPreviousRoutePoints = String(
+              p.realPreviousRoute?.length ?? 0,
+            );
+          }
+        }
         if (!map.getLayer("real-roads-line"))
           map.addLayer({
             id: "real-roads-line",
@@ -1085,6 +1128,18 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             source: "real-buildings",
             paint: { "line-color": "#c985a4", "line-width": 1 },
           });
+        if (!map.getLayer("real-previous-route-line"))
+          map.addLayer({
+            id: "real-previous-route-line",
+            type: "line",
+            source: "real-previous-route",
+            paint: {
+              "line-color": "#94a3b8",
+              "line-width": 2.6,
+              "line-dasharray": [3, 3],
+              "line-opacity": 0.72,
+            },
+          });
         if (!map.getLayer("real-route-line"))
           map.addLayer({
             id: "real-route-line",
@@ -1092,17 +1147,45 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             source: "real-route",
             paint: { "line-color": "#36dcb5", "line-width": 4 },
           });
+        if (!map.getLayer("real-conflict-segments-glow"))
+          map.addLayer({
+            id: "real-conflict-segments-glow",
+            type: "line",
+            source: "real-conflict-segments",
+            paint: {
+              "line-color": "#ff4d5e",
+              "line-width": 11,
+              "line-blur": 4,
+              "line-opacity": 0.34,
+            },
+          });
+        if (!map.getLayer("real-conflict-segments-line"))
+          map.addLayer({
+            id: "real-conflict-segments-line",
+            type: "line",
+            source: "real-conflict-segments",
+            paint: {
+              "line-color": "#ef4444",
+              "line-width": 5.5,
+            },
+          });
         for (const id of ["real-buildings-fill", "real-buildings-outline"])
           map.setLayoutProperty(
             id,
             "visibility",
             p.layers.buildings ? "visible" : "none",
           );
-        map.setLayoutProperty(
+        for (const id of [
+          "real-previous-route-line",
           "real-route-line",
-          "visibility",
-          p.layers.routes ? "visible" : "none",
-        );
+          "real-conflict-segments-glow",
+          "real-conflict-segments-line",
+        ])
+          map.setLayoutProperty(
+            id,
+            "visibility",
+            p.layers.routes ? "visible" : "none",
+          );
         if (map.getLayer("geo-distance-line"))
           map.setLayoutProperty(
             "geo-distance-line",
