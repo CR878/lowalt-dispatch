@@ -194,6 +194,43 @@ export const regionPoints = (r: AirspaceRegion): [number, number][] =>
     .flat()
     .map((p) => [p[0], p[1]]);
 
+/** Endpoints plus zone vertices inside the route box expanded by padDeg. */
+export function flysafeOverviewPoints(
+  origin: [number, number] | null | undefined,
+  destination: [number, number] | null | undefined,
+  regions: AirspaceRegion[],
+  padDeg = 0.3,
+): [number, number][] {
+  const anchors = [origin, destination].filter(
+    (point): point is [number, number] =>
+      !!point &&
+      point.length === 2 &&
+      Number.isFinite(point[0]) &&
+      Number.isFinite(point[1]),
+  );
+  if (!anchors.length) return [];
+  const west = Math.min(...anchors.map((point) => point[0])) - padDeg;
+  const east = Math.max(...anchors.map((point) => point[0])) + padDeg;
+  const south = Math.min(...anchors.map((point) => point[1])) - padDeg;
+  const north = Math.max(...anchors.map((point) => point[1])) + padDeg;
+  const points = anchors.map(
+    (point) => [point[0], point[1]] as [number, number],
+  );
+  for (const region of regions) {
+    for (const vertex of regionPoints(region)) {
+      if (
+        vertex[0] >= west &&
+        vertex[0] <= east &&
+        vertex[1] >= south &&
+        vertex[1] <= north
+      ) {
+        points.push(vertex);
+      }
+    }
+  }
+  return points;
+}
+
 /** Only displays explicitly attributed WGS84 geometry; this is no source/approval verification. */
 export function parseAirspaces(value: unknown): AirspaceRegion[] {
   if (!value || typeof value !== "object")

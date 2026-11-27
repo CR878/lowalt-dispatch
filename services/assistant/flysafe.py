@@ -248,6 +248,42 @@ def prior_supplements(prior: ConstraintSnapshot | None) -> list[ConstraintZone]:
     return [zone for zone in prior.zones if zone.source != FLYSAFE_SOURCE]
 
 
+def retain_prior_flysafe(
+    failed: ConstraintSnapshot,
+    prior: ConstraintSnapshot | None,
+    *,
+    scheduled_for: str | None,
+) -> ConstraintSnapshot:
+    """Keep the last successful FlySafe polygons when a later refresh fails.
+
+    Does not invent geometry. A prior ``manufacturer_reference`` snapshot that
+    already contains FlySafe zones stays that status, including manual or drill
+    supplements. ``fetched_at`` stays the prior success time. With no such
+    geometry, the failed snapshot is returned unchanged.
+    """
+
+    if failed.source_status != "unavailable" or prior is None:
+        return failed
+    if prior.source_status != "manufacturer_reference":
+        return failed
+    flysafe_zones = [zone for zone in prior.zones if zone.source == FLYSAFE_SOURCE]
+    if not flysafe_zones:
+        return failed
+    seen = {zone.id for zone in flysafe_zones}
+    supplements = [zone for zone in prior_supplements(prior) if zone.id not in seen]
+    detail = (failed.failure_reason or "").strip()
+    note = "本次刷新失败，地图仍显示上次成功获取的大疆 FlySafe 厂商地理围栏。"
+    reason = f"{note}{detail}" if detail else note
+    return ConstraintSnapshot.build(
+        zones=[*flysafe_zones, *supplements],
+        source_status="manufacturer_reference",
+        zone_buffer_m=failed.zone_buffer_m,
+        scheduled_for=scheduled_for,
+        fetched_at=prior.fetched_at,
+        failure_reason=reason[:1500],
+    )
+
+
 def _with_supplements(
     snapshot: ConstraintSnapshot,
     supplements: list[ConstraintZone],
@@ -394,8 +430,21 @@ def refresh_planning_snapshot(
     """Query the planning bbox and return a snapshot, or None when live query is off.
 
     ``None`` means this process did not attempt a query (tests / Playwright).
-    A failed or empty query returns an ``unavailable`` snapshot and no geometry.
+    A failed or empty query is ``unavailable`` with no new geometry. If ``prior``
+    is already a manufacturer snapshot that contains FlySafe zones, those zones
+    are kept and ``failure_reason`` records that this refresh failed.
     """
+
+    def emit(snapshot: ConstraintSnapshot, *, with_supplements: bool = False) -> ConstraintSnapshot:
+        if snapshot.source_status == "unavailable" and with_supplements:
+            snapshot = _with_supplements(
+                snapshot,
+                prior_supplements(prior),
+                scheduled_for=scheduled_for,
+            )
+        if snapshot.source_status != "unavailable":
+            return snapshot
+        return retain_prior_flysafe(snapshot, prior, scheduled_for=scheduled_for)
 
     if fetcher is None and not flysafe_live_enabled():
         return None
@@ -403,21 +452,25 @@ def refresh_planning_snapshot(
         drone_slug = clean_drone_slug(drone)
         bbox = planning_bbox(origin, destination)
     except ValueError as exc:
-        return _unavailable(str(exc), zone_buffer_m=zone_buffer_m, scheduled_for=scheduled_for)
+        return emit(_unavailable(str(exc), zone_buffer_m=zone_buffer_m, scheduled_for=scheduled_for))
     fetch = fetcher or live_fetch_feature_collection
     try:
         collection = fetch(bbox, drone=drone_slug)
     except Exception as exc:
-        return _unavailable(
-            f"大疆 FlySafe 查询失败：{type(exc).__name__}: {str(exc)[:180]}。未编造围栏",
-            zone_buffer_m=zone_buffer_m,
-            scheduled_for=scheduled_for,
+        return emit(
+            _unavailable(
+                f"大疆 FlySafe 查询失败：{type(exc).__name__}: {str(exc)[:180]}。未编造围栏",
+                zone_buffer_m=zone_buffer_m,
+                scheduled_for=scheduled_for,
+            )
         )
     if not isinstance(collection, dict):
-        return _unavailable(
-            "大疆 FlySafe 查询结果为空，未编造围栏",
-            zone_buffer_m=zone_buffer_m,
-            scheduled_for=scheduled_for,
+        return emit(
+            _unavailable(
+                "大疆 FlySafe 查询结果为空，未编造围栏",
+                zone_buffer_m=zone_buffer_m,
+                scheduled_for=scheduled_for,
+            )
         )
     snapshot = snapshot_from_flysafe_collection(
         collection,
@@ -426,6 +479,4 @@ def refresh_planning_snapshot(
         scheduled_for=scheduled_for,
         prior=prior,
     )
-    if snapshot.source_status == "unavailable":
-        return _with_supplements(snapshot, prior_supplements(prior), scheduled_for=scheduled_for)
-    return snapshot
+    return emit(snapshot, with_supplements=True)

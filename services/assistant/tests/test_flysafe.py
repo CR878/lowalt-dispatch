@@ -8,7 +8,10 @@ import pytest
 
 from planner.georef import enu_to_wgs84
 from services.assistant import flysafe, osm_obstacles, route_weather
-from services.assistant.airspace_snapshot import check_route_against_snapshot
+from services.assistant.airspace_snapshot import (
+    ConstraintSnapshot,
+    check_route_against_snapshot,
+)
 from services.assistant.navigation import CandidateInput, real_candidate_routes
 from services.assistant.tests.test_airspace_constraints import ANCHOR, geo
 
@@ -255,6 +258,44 @@ def test_fetch_failure_and_empty_result_are_unavailable_without_geometry():
     empty_check = check_route_against_snapshot([geo(0, 0), geo(2000, 0)], empty)
     assert empty_check["passed_known_snapshot"] is None
     assert "0 个区域" in empty.failure_reason
+
+
+def test_failed_refresh_keeps_prior_flysafe_zones():
+    block = _ring([(900, -250), (1100, -250), (1100, 250), (900, 250), (900, -250)])
+    loaded = flysafe.snapshot_from_flysafe_collection(
+        flysafe_collection(flysafe_feature(11, block, name="南昌市藤王阁景区", category="enhanced_warning")),
+        drone="dji-mini-3",
+    )
+    manual = loaded.zones[0].model_copy(
+        update={
+            "id": "manual-keep",
+            "name": "手工附加",
+            "kind": "restricted",
+            "source": "手工导入对照",
+            "source_kind": "team",
+            "source_ref": "user:manual-keep",
+        }
+    )
+    prior = ConstraintSnapshot.build(
+        zones=[*loaded.zones, manual],
+        source_status="manufacturer_reference",
+        fetched_at=loaded.fetched_at,
+    )
+
+    def fail(bbox, *, drone):
+        raise TimeoutError("upstream down")
+
+    kept = flysafe.refresh_planning_snapshot(geo(0, 0), geo(2000, 0), prior=prior, fetcher=fail)
+    assert kept is not None
+    assert kept.source_status == "manufacturer_reference"
+    assert kept.fetched_at == prior.fetched_at
+    assert [zone.id for zone in kept.zones] == ["flysafe-11-1", "manual-keep"]
+    assert kept.zones[0].geometry == prior.zones[0].geometry
+    assert kept.zones[0].source == flysafe.FLYSAFE_SOURCE
+    assert "本次刷新失败" in kept.failure_reason
+    assert "TimeoutError" in kept.failure_reason
+    assert "upstream down" in kept.failure_reason
+    assert kept.total_zone_count == 2
 
 
 def test_live_query_stays_off_in_unit_tests(monkeypatch):

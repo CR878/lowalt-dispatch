@@ -1,5 +1,6 @@
 import {
   ACTIVE_SNAPSHOT_STORAGE_KEY,
+  flysafeOverviewPoints,
   geojsonFromRegions,
   regionsFromSnapshot,
   type AirspaceCheckData,
@@ -1033,6 +1034,46 @@ export default function App({
   const flysafeDestination = geoMission.destination?.point.join(",") ?? "";
   const flysafePreserveRef = useRef<string | null>(null);
   flysafePreserveRef.current = activeSnapshot?.snapshot_id ?? null;
+  const planningRegionsRef = useRef(planningRegions);
+  planningRegionsRef.current = planningRegions;
+  const applyAirspaceSnapshot = useCallback(
+    (snap: ConstraintSnapshotData) => {
+      const incoming = regionsFromSnapshot(snap);
+      const keepShown =
+        planningRegionsRef.current.length > 0 &&
+        (snap.source_status === "unavailable" || incoming.length === 0);
+      if (keepShown) {
+        setActiveSnapshot((prev) =>
+          prev
+            ? {
+                ...prev,
+                failure_reason: snap.failure_reason || prev.failure_reason,
+              }
+            : prev,
+        );
+        return;
+      }
+      setActiveSnapshot(snap);
+      setPlanningRegions(incoming);
+      if (!incoming.length) return;
+      setDemoVisible(false);
+      setMapKind("world");
+      setShowGeographic(true);
+      setLayers((current) => ({ ...current, restrictions: true }));
+      const focus = flysafeOverviewPoints(
+        geoMission.origin?.point,
+        geoMission.destination?.point,
+        incoming,
+      );
+      if (focus.length) map.current?.overview(focus);
+      try {
+        localStorage.setItem(ACTIVE_SNAPSHOT_STORAGE_KEY, snap.snapshot_id);
+      } catch {
+        /* Ignore storage errors. */
+      }
+    },
+    [geoMission.destination?.point, geoMission.origin?.point],
+  );
   useEffect(() => {
     if (!flysafeOrigin || !flysafeDestination || realRouting.busy) return;
     const origin = flysafeOrigin.split(",").map(Number);
@@ -1063,16 +1104,7 @@ export default function App({
         .then((res) => (res.ok ? res.json() : null))
         .then((data: { snapshot?: ConstraintSnapshotData | null } | null) => {
           if (controller.signal.aborted || !data?.snapshot) return;
-          setActiveSnapshot(data.snapshot);
-          setPlanningRegions(regionsFromSnapshot(data.snapshot));
-          try {
-            localStorage.setItem(
-              ACTIVE_SNAPSHOT_STORAGE_KEY,
-              data.snapshot.snapshot_id,
-            );
-          } catch {
-            /* Ignore storage errors. */
-          }
+          applyAirspaceSnapshot(data.snapshot);
         })
         .catch(() => {
           /* Disabled, offline, or aborted. Do not invent zones. */
@@ -1088,6 +1120,7 @@ export default function App({
     realRouting.busy,
     realRouting.zoneBufferM,
     realSchedule,
+    applyAirspaceSnapshot,
   ]);
 
   useEffect(() => {
@@ -1099,14 +1132,8 @@ export default function App({
     ) {
       return;
     }
-    setActiveSnapshot(snap);
-    setPlanningRegions(regionsFromSnapshot(snap));
-    try {
-      localStorage.setItem(ACTIVE_SNAPSHOT_STORAGE_KEY, snap.snapshot_id);
-    } catch {
-      /* Ignore storage errors. */
-    }
-  }, [realRouting.result]);
+    applyAirspaceSnapshot(snap);
+  }, [realRouting.result, applyAirspaceSnapshot]);
 
   const syncAirspaceToServer = useCallback(
     async (

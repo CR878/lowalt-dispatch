@@ -900,6 +900,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
               (nav?.regions ?? []).map((r) =>
                 feature(r.geometry, {
                   region_id: r.id,
+                  kind: r.kind,
                   color: airspaceKinds[r.kind].color,
                   selected: r.id === nav?.selectedRegion ? 1 : 0,
                 }),
@@ -915,9 +916,17 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
                 "fill-color": ["get", "color"],
                 "fill-opacity": [
                   "case",
+                  [
+                    "all",
+                    ["==", ["get", "kind"], "restricted"],
+                    ["==", ["get", "selected"], 1],
+                  ],
+                  0.52,
+                  ["==", ["get", "kind"], "restricted"],
+                  0.42,
                   ["==", ["get", "selected"], 1],
-                  0.24,
-                  0.12,
+                  0.42,
+                  0.32,
                 ],
               },
             });
@@ -928,8 +937,18 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
               source: "airspace-regions",
               paint: {
                 "line-color": ["get", "color"],
-                "line-width": ["case", ["==", ["get", "selected"], 1], 3, 1.5],
-                "line-dasharray": [4, 2],
+                "line-width": [
+                  "case",
+                  [
+                    "all",
+                    ["==", ["get", "kind"], "restricted"],
+                    ["==", ["get", "selected"], 1],
+                  ],
+                  3,
+                  ["==", ["get", "kind"], "restricted"],
+                  2.4,
+                  1.8,
+                ],
               },
             });
           airspaceLabels.forEach((m) => m.remove());

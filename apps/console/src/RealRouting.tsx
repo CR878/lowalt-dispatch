@@ -866,6 +866,11 @@ export function RealRoutingPanel({
         国家地图官网 /
         天地图，也不是飞行批准。查询失败或空结果表示未知，不是放行。通过检查只表示通过本次已知区域检查。手动导入和演练走廊是附加对照，不是主数据源；隐藏图层不会取消避让。
       </p>
+      {activeSnapshot?.failure_reason ? (
+        <p role="status" data-testid="flysafe-refresh-note">
+          {activeSnapshot.failure_reason}
+        </p>
+      ) : null}
       <p>
         地点坐标只作定位参考；请在开阔处确认实际起降点。起终点位于建筑或限制区内时会明确拒绝，不会自动移点。
       </p>

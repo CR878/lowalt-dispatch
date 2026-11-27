@@ -142,6 +142,15 @@ export default function Airspace({
             {nav.activeSnapshot.total_zone_count} 个区域
           </p>
         )}
+      {nav.activeSnapshot?.failure_reason ? (
+        <p
+          className="nav-note"
+          role="status"
+          data-testid="flysafe-refresh-note"
+        >
+          {nav.activeSnapshot.failure_reason}
+        </p>
+      ) : null}
       {nav.regionError && (
         <div className="nav-error" role="alert">
           {nav.regionError}
