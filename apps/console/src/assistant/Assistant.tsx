@@ -1036,6 +1036,8 @@ export default function Assistant(props: Props) {
               {busy ? (
                 <button
                   type="button"
+                  // Explicitly enabled so a reused send button cannot stay disabled.
+                  disabled={false}
                   aria-label="停止接收助手结果"
                   onClick={() => request.current?.abort()}
                 >
