@@ -115,6 +115,7 @@ class CandidateInput(VehicleSelection):
     max_expand: int = Field(default=500_000, ge=1000, le=1_000_000)
     avoid_regions: list[AvoidRegion] = Field(default_factory=list, max_length=100)
     snapshot_id: str | None = Field(default=None, max_length=64)
+    include_flysafe: bool = True
     zone_buffer_m: float = Field(default=0.0, ge=0.0, le=500.0)
     intake_id: str | None = Field(default=None, max_length=160)
     previous_waypoints: list[list[float]] | None = Field(default=None, max_length=1000)
@@ -235,7 +236,23 @@ def real_candidate_routes(
             scheduled_for=body.scheduled_for,
         )
     )
-    airspace_store.save(bound_snapshot, set_active=False)
+    # Callers that already froze a snapshot (intake background / route refresh)
+    # pass it in and set include_flysafe false. Direct planning refreshes here.
+    promote_active = False
+    if body.include_flysafe and snapshot is None:
+        from services.assistant.flysafe import refresh_planning_snapshot
+
+        refreshed = refresh_planning_snapshot(
+            start,
+            goal,
+            zone_buffer_m=bound_snapshot.zone_buffer_m,
+            scheduled_for=body.scheduled_for,
+            prior=bound_snapshot,
+        )
+        if refreshed is not None:
+            bound_snapshot = refreshed
+            promote_active = True
+    airspace_store.save(bound_snapshot, set_active=promote_active)
     exclusions = bound_snapshot.to_exclusions_fc(scheduled_for=body.scheduled_for)
     enforced_zones = [z for z in bound_snapshot.zones if z.participates_in_avoidance]
 
@@ -366,8 +383,22 @@ def real_candidate_routes(
             f"请求分辨率 {body.resolution_m:g} m 在 20 m 物理净空下无可行通道，已自动改用 "
             f"{resolution_used:g} m 重新搜索；净空标准未降低。"
         )
+    if bound_snapshot.source_status == "manufacturer_reference":
+        airspace_warning = (
+            "已载入大疆 FlySafe 厂商地理围栏参考，不是法定空域，不是 UOM / 国家地图官网 / 天地图数据，"
+            "也不代表获准飞行。官方 NOTAM / UOM 仍须人工核对。"
+        )
+    elif bound_snapshot.source_status == "unavailable":
+        airspace_warning = (
+            "大疆 FlySafe 本次不可用或为空，空域未知，不是放行，未编造围栏。"
+            "NOTAM / UOM 仍须人工核对；此结果不代表获准飞行。"
+        )
+    else:
+        airspace_warning = (
+            "真实空域未接入，NOTAM / UOM 及机场、人口密集区限制须人工核对；此结果不代表获准飞行。"
+        )
     warnings += [
-        "真实空域未接入，NOTAM / UOM 及机场、人口密集区限制须人工核对；此结果不代表获准飞行。",
+        airspace_warning,
         "只验证所下载建筑足迹的水平避障；未验证地形、电线、塔吊、移动障碍和垂直航路。",
         "道路来自 OSM，仅作地理参照，未视作获准飞行走廊。",
     ]
@@ -456,11 +487,15 @@ def real_candidate_routes(
         if bound_snapshot.source_status == "known_empty"
         else "query_failed"
         if bound_snapshot.source_status == "query_failed"
+        else "unavailable"
+        if bound_snapshot.source_status == "unavailable"
         else "manual_review_required"
     )
     sources_label = (
         "；".join(sorted({z.source for z in bound_snapshot.zones}))
         if bound_snapshot.zones
+        else "大疆 FlySafe 厂商地理围栏参考（本次不可用或为空，不是放行）"
+        if bound_snapshot.source_status == "unavailable"
         else "未导入空域边界；官方空域未接入"
     )
     return {
@@ -506,7 +541,13 @@ def real_candidate_routes(
             "dispatch_enabled": False,
             "note": (
                 f"{airspace_check['verdict_label']}。对尚未过期的禁飞/内部管制多边形保守作二维全高度避让"
-                "（含未来生效、时效或高度未知，边界接触判为冲突）；其他类别仅展示，未接官方空域服务。"
+                "（含未来生效、时效或高度未知，边界接触判为冲突）；其他类别仅展示。"
+                "大疆 FlySafe 只是厂商地理围栏参考，未接官方 UOM / NOTAM，不代表获准飞行。"
+            ),
+            "reference_label": (
+                "大疆 FlySafe 厂商地理围栏参考"
+                if bound_snapshot.source_status in {"manufacturer_reference", "unavailable"}
+                else None
             ),
         },
         "avoid_regions": [

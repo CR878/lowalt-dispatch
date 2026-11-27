@@ -378,6 +378,7 @@ export function useRealRouting(
             destination: { lng: endLng, lat: endLat },
             scheduled_for: scheduledFor,
             snapshot_id: snapshotRef.current?.snapshot_id ?? null,
+            include_flysafe: true,
             zone_buffer_m: safeBuffer,
             intake_id: intakeRef.current ?? null,
             previous_waypoints: priorWaypoints,
@@ -860,6 +861,11 @@ export function RealRoutingPanel({
       data-testid="real-routing"
     >
       <strong>真实建筑与空域约束规划</strong>
+      <p data-testid="flysafe-source-label">
+        主数据源：大疆 FlySafe 厂商地理围栏参考。不是法定空域，不是 UOM /
+        国家地图官网 /
+        天地图，也不是飞行批准。查询失败或空结果表示未知，不是放行。通过检查只表示通过本次已知区域检查。手动导入和演练走廊是附加对照，不是主数据源；隐藏图层不会取消避让。
+      </p>
       <p>
         地点坐标只作定位参考；请在开阔处确认实际起降点。起终点位于建筑或限制区内时会明确拒绝，不会自动移点。
       </p>
@@ -926,7 +932,7 @@ export function RealRoutingPanel({
           >
             {corridorBusy
               ? "正在生成演练禁飞区…"
-              : "在当前航线中段加入演练限制区"}
+              : "附加演练走廊（不是主数据源）"}
           </button>
           {onOpenAirspacePanel && (
             <button type="button" onClick={onOpenAirspacePanel}>

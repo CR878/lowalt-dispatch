@@ -288,6 +288,7 @@ def real_route_for_intake(
             zone_buffer_m=bound.zone_buffer_m,
             intake_id=intake_id,
             previous_waypoints=previous_waypoints,
+            include_flysafe=False,
         )
         result = real_candidate_routes(body, budget_total_s=30.0, snapshot=bound)
     except Exception as exc:  # network, OSM schema, budget — record, do not guess
@@ -1093,10 +1094,24 @@ class Toolset:
                     }
                     for z in snap.zones
                 ],
-                "source": "服务端 WGS84 空域约束快照（不会混入本地 ENU v0 草稿）",
+                "source": (
+                    "大疆 FlySafe 厂商地理围栏参考"
+                    if snap.source_status == "manufacturer_reference"
+                    else "服务端 WGS84 空域约束快照（不会混入本地 ENU v0 草稿）"
+                ),
                 "note": (
-                    "仅代表当前工作区已知导入/演练区域，未接入官方 UOM/NOTAM；"
-                    "本地 ENU 演示区域 scenarios/v0/zones.geojson 已隔离，不套用于真实 WGS84 地点。"
+                    "数据源是大疆 FlySafe 厂商地理围栏参考，不是法定空域，不是 UOM / 国家地图官网 / 天地图，"
+                    "也不代表获准飞行。通过检查只表示通过本次已知区域检查。"
+                    if snap.source_status == "manufacturer_reference"
+                    else (
+                        f"大疆 FlySafe 不可用或为空（{snap.failure_reason or '未知'}）。"
+                        "空域未知，不是放行，未编造围栏。"
+                        if snap.source_status == "unavailable"
+                        else (
+                            "仅代表当前工作区已知导入/演练区域，未接入官方 UOM/NOTAM；"
+                            "本地 ENU 演示区域 scenarios/v0/zones.geojson 已隔离，不套用于真实 WGS84 地点。"
+                        )
+                    )
                 ),
             }
         return evidence.list_airspace_zones()
@@ -1173,9 +1188,15 @@ class Toolset:
                     "known_zone_avoidance": "已执行二维全高度保守避让与独立逐航段复核"
                     if snap_dict and snap_dict.get("enforced_zone_count", 0) > 0
                     else "当前绑定快照无生效限制区或尚未绑定快照",
-                    "simulation_demo": "包含演练标识区域，仅作确定性演示复核"
-                    if snap_dict and snap_dict.get("is_simulated")
-                    else "用户导入坐标边界（未经官方真伪核验）",
+                    "simulation_demo": (
+                        "包含演练标识区域，仅作确定性演示复核"
+                        if snap_dict and snap_dict.get("is_simulated")
+                        else (
+                            "大疆 FlySafe 厂商地理围栏参考，不是法定空域或飞行批准"
+                            if snap_dict and snap_dict.get("source_status") == "manufacturer_reference"
+                            else "用户导入坐标边界（未经官方真伪核验）"
+                        )
+                    ),
                     "official_airspace_verification": "未接入官方 UOM / NOTAM 实时空域核验",
                     "flight_execution": "未连接真实飞控执行（dispatch_enabled=false）",
                 },
@@ -1215,7 +1236,11 @@ class Toolset:
                 "previous_version": None,
                 "honesty_boundary": {
                     "known_zone_avoidance": "对当前绑定快照做了逐航段闭区间几何复核",
-                    "simulation_demo": "演练/导入参考图层，非官方许可",
+                    "simulation_demo": (
+                        "大疆 FlySafe 厂商地理围栏参考，不是法定空域或飞行批准"
+                        if snap.source_status == "manufacturer_reference"
+                        else "演练/导入参考图层，非官方许可"
+                    ),
                     "official_airspace_verification": "未接入官方 UOM / NOTAM 实时空域核验",
                     "flight_execution": "未连接真实飞控执行（dispatch_enabled=false）",
                 },
@@ -1589,7 +1614,18 @@ class Toolset:
                 snapshot_id=self.turn.context.airspace_snapshot_id,
                 scheduled_for=args.scheduled_for,
             )
-            airspace_store.save(frozen_snapshot, set_active=False)
+            from services.assistant.flysafe import refresh_planning_snapshot
+
+            refreshed = refresh_planning_snapshot(
+                list(origin["point"]),
+                list(destination["point"]),
+                zone_buffer_m=frozen_snapshot.zone_buffer_m,
+                scheduled_for=args.scheduled_for,
+                prior=frozen_snapshot,
+            )
+            if refreshed is not None:
+                frozen_snapshot = refreshed
+            airspace_store.save(frozen_snapshot, set_active=refreshed is not None)
             airspace = _airspace_evidence_from_snapshot(frozen_snapshot)
         else:
             airspace = self.results.get("get_airspace_zones") or evidence.list_airspace_zones()

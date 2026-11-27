@@ -444,15 +444,23 @@ def _build_factors(weather, query: EnvQuery, thresholds):
         if query.airspace_snapshot_id
         else airspace_store.get_active()
     )
-    if air_snap is None or air_snap.source_status in {"not_loaded", "query_failed"}:
+    if air_snap is None or air_snap.source_status in {"not_loaded", "query_failed", "unavailable"}:
+        if air_snap is not None and air_snap.source_status == "unavailable":
+            air_reason = (
+                f"大疆 FlySafe 厂商地理围栏不可用或为空：{air_snap.failure_reason or '未知原因'}。"
+                "空域未知，不是放行。这不是 assess_route_environment 的法定空域结论。"
+            )
+            air_factor = "unavailable"
+        elif air_snap is not None and air_snap.source_status == "query_failed":
+            air_reason = f"空域快照读取失败：{air_snap.failure_reason or '未知原因'}"
+            air_factor = "unavailable"
+        else:
+            air_reason = "未导入空域约束快照，仅完成建筑避障"
+            air_factor = "not_evaluated"
         add(
             "known_airspace_snapshot",
-            status="not_evaluated"
-            if air_snap is None or air_snap.source_status == "not_loaded"
-            else "unavailable",
-            reason="未导入空域约束快照，仅完成建筑避障"
-            if air_snap is None or air_snap.source_status == "not_loaded"
-            else f"空域快照读取失败：{air_snap.failure_reason or '未知原因'}",
+            status=air_factor,
+            reason=air_reason,
         )
     else:
         air_check = check_route_against_snapshot(

@@ -300,6 +300,12 @@ def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
             ["快照 ID", snap.get("snapshot_id") or "无（历史建筑避障记录）"],
             ["快照摘要", (snap.get("digest") or "—")[:27]],
             ["纳入避让区域", f"{snap.get('enforced_zone_count', 0)} / {snap.get('total_zone_count', 0)} 个"],
+            [
+                "数据来源",
+                "大疆 FlySafe 厂商地理围栏参考"
+                if snap.get("source_status") == "manufacturer_reference"
+                else (snap.get("source_status") or "—"),
+            ],
             ["核查结论", check.get("verdict_label") or check.get("status") or "—"],
         ]
         prev = airspace_audit.get("previous_version")

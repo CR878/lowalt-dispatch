@@ -29,6 +29,10 @@ def _stub_real_route(monkeypatch, tmp_path):
     monkeypatch.setattr(tools_module, "airspace_store", isolated_airspace)
     monkeypatch.setattr(app_module, "airspace_store", isolated_airspace)
 
+    from services.assistant import flysafe
+
+    monkeypatch.setattr(flysafe, "flysafe_live_enabled", lambda: False)
+
     def stub(origin, destination, scheduled_for):
         return {
             "status": "ok",

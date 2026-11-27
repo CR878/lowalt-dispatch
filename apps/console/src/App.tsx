@@ -1029,6 +1029,85 @@ export default function App({
     return () => controller.abort();
   }, []);
 
+  const flysafeOrigin = geoMission.origin?.point.join(",") ?? "";
+  const flysafeDestination = geoMission.destination?.point.join(",") ?? "";
+  const flysafePreserveRef = useRef<string | null>(null);
+  flysafePreserveRef.current = activeSnapshot?.snapshot_id ?? null;
+  useEffect(() => {
+    if (!flysafeOrigin || !flysafeDestination || realRouting.busy) return;
+    const origin = flysafeOrigin.split(",").map(Number);
+    const destination = flysafeDestination.split(",").map(Number);
+    if (origin.length !== 2 || destination.length !== 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const parsedBuf = Number(realRouting.zoneBufferM);
+      const zoneBufferM =
+        Number.isFinite(parsedBuf) && parsedBuf >= 0 && parsedBuf <= 500
+          ? parsedBuf
+          : 0;
+      void fetch("/api/assistant/airspace/flysafe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Aeris-Request": "1",
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          origin,
+          destination,
+          zone_buffer_m: zoneBufferM,
+          scheduled_for: realSchedule,
+          preserve_snapshot_id: flysafePreserveRef.current,
+        }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data: { snapshot?: ConstraintSnapshotData | null } | null) => {
+          if (controller.signal.aborted || !data?.snapshot) return;
+          setActiveSnapshot(data.snapshot);
+          setPlanningRegions(regionsFromSnapshot(data.snapshot));
+          try {
+            localStorage.setItem(
+              ACTIVE_SNAPSHOT_STORAGE_KEY,
+              data.snapshot.snapshot_id,
+            );
+          } catch {
+            /* Ignore storage errors. */
+          }
+        })
+        .catch(() => {
+          /* Disabled, offline, or aborted. Do not invent zones. */
+        });
+    }, 600);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [
+    flysafeOrigin,
+    flysafeDestination,
+    realRouting.busy,
+    realRouting.zoneBufferM,
+    realSchedule,
+  ]);
+
+  useEffect(() => {
+    const snap = realRouting.result?.constraint_snapshot;
+    if (
+      !snap ||
+      (snap.source_status !== "manufacturer_reference" &&
+        snap.source_status !== "unavailable")
+    ) {
+      return;
+    }
+    setActiveSnapshot(snap);
+    setPlanningRegions(regionsFromSnapshot(snap));
+    try {
+      localStorage.setItem(ACTIVE_SNAPSHOT_STORAGE_KEY, snap.snapshot_id);
+    } catch {
+      /* Ignore storage errors. */
+    }
+  }, [realRouting.result]);
+
   const syncAirspaceToServer = useCallback(
     async (
       regions: AirspaceRegion[],
@@ -2287,9 +2366,7 @@ export default function App({
                         : mapKind === "world"
                           ? basemap === "satellite"
                             ? "ESRI WORLD IMAGERY / WGS84"
-                            : theme === "dark"
-                              ? "CARTO DARK MATTER / WGS84"
-                              : "CARTO POSITRON / WGS84"
+                            : "CARTO POSITRON / WGS84"
                           : "地形实验 / ENU · 3 × 3 km"}
                 </span>
               </div>
@@ -2354,11 +2431,7 @@ export default function App({
                       <Map size={13} />
                     )}
                     <span>
-                      {basemap === "satellite"
-                        ? "卫星实景"
-                        : theme === "dark"
-                          ? "夜间底图"
-                          : "日间底图"}
+                      {basemap === "satellite" ? "卫星实景" : "日间街道"}
                     </span>
                   </button>
                 )}
@@ -2943,9 +3016,7 @@ export default function App({
                     onClick={() => setBasemap("dark")}
                     aria-pressed={basemap === "dark"}
                   >
-                    <span>
-                      {theme === "dark" ? "夜间底图" : "日间底图"} · CARTO
-                    </span>
+                    <span>日间街道 · CARTO Positron</span>
                     <span
                       className={`checkbox ${basemap === "dark" ? "checked" : ""}`}
                     >

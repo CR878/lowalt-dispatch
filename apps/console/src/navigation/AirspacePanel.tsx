@@ -44,7 +44,10 @@ export function AirspaceLegend({ nav }: { nav: NavigationController }) {
               <b>{nav.regions.filter((r) => r.kind === id).length}</b>
             </label>
           ))}
-          <p>数量为本次载入总数；隐藏仅影响显示。厂商图层不等于官方许可。</p>
+          <p>
+            数量为本次载入总数；隐藏仅影响显示，不取消避让。大疆 FlySafe
+            厂商地理围栏参考不等于官方许可。
+          </p>
           <button
             onClick={() => {
               nav.setOpen(true);
@@ -80,7 +83,9 @@ export default function Airspace({
         <div>
           <h3>看清区域，也看清来源</h3>
           <p>
-            分类和颜色用于阅读地图；未接入全国禁限飞数据库。导入前请核实数据使用权限、坐标、版本与有效期。
+            主数据源是大疆 FlySafe 厂商地理围栏参考，不是法定空域，不是 UOM /
+            国家地图官网 / 天地图，也不是飞行批准。查询失败或 0
+            个区域表示未知，不是放行。手动导入和演练走廊只作附加对照。
           </p>
         </div>
         <div className="nav-inline">
@@ -97,7 +102,7 @@ export default function Airspace({
           />
           <button className="nav-button" onClick={() => file.current?.click()}>
             <Upload size={14} />
-            导入空域 GeoJSON
+            手动导入 GeoJSON（附加）
           </button>
           <button
             className="nav-link"
@@ -124,7 +129,9 @@ export default function Airspace({
         ))}
       </div>
       <p className="nav-note">
-        计数为本次载入总数，不是当前视野或全国总数；没有数据不表示该地点没有限制。尚未过期的禁飞区与内部管制区会写入服务端约束快照并纳入二维全高度避让，隐藏分类仅影响地图显示、不会取消避让约束，也不会修改飞控电子围栏。
+        计数为本次载入总数，不是当前视野或全国总数；没有数据不表示该地点没有限制，空的
+        FlySafe
+        结果也不是放行。尚未过期的禁飞区与内部管制区会写入服务端约束快照并纳入二维全高度避让，隐藏分类仅影响地图显示、不会取消避让约束，也不会修改飞控电子围栏。
       </p>
       {nav.activeSnapshot &&
         nav.activeSnapshot.source_status !== "not_loaded" && (
@@ -279,9 +286,11 @@ export default function Airspace({
           <Layers size={25} />
           <div>
             <strong>
-              {nav.activeSnapshot?.source_status === "known_empty"
-                ? "当前已知空域快照显式为空（0 个区域）"
-                : "尚未载入区域边界"}
+              {nav.activeSnapshot?.source_status === "unavailable"
+                ? "大疆 FlySafe 不可用或为空（未知，不是放行）"
+                : nav.activeSnapshot?.source_status === "known_empty"
+                  ? "当前已知空域快照显式为空（0 个区域）"
+                  : "尚未载入区域边界"}
             </strong>
             <p>
               已提供分类图例与导入入口。请提供有来源的 WGS84 GeoJSON

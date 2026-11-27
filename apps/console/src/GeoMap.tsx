@@ -19,7 +19,6 @@ import type { Feature, FeatureCollection, Geometry } from "geojson";
 import { GRID, GRID_STEP, pointAlong, TerrainModel } from "./terrain";
 import { RADAR_TILE_ZOOM, WIND_REGION, type WindField } from "./weather";
 import { createWindLayer, WIND_MAX_ZOOM } from "./WindLayer";
-import { useTheme } from "./portal/Theme";
 import type { NavigationOverlay } from "./navigation/engine";
 import type { RealScene } from "./RealRouting";
 import { airspaceKinds } from "./navigation/airspace";
@@ -136,10 +135,6 @@ export type GeoMapProps = {
 
 export default forwardRef<GeoMapHandle, GeoMapProps>(
   function GeoMap(props, ref) {
-    const { theme } = useTheme();
-    const appearance = useRef(theme);
-    appearance.current = theme;
-    const loadedTheme = useRef(theme);
     const root = useRef<HTMLDivElement>(null);
     const runtime = useRef<{
       map: LibreMap;
@@ -280,7 +275,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       try {
         map = new maplibregl.Map({
           container: root.current!,
-          style: offline(appearance.current === "dark"),
+          style: offline(false),
           center: enuToLngLat([1500, 1500]),
           zoom: 14.1,
           pitch: dynamic.current.mode === "3d" ? 55 : 0,
@@ -841,10 +836,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         const timeout = window.setTimeout(() => abort.abort(), 12000);
         state("正在连接真实底图");
         try {
-          const response = await fetch(
-            appearance.current === "dark" ? CARTO_NIGHT_STYLE : CARTO_STYLE,
-            { signal: abort.signal },
-          );
+          const response = await fetch(CARTO_STYLE, { signal: abort.signal });
           if (!response.ok) throw new Error();
           const style = (await response.json()) as StyleSpecification;
           if (
@@ -865,7 +857,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           map.setStyle(style, { diff: false });
         } catch {
           if (!disposed && generation === styleGeneration) {
-            map.setStyle(offline(appearance.current === "dark"), {
+            map.setStyle(offline(false), {
               diff: false,
             });
             state("底图离线 · 坐标可用");
@@ -945,7 +937,13 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
             const el = document.createElement("button");
             el.className = "geo-airspace-label";
             el.style.borderColor = airspaceKinds[r.kind].color;
-            el.textContent = `${r.is_simulated ? "演练 · " : "参考 · "}${r.name}`;
+            el.textContent = `${
+              r.is_simulated
+                ? "演练 · "
+                : r.source_kind === "manufacturer"
+                  ? "FlySafe · "
+                  : "参考 · "
+            }${r.name}`;
             el.title = `${airspaceKinds[r.kind].title} · ${r.source}`;
             el.addEventListener("click", (e) => {
               e.stopPropagation();
@@ -1285,7 +1283,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
                 ? "卫星底图暂不可用 · 主题底图可用"
                 : "卫星实景 · Esri World Imagery"
               : online
-                ? "真实底图 · CARTO"
+                ? "真实底图 · CARTO Positron"
                 : "底图离线 · 坐标可用",
           );
         }
@@ -1560,11 +1558,6 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         runtime.current = null;
       };
     }, []);
-    useEffect(() => {
-      if (loadedTheme.current === theme) return;
-      loadedTheme.current = theme;
-      void runtime.current?.reload(true);
-    }, [theme]);
     useEffect(() => {
       const map = runtime.current?.map;
       if (map)

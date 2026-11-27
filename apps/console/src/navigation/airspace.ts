@@ -72,7 +72,9 @@ export type ConstraintSnapshotData = {
     | "known_empty"
     | "user_imported"
     | "simulation_preset"
-    | "query_failed";
+    | "query_failed"
+    | "manufacturer_reference"
+    | "unavailable";
   is_simulated: boolean;
   fetched_at: string;
   zone_buffer_m: number;
@@ -110,6 +112,7 @@ export type AirspaceCheckData = {
     | "no_enforced_zones_in_snapshot"
     | "snapshot_not_loaded"
     | "query_failed"
+    | "unavailable"
     | "not_checked_legacy";
   passed_known_snapshot: boolean | null;
   operationally_approved: boolean;

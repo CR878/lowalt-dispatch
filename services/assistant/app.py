@@ -140,6 +140,16 @@ class CorridorSimulationInput(BaseModel):
     scheduled_for: str | None = None
 
 
+class FlySafeQueryInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    origin: list[float] = Field(min_length=2, max_length=2)
+    destination: list[float] = Field(min_length=2, max_length=2)
+    zone_buffer_m: float = Field(default=0.0, ge=0.0, le=500.0)
+    scheduled_for: str | None = None
+    drone: str | None = Field(default=None, max_length=64)
+    preserve_snapshot_id: str | None = Field(default=None, max_length=64)
+
+
 class RouteAirspaceCheckInput(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     waypoints: list[list[float]] = Field(min_length=2, max_length=1000)
@@ -253,6 +263,74 @@ def simulate_corridor_airspace(body: CorridorSimulationInput):
         "added_zone_id": zone.id,
         "route_check": route_check,
         "dispatch_enabled": False,
+    }
+
+
+@app.post("/api/assistant/airspace/flysafe")
+def query_flysafe_zones(body: FlySafeQueryInput):
+    """Query DJI FlySafe for the planning bbox and store a manufacturer-reference snapshot.
+
+    Disabled processes (``AERIS_FLYSAFE_LIVE=0``) do not contact the network and
+    do not replace the active snapshot. Failures and empty results are
+    ``unavailable`` with no invented geometry.
+    """
+    from services.assistant.flysafe import (
+        FLYSAFE_SOURCE,
+        flysafe_live_enabled,
+        refresh_planning_snapshot,
+    )
+
+    if not flysafe_live_enabled():
+        return {
+            "status": "disabled",
+            "snapshot": None,
+            "reason": "本进程未开启大疆 FlySafe 实时查询（AERIS_FLYSAFE_LIVE=0），未编造围栏",
+            "reference_label": FLYSAFE_SOURCE,
+            "dispatch_enabled": False,
+            "operationally_approved": False,
+        }
+    prior = None
+    if body.preserve_snapshot_id:
+        try:
+            prior = airspace_store.get(body.preserve_snapshot_id)
+        except KeyError:
+            prior = airspace_store.get_active()
+    else:
+        prior = airspace_store.get_active()
+    try:
+        snap = refresh_planning_snapshot(
+            body.origin,
+            body.destination,
+            zone_buffer_m=body.zone_buffer_m,
+            scheduled_for=body.scheduled_for,
+            prior=prior,
+            drone=body.drone,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if snap is None:
+        raise HTTPException(503, "大疆 FlySafe 查询没有执行，未编造围栏")
+    snap = airspace_store.save(snap, set_active=True)
+    write_audit(
+        {
+            "type": "airspace_flysafe_query",
+            "snapshot_id": snap.snapshot_id,
+            "digest": snap.digest,
+            "source_status": snap.source_status,
+            "total_zone_count": snap.total_zone_count,
+            "enforced_zone_count": snap.enforced_zone_count,
+            "failure_reason": snap.failure_reason,
+            "reference_label": FLYSAFE_SOURCE,
+            "dispatch_enabled": False,
+        }
+    )
+    return {
+        "status": snap.source_status,
+        "snapshot": snap.model_dump(mode="json"),
+        "reference_label": FLYSAFE_SOURCE,
+        "reason": snap.failure_reason,
+        "dispatch_enabled": False,
+        "operationally_approved": False,
     }
 
 
@@ -521,6 +599,17 @@ def refresh_intake_route(
             zone_buffer_m=body.zone_buffer_m if (body and body.zone_buffer_m is not None) else 0.0,
             scheduled_for=intake.get("scheduled_for"),
         )
+        from services.assistant.flysafe import refresh_planning_snapshot
+
+        refreshed = refresh_planning_snapshot(
+            list(origin),
+            list(destination),
+            zone_buffer_m=target_snapshot.zone_buffer_m,
+            scheduled_for=intake.get("scheduled_for"),
+            prior=target_snapshot,
+        )
+        if refreshed is not None:
+            target_snapshot = airspace_store.save(refreshed, set_active=True)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 

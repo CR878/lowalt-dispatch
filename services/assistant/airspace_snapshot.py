@@ -53,6 +53,8 @@ SnapshotSourceStatus = Literal[
     "user_imported",
     "simulation_preset",
     "query_failed",
+    "manufacturer_reference",
+    "unavailable",
 ]
 AirspaceCheckStatus = Literal[
     "passed_known_snapshot",
@@ -61,6 +63,7 @@ AirspaceCheckStatus = Literal[
     "no_enforced_zones_in_snapshot",
     "snapshot_not_loaded",
     "query_failed",
+    "unavailable",
     "not_checked_legacy",
 ]
 
@@ -76,6 +79,10 @@ STANDARD_AIRSPACE_GAPS: tuple[str, ...] = (
     "未接入官方 UOM / NOTAM 实时管制与临时空域通告接口",
     "第一阶段按二维全高度保守避让，未做三维高度层放行核验",
     "导入或演练多边形仅代表本次已知边界，不构成现实无禁飞区证明或飞行批准",
+)
+FLYSAFE_REFERENCE_GAP = (
+    "本次区域来自大疆 FlySafe 厂商地理围栏参考，不是法定空域、"
+    "不是官方 UOM / 国家地图官网 / 天地图数据，也不构成飞行批准"
 )
 
 
@@ -601,6 +608,10 @@ def check_route_against_snapshot(
     )
     if scheduled_for is not None:
         model = model.for_schedule(scheduled_for)
+    if model.source_status == "manufacturer_reference":
+        gaps.insert(0, FLYSAFE_REFERENCE_GAP)
+    elif model.source_status == "unavailable":
+        gaps.insert(0, "大疆 FlySafe 查询不可用或结果为空：空域未知，不是放行，未编造围栏")
 
     points = _extract_lonlat_pairs(waypoints) if waypoints else []
     base = {
@@ -631,6 +642,13 @@ def check_route_against_snapshot(
             "verdict_label": "空域约束读取失败（空域未核对，非通过）",
             "gaps": [f"空域约束源读取失败：{model.failure_reason or '原因未知'}", *gaps],
         }
+    if model.source_status == "unavailable":
+        return base | {
+            "status": "unavailable",
+            "passed_known_snapshot": None,
+            "verdict_label": "大疆 FlySafe 厂商地理围栏不可用或为空（空域未知，不是放行）",
+            "gaps": [f"大疆 FlySafe：{model.failure_reason or '原因未知'}", *gaps],
+        }
     if model.source_status == "not_loaded":
         return base | {
             "status": "snapshot_not_loaded",
@@ -648,10 +666,16 @@ def check_route_against_snapshot(
 
     enforced_zones = [z for z in model.zones if z.participates_in_avoidance]
     if not enforced_zones:
+        no_enforced_label = "快照中无生效禁飞/内部管制区（仅含提示类或已过有效期区域；非官方放行）"
+        if model.source_status == "manufacturer_reference":
+            no_enforced_label = (
+                "通过本次已知区域检查（大疆 FlySafe 厂商地理围栏参考中无生效禁飞区；"
+                "非法定空域，不代表获准飞行）"
+            )
         return base | {
             "status": "no_enforced_zones_in_snapshot",
             "passed_known_snapshot": True,
-            "verdict_label": "快照中无生效禁飞/内部管制区（仅含提示类或已过有效期区域；非官方放行）",
+            "verdict_label": no_enforced_label,
             "gaps": [
                 f"已载入 {model.total_zone_count} 个区域，但当前时段无参与硬避让的禁飞区/内部管制区",
                 *gaps,
@@ -741,7 +765,15 @@ def check_route_against_snapshot(
             "gaps": gaps,
         }
 
-    sim_tag = "（含演练区域）" if model.is_simulated else "（用户导入区域）"
+    if model.source_status == "manufacturer_reference":
+        sim_tag = "（大疆 FlySafe 厂商地理围栏参考"
+        if model.is_simulated:
+            sim_tag += "，并含演练附加区"
+        sim_tag += "；非法定空域，不代表获准飞行）"
+    elif model.is_simulated:
+        sim_tag = "（含演练区域）"
+    else:
+        sim_tag = "（用户导入区域）"
     return base | {
         "status": "passed_known_snapshot",
         "passed_known_snapshot": True,
