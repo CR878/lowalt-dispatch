@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "source_commit": "be1b3d39b668deffae78b2de77425454338e805d",
-  "source_worktree_dirty": true,
+  "source_commit": "1b2b4cb6cf7f1063b2800a61af8d47fa79837989",
+  "source_worktree_dirty": false,
   "source_hashes": {
     "apps/console/scripts/export_scene.py": "44767509df2492ab779e503046d87252990acd63dd3db1b548ebd958a49a0d9a",
     "apps/console/scripts/export_task_evidence.py": "32240df8be4c5bad766f07a2e55d0665c59d6264afda936e0310fb8bbe427740",
@@ -80,7 +80,7 @@
         "provenance": {
           "source": "sim:scenario_v0",
           "version": "v0",
-          "captured_at": "2026-11-27T12:46:05.972510Z",
+          "captured_at": "2026-11-27T12:47:18.889221Z",
           "valid_from": null,
           "valid_until": null,
           "is_simulated": true,
@@ -88,9 +88,9 @@
         }
       },
       "snapshot": {
-        "snapshot_id": "SNAP-S1-02-20261127T124605",
-        "captured_at": "2026-11-27T12:46:05.972510Z",
-        "valid_until": "2026-11-27T13:16:05.972510Z",
+        "snapshot_id": "SNAP-S1-02-20261127T124718",
+        "captured_at": "2026-11-27T12:47:18.889221Z",
+        "valid_until": "2026-11-27T13:17:18.889221Z",
         "landing_sites": [
           {
             "site_id": "L1",
@@ -113,7 +113,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -141,7 +141,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -169,7 +169,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -197,7 +197,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -211,7 +211,7 @@
       "route": {
         "route_id": "T-S1-02-evidence-v1",
         "plan_version": "evidence-v1",
-        "snapshot_id": "SNAP-S1-02-20261127T124605",
+        "snapshot_id": "SNAP-S1-02-20261127T124718",
         "algorithm": "astar_diversion",
         "waypoints": [
           {
@@ -2566,7 +2566,7 @@
         ],
         "energy_budget_wh": 240.0,
         "diversion_site_id": null,
-        "valid_until": "2026-11-27T13:16:05.972510Z",
+        "valid_until": "2026-11-27T13:17:18.889221Z",
         "checks": []
       }
     },
@@ -2620,7 +2620,7 @@
         "provenance": {
           "source": "sim:scenario_v0",
           "version": "v0",
-          "captured_at": "2026-11-27T12:46:05.972510Z",
+          "captured_at": "2026-11-27T12:47:18.889221Z",
           "valid_from": null,
           "valid_until": null,
           "is_simulated": true,
@@ -2628,9 +2628,9 @@
         }
       },
       "snapshot": {
-        "snapshot_id": "SNAP-S1-01-20261127T124605",
-        "captured_at": "2026-11-27T12:46:05.972510Z",
-        "valid_until": "2026-11-27T13:16:05.972510Z",
+        "snapshot_id": "SNAP-S1-01-20261127T124718",
+        "captured_at": "2026-11-27T12:47:18.889221Z",
+        "valid_until": "2026-11-27T13:17:18.889221Z",
         "landing_sites": [
           {
             "site_id": "L1",
@@ -2653,7 +2653,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -2681,7 +2681,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -2709,7 +2709,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -2737,7 +2737,7 @@
             "provenance": {
               "source": "sim:scenario_v0",
               "version": "v0",
-              "captured_at": "2026-11-27T12:46:05.972510Z",
+              "captured_at": "2026-11-27T12:47:18.889221Z",
               "valid_from": null,
               "valid_until": null,
               "is_simulated": true,
@@ -2751,7 +2751,7 @@
       "route": {
         "route_id": "T-S1-01-evidence-v1",
         "plan_version": "evidence-v1",
-        "snapshot_id": "SNAP-S1-01-20261127T124605",
+        "snapshot_id": "SNAP-S1-01-20261127T124718",
         "algorithm": "astar_static",
         "waypoints": [
           {
@@ -5151,7 +5151,7 @@
         ],
         "energy_budget_wh": 240.0,
         "diversion_site_id": null,
-        "valid_until": "2026-11-27T13:16:05.972510Z",
+        "valid_until": "2026-11-27T13:17:18.889221Z",
         "checks": []
       }
     }
@@ -5161,9 +5161,9 @@
       "task_id": "T-S1-02",
       "route_id": "T-S1-02-evidence-v1",
       "plan_version": "evidence-v1",
-      "snapshot_id": "SNAP-S1-02-20261127T124605",
-      "route_digest": "bd545191f650c83aecc0cd29420b2f0f29a969165eeef2a21b30c058924c2f8f",
-      "verified_at": "2026-11-27T12:46:05.972510Z",
+      "snapshot_id": "SNAP-S1-02-20261127T124718",
+      "route_digest": "9a2c7c07aad369e751f7ddcba993bc09b2518e0805f713ed801082556f2de8b8",
+      "verified_at": "2026-11-27T12:47:18.889221Z",
       "vehicle_state_ts": null,
       "checks": [
         {
@@ -5207,9 +5207,9 @@
       "task_id": "T-S1-01",
       "route_id": "T-S1-01-evidence-v1",
       "plan_version": "evidence-v1",
-      "snapshot_id": "SNAP-S1-01-20261127T124605",
-      "route_digest": "9900b61e7a2da1ef2aa0d750624e0f0e7276b3099448d3546ec216d41c00c419",
-      "verified_at": "2026-11-27T12:46:05.972510Z",
+      "snapshot_id": "SNAP-S1-01-20261127T124718",
+      "route_digest": "c3a913213a34ef35f466aef258bbb4ece3f487b28e3bd3f9c5e9275d6c4209d4",
+      "verified_at": "2026-11-27T12:47:18.889221Z",
       "vehicle_state_ts": null,
       "checks": [
         {
@@ -5256,7 +5256,7 @@
       "task_id": "T-S1-02",
       "scenario_id": "S1-02",
       "source": "planner/diversion.py (astar_diversion) + validator/checks.py / scenarios/v0",
-      "generated_at": "2026-11-27T12:46:05.972510+00:00",
+      "generated_at": "2026-11-27T12:47:18.889221+00:00",
       "origin": "中心物资站",
       "destination": "河东救援点",
       "payload_kg": 0.8,
@@ -5264,7 +5264,7 @@
       "algorithm": "astar_diversion",
       "verdict": "passed",
       "route_id": "T-S1-02-evidence-v1",
-      "route_digest": "bd545191f650c83aecc0cd29420b2f0f29a969165eeef2a21b30c058924c2f8f",
+      "route_digest": "9a2c7c07aad369e751f7ddcba993bc09b2518e0805f713ed801082556f2de8b8",
       "length_m": 3680.2937675242692,
       "waypoints": [
         [
@@ -7519,14 +7519,14 @@
       ],
       "dispatch_enabled": false,
       "is_simulated": true,
-      "revision": "341b5d712212b55e6633842ac6a7b5b38b1935bcb036f67fc600170aa090ba72"
+      "revision": "1531230ed8406043b26254e08fd28ad6c74208f7da93799003aa9b1ec3cceedd"
     },
     "contrast": {
       "case": "contrast",
       "task_id": "T-S1-01",
       "scenario_id": "S1-01",
       "source": "planner/diversion.py (astar_static) + validator/checks.py / scenarios/v0",
-      "generated_at": "2026-11-27T12:46:05.972510+00:00",
+      "generated_at": "2026-11-27T12:47:18.889221+00:00",
       "origin": "中心物资站",
       "destination": "河东救援点",
       "payload_kg": 1.0,
@@ -7534,7 +7534,7 @@
       "algorithm": "astar_static",
       "verdict": "rejected",
       "route_id": "T-S1-01-evidence-v1",
-      "route_digest": "9900b61e7a2da1ef2aa0d750624e0f0e7276b3099448d3546ec216d41c00c419",
+      "route_digest": "c3a913213a34ef35f466aef258bbb4ece3f487b28e3bd3f9c5e9275d6c4209d4",
       "length_m": 3664.823227814083,
       "waypoints": [
         [
@@ -9809,7 +9809,7 @@
       ],
       "dispatch_enabled": false,
       "is_simulated": true,
-      "revision": "758b6f1dbbdf054d85c2d37a767bd1812908d29c714f5201a05533686975aff1"
+      "revision": "9ea656bfa6304f7f699c704c1eac89b826acb6d470a890c35b3dbdc4f15a1a90"
     }
   }
 }
