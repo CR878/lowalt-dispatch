@@ -169,6 +169,10 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         if (!points.length) return;
         const map = runtime.current?.map;
         if (!map) return;
+        if (!map.isStyleLoaded()) {
+          map.once("load", () => runtime.current?.overview(points));
+          return;
+        }
         // The real-route panel can change the workspace width in this same
         // React commit. Fit against its current layout rather than a stale
         // viewport, and render the matching GPU frame below.
@@ -857,9 +861,6 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           map.setStyle(style, { diff: false });
         } catch {
           if (!disposed && generation === styleGeneration) {
-            map.setStyle(offline(false), {
-              diff: false,
-            });
             state("底图离线 · 坐标可用");
           }
         } finally {
