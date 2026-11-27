@@ -169,9 +169,17 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
         if (!points.length) return;
         const map = runtime.current?.map;
         if (!map) return;
+        let attempts = 0;
         const fit = () => {
-          if (!runtime.current?.map) return;
-          const current = runtime.current.map;
+          const current = runtime.current?.map;
+          if (!current) return;
+          // `load` fires once per style. A later overview can see
+          // isStyleLoaded() false while that event will never fire again,
+          // which left zone labels at the previous camera and under the sidebar.
+          if (!current.isStyleLoaded()) {
+            if (attempts++ < 12) current.once("idle", fit);
+            return;
+          }
           // The real-route panel can change the workspace width in this same
           // React commit. Fit against its current layout rather than a stale
           // viewport, and render the matching GPU frame below.
@@ -187,8 +195,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           });
           current.redraw();
         };
-        if (map.isStyleLoaded()) fit();
-        else map.once("load", fit);
+        fit();
       },
       reset: () =>
         runtime.current?.map.flyTo({
