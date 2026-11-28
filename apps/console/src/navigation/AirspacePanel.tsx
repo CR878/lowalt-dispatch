@@ -130,8 +130,8 @@ export default function Airspace({
       </div>
       <p className="nav-note">
         计数为本次载入总数，不是当前视野或全国总数；没有数据不表示该地点没有限制，空的
-        FlySafe
-        结果也不是放行。尚未过期的禁飞区与内部管制区会写入服务端约束快照并纳入二维全高度避让，隐藏分类仅影响地图显示、不会取消避让约束，也不会修改飞控电子围栏。
+        FlySafe 结果也不是放行。全国范围的大疆 FlySafe
+        厂商围栏是单独的地图图层，默认打开，不写入这条航线的约束快照，也不跟着工单切换被清掉。尚未过期的禁飞区与内部管制区会写入服务端约束快照并纳入二维全高度避让，隐藏分类仅影响地图显示、不会取消避让约束，也不会修改飞控电子围栏。
       </p>
       {nav.activeSnapshot &&
         nav.activeSnapshot.source_status !== "not_loaded" && (

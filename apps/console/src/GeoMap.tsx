@@ -104,6 +104,8 @@ export type WeatherOverlay = {
 export type GeoMapProps = {
   onAirspaceSelect?: (id: string) => void;
   navigation?: NavigationOverlay | null;
+  nationalFlysafe?: FeatureCollection | null;
+  nationalFlysafeKey?: string;
   onManualMove?: () => void;
   mode: ViewMode;
   basemap: Basemap;
@@ -897,7 +899,50 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
       let lastRealRoute = "";
       let lastRealConflictKey = "";
       let lastAirspaces = "";
+      let lastNational = "";
       let airspaceLabels: maplibregl.Marker[] = [];
+      const nationalRed = "#d64545";
+      function syncNationalFlysafe() {
+        if (!mapReady) return;
+        const overlay = dynamic.current.nationalFlysafe;
+        const key = dynamic.current.nationalFlysafeKey ?? "";
+        const features = overlay?.features ?? [];
+        if (key !== lastNational || !map.getSource("flysafe-national")) {
+          lastNational = key;
+          source(
+            "flysafe-national",
+            features.length
+              ? overlay!
+              : { type: "FeatureCollection", features: [] },
+          );
+          if (!map.getLayer("flysafe-national-fill"))
+            map.addLayer({
+              id: "flysafe-national-fill",
+              type: "fill",
+              source: "flysafe-national",
+              paint: {
+                "fill-color": nationalRed,
+                "fill-opacity": 0.46,
+              },
+            });
+          if (!map.getLayer("flysafe-national-outline"))
+            map.addLayer({
+              id: "flysafe-national-outline",
+              type: "line",
+              source: "flysafe-national",
+              paint: {
+                "line-color": nationalRed,
+                "line-width": 1.8,
+              },
+            });
+          addBelowDemo("flysafe-national-fill");
+          addBelowDemo("flysafe-national-outline");
+        }
+        const visible =
+          dynamic.current.layers.restrictions && features.length > 0;
+        setLayerVisibility("flysafe-national-fill", visible);
+        setLayerVisibility("flysafe-national-outline", visible);
+      }
       function syncNavigation() {
         if (!mapReady) return;
         const nav = dynamic.current.navigation;
@@ -1293,6 +1338,7 @@ export default forwardRef<GeoMapHandle, GeoMapProps>(
           p.liveMode || !p.layers.scan || !p.playing || p.reducedMotion,
         );
         syncOverlays();
+        syncNationalFlysafe();
         syncNavigation();
         if (p.navigation?.aircraft) {
           droneEl.hidden = !mapReady;

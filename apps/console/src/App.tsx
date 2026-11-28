@@ -7,6 +7,7 @@ import {
   type AirspaceRegion,
   type ConstraintSnapshotData,
 } from "./navigation/airspace";
+import type { FeatureCollection } from "geojson";
 import { DispatchPanel, rememberedDispatchTask } from "./DispatchPanel";
 import { useTheme } from "./portal/Theme";
 import {
@@ -716,6 +717,10 @@ export default function App({
       ? intakeSelection.id
       : null;
   const [planningRegions, setPlanningRegions] = useState<AirspaceRegion[]>([]);
+  const [nationalFlysafe, setNationalFlysafe] =
+    useState<FeatureCollection | null>(null);
+  const [nationalFlysafeKey, setNationalFlysafeKey] = useState("");
+  const [nationalFlysafeNote, setNationalFlysafeNote] = useState("");
   const [activeSnapshot, setActiveSnapshot] =
     useState<ConstraintSnapshotData | null>(null);
   const [corridorBusy, setCorridorBusy] = useState(false);
@@ -1122,6 +1127,57 @@ export default function App({
     realSchedule,
     applyAirspaceSnapshot,
   ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const adopt = (data: {
+      status?: string;
+      note?: string;
+      fetched_at?: string | null;
+      zone_count?: number;
+      incomplete?: boolean;
+      features?: FeatureCollection;
+    }) => {
+      const features = data.features?.features;
+      if (Array.isArray(features) && features.length && data.features) {
+        setNationalFlysafe(data.features);
+        setNationalFlysafeKey(
+          `${data.fetched_at ?? ""}|${data.zone_count ?? features.length}|${data.incomplete ? 1 : 0}`,
+        );
+        setNationalFlysafeNote(data.note || "");
+      } else if (
+        data.note &&
+        data.status !== "disabled" &&
+        data.status !== "empty"
+      ) {
+        setNationalFlysafeNote(data.note);
+      }
+    };
+    const headers = { "X-Aeris-Request": "1" };
+    void fetch("/api/assistant/airspace/flysafe/national", { headers })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        adopt(data);
+        if (data.status === "disabled") return;
+        return fetch("/api/assistant/airspace/flysafe/national", {
+          method: "POST",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ force: false }),
+        });
+      })
+      .then((res) => (res && "ok" in res ? (res.ok ? res.json() : null) : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        adopt(data);
+      })
+      .catch(() => {
+        /* Keep whatever overlay is already on the map. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const snap = realRouting.result?.constraint_snapshot;
@@ -2714,6 +2770,8 @@ export default function App({
                       ? nav.overlay
                       : null
                   }
+                  nationalFlysafe={nationalFlysafe}
+                  nationalFlysafeKey={nationalFlysafeKey}
                   onAirspaceSelect={(id) => {
                     nav.setSelectedRegion(id);
                     nav.setOpen(true);
@@ -3146,6 +3204,15 @@ export default function App({
                   {coordinate[1].toFixed(5)}° N
                 </div>
               </div>
+              {nationalFlysafeNote ? (
+                <p
+                  className="map-bottom-note"
+                  role="status"
+                  data-testid="flysafe-national-note"
+                >
+                  {nationalFlysafeNote}
+                </p>
+              ) : null}
               <div className="map-bottom-note">
                 <span>
                   {!liveMode && demoVisible && layers.restrictions

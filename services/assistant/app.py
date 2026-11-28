@@ -334,6 +334,42 @@ def query_flysafe_zones(body: FlySafeQueryInput):
     }
 
 
+class FlySafeNationalInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    force: bool = False
+    drone: str | None = Field(default=None, max_length=64)
+
+
+@app.get("/api/assistant/airspace/flysafe/national")
+def read_flysafe_national_overlay():
+    """Return the cached China-wide display overlay. Does not query DJI or planning."""
+
+    from services.assistant.flysafe_national import read_national_overlay
+
+    return read_national_overlay()
+
+
+@app.post("/api/assistant/airspace/flysafe/national")
+def refresh_flysafe_national_overlay(body: FlySafeNationalInput):
+    """Refresh the China-wide display overlay. Never writes the planning snapshot."""
+
+    from services.assistant.flysafe_national import refresh_national_overlay
+
+    result = refresh_national_overlay(force=body.force, drone=body.drone)
+    write_audit(
+        {
+            "type": "airspace_flysafe_national",
+            "status": result["status"],
+            "zone_count": result["zone_count"],
+            "incomplete": result["incomplete"],
+            "retained_prior": result["retained_prior"],
+            "reference_label": result["reference_label"],
+            "dispatch_enabled": False,
+        }
+    )
+    return result
+
+
 @app.post("/api/assistant/airspace/check")
 def check_airspace_route(body: RouteAirspaceCheckInput):
     try:
