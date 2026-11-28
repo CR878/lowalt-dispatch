@@ -292,6 +292,42 @@ def build_presentation(question: str, results: dict[str, dict]) -> Presentation:
                 note="本地 ENU 坐标下的几何预览，完整校验见任务流程。",
             )
         )
+    airspace_audit = results.get("inspect_airspace_constraints")
+    if isinstance(airspace_audit, dict) and airspace_audit.get("status") == "ok":
+        snap = airspace_audit.get("constraint_snapshot") or {}
+        check = airspace_audit.get("airspace_check") or {}
+        rows: list[list[str | float | None]] = [
+            ["快照 ID", snap.get("snapshot_id") or "无（历史建筑避障记录）"],
+            ["快照摘要", (snap.get("digest") or "—")[:27]],
+            ["纳入避让区域", f"{snap.get('enforced_zone_count', 0)} / {snap.get('total_zone_count', 0)} 个"],
+            [
+                "数据来源",
+                "大疆 FlySafe 厂商地理围栏参考"
+                if snap.get("source_status") == "manufacturer_reference"
+                else (snap.get("source_status") or "—"),
+            ],
+            ["核查结论", check.get("verdict_label") or check.get("status") or "—"],
+        ]
+        prev = airspace_audit.get("previous_version")
+        if isinstance(prev, dict):
+            prev_check = prev.get("rechecked_airspace_check") or {}
+            segs = prev_check.get("conflicting_segment_indices") or []
+            if segs:
+                rows.append(
+                    [
+                        f"原路线 {prev.get('version_label', 'v1')} 冲突航段",
+                        "、".join(f"第 {idx + 1} 段" for idx in segs[:6]),
+                    ]
+                )
+        blocks.append(
+            TableBlock(
+                title="空域约束与航段核查",
+                source=airspace_audit.get("source", "inspect_airspace_constraints"),
+                columns=["核查项", "当前记录"],
+                rows=rows,
+                note="仅针对本次绑定的已知区域快照；未接入官方 UOM/NOTAM，不构成飞行批准。",
+            )
+        )
     env = results.get("assess_route_environment")
     priority: list[UIBlock] = []
     if isinstance(env, dict) and env.get("factors"):

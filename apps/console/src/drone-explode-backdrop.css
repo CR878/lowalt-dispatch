@@ -229,11 +229,12 @@ html[data-drone-bg="on"] .demo-algo {
 }
 
 html:has(.app) .drone-bg-pill {
-  top: 19px;
-  bottom: auto;
+  top: auto;
+  bottom: 22px;
+  left: 50%;
   right: auto;
-  left: 62%;
   transform: translateX(-50%);
+  z-index: 24;
 }
 
 html:has(.aeris-demo.demo-capture) .drone-bg-pill {
